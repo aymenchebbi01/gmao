@@ -1,0 +1,115 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Fields:
+//   - uid: string (required)
+//   - username: string (required)
+//   - displayName: string
+//   - role: string (admin, manager, technician)
+//   - password: string (hashed, server-only)
+//
+// Collection: machines
+// Fields:
+//   - name: string (required)
+//   - serialNumber: string (required)
+//   - status: string (operational, down, maintenance, retired)
+//   - location: string
+//   - type: string
+//   ...
+//
+// Collection: workOrders
+// Fields:
+//   - title: string (required)
+//   - machineId: string (required)
+//   - status: string (pending, in-progress, completed, cancelled)
+//   ...
+//
+// Collection: spareParts
+// Fields:
+//   - name: string (required)
+//   - sku: string (required)
+//   - stock: number (required)
+//   ...
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "chebbi.aymen@esprit.tn" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidMachine(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.serialNumber is string && data.serialNumber.size() > 0 &&
+             data.status in ['operational', 'down', 'maintenance', 'retired'];
+    }
+
+    function isValidWorkOrder(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.machineId is string &&
+             data.status in ['pending', 'in-progress', 'completed', 'cancelled'];
+    }
+
+    function isValidSparePart(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.sku is string &&
+             data.stock is number && data.stock >= 0;
+    }
+
+    // NOTE: The current application uses a custom Express-based authentication system.
+    // To enable secure Firestore access from the client, it is HIGHLY RECOMMENDED 
+    // to integrate Firebase Authentication (e.g., signInWithCustomToken or signInWithPopup).
+    // For now, we allow read/write access with data validation to ensure the app functions,
+    // but these should be restricted to 'isAuthenticated()' once Auth is integrated.
+
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true; // Server-side signup/login needs this
+    }
+
+    match /machines/{machineId} {
+      allow read: if true;
+      allow create, update: if isValidMachine(request.resource.data);
+      allow delete: if true; 
+    }
+
+    match /workOrders/{orderId} {
+      allow read: if true;
+      allow create, update: if isValidWorkOrder(request.resource.data);
+      allow delete: if true;
+    }
+
+    match /spareParts/{partId} {
+      allow read: if true;
+      allow create, update: if isValidSparePart(request.resource.data);
+      allow delete: if true;
+    }
+
+    match /faultTypes/{faultId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Fallback for any other collections to prevent "Missing or insufficient permissions" during development
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

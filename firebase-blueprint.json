@@ -1,0 +1,121 @@
+{
+  "entities": {
+    "Machine": {
+      "title": "Machine",
+      "description": "Industrial equipment or machinery",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "type": { "type": "string" },
+        "manufacturingYear": { "type": "number" },
+        "location": { "type": "string" },
+        "condition": { "type": "string", "enum": ["Excellent", "Good", "Fair", "Poor"] },
+        "clampingForce": { "type": "number" },
+        "status": { "type": "string", "enum": ["operational", "down", "maintenance", "retired"] },
+        "lastMaintenance": { "type": "string", "format": "date-time" },
+        "nextMaintenance": { "type": "string", "format": "date-time" },
+        "manualUrl": { "type": "string", "format": "uri" },
+        "imageUrl": { "type": "string", "format": "uri" },
+        "preventivePlan": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "type": "string", "enum": ["inspection", "cleaning", "lubrication", "replacement", "adjustment"] },
+              "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly", "quarterly", "yearly"] },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "serialNumber", "status"]
+    },
+    "WorkOrder": {
+      "title": "Work Order",
+      "description": "Maintenance intervention task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "machineId": { "type": "string" },
+        "machineName": { "type": "string" },
+        "type": { "type": "string", "enum": ["corrective", "preventive"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "status": { "type": "string", "enum": ["pending", "in-progress", "completed", "cancelled"] },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "assignedName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "parentFaultId": { "type": "string" },
+        "childFaultIds": { "type": "array", "items": { "type": "string" } },
+        "intervention": {
+          "type": "object",
+          "properties": {
+            "actions": { "type": "string" },
+            "partsUsed": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "partId": { "type": "string" },
+                  "name": { "type": "string" },
+                  "quantity": { "type": "number" }
+                }
+              }
+            },
+            "startTime": { "type": "string", "format": "date-time" },
+            "endTime": { "type": "string", "format": "date-time" },
+            "durationMinutes": { "type": "number" },
+            "comments": { "type": "string" },
+            "completedAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      },
+      "required": ["machineId", "type", "priority", "status", "title"]
+    },
+    "SparePart": {
+      "title": "Spare Part",
+      "description": "Inventory item for maintenance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "sku": { "type": "string" },
+        "category": { "type": "string" },
+        "location": { "type": "string" },
+        "stock": { "type": "number" },
+        "minStock": { "type": "number" },
+        "unit": { "type": "string" },
+        "price": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "sku", "stock"]
+    },
+    "User": {
+      "title": "User",
+      "description": "System user with role",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "manager", "technician"] },
+        "password": { "type": "string", "description": "Hashed password for custom auth" }
+      },
+      "required": ["uid", "username", "role"]
+    }
+  },
+  "firestore": {
+    "/machines": { "schema": "Machine", "description": "Industrial equipment" },
+    "/workOrders": { "schema": "WorkOrder", "description": "Maintenance tasks" },
+    "/spareParts": { "schema": "SparePart", "description": "Inventory of parts" },
+    "/users": { "schema": "User", "description": "User profiles and roles" }
+  }
+}

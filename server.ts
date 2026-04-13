@@ -1,0 +1,637 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { createServer as createViteServer } from 'vite';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import cookieParser from 'cookie-parser';
+import multer from 'multer';
+import fs from 'fs';
+import db from './db.js';
+
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = Number(process.env.PORT) || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'gmao-pro-secret-key-2026';
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
+
+// Ensure 3D coordinates column exists
+try {
+  const tableInfo = db.prepare("PRAGMA table_info(machines)").all();
+  const hasPosition3d = tableInfo.some((col: any) => col.name === 'position3d');
+  if (!hasPosition3d) {
+    db.prepare("ALTER TABLE machines ADD COLUMN position3d TEXT").run();
+    console.log("Added position3d column to machines table");
+  }
+  const hasSiteNumber = tableInfo.some((col: any) => col.name === 'siteNumber');
+  if (!hasSiteNumber) {
+    db.prepare("ALTER TABLE machines ADD COLUMN siteNumber VARCHAR(255)").run();
+    console.log("Added siteNumber column to machines table");
+  }
+} catch (error) {
+  console.error("Migration error:", error);
+}
+
+// Multer storage config
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  }
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(cookieParser());
+app.use('/uploads', express.static(uploadsDir));
+
+// --- Audit Logging Helper ---
+function logAction(userId: string | undefined, username: string | undefined, action: string, entityType: string, entityId: string, details: string) {
+  try {
+    db.prepare(
+      'INSERT INTO audit_logs (userId, username, action, entityType, entityId, details) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(userId, username, action, entityType, entityId, details);
+  } catch (error) {
+    console.error('Audit logging failed:', error);
+  }
+}
+
+// --- Auth Routes ---
+
+app.post('/api/auth/signup', async (req, res) => {
+  try {
+    const { username, password, displayName, role } = req.body;
+
+    // Check if user exists
+    const existing = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    if (existing) {
+      return res.status(400).json({ error: 'Username already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const uid = Math.random().toString(36).substring(2, 15);
+
+    db.prepare(
+      'INSERT INTO users (uid, username, password, displayName, role) VALUES (?, ?, ?, ?, ?)'
+    ).run(uid, username, hashedPassword, displayName, role);
+
+    logAction(uid, username, 'Signup', 'User', uid, `User ${username} signed up`);
+
+    const user = { uid, username, displayName, role };
+    const token = jwt.sign(user, JWT_SECRET, { expiresIn: '7d' });
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    res.status(201).json({ user });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const validPassword = await bcrypt.compare(password, user.password);
+
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    const userProfile = {
+      uid: user.uid,
+      username: user.username,
+      displayName: user.displayName,
+      role: user.role
+    };
+
+    const token = jwt.sign(userProfile, JWT_SECRET, { expiresIn: '7d' });
+
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
+    logAction(user.uid, user.username, 'Login', 'User', user.uid, `User ${user.username} logged in`);
+
+    res.json({ user: userProfile });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('token');
+  res.json({ message: 'Logged out' });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  try {
+    const token = req.cookies.token;
+    if (!token) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    res.json({ user: decoded });
+  } catch (error) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// --- API Routes ---
+
+// Machines
+app.get('/api/machines', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM machines').all() as any[];
+    const parsed = rows.map(row => ({
+      ...row,
+      preventivePlan: row.preventivePlan ? JSON.parse(row.preventivePlan) : [],
+      position3d: row.position3d ? JSON.parse(row.position3d) : null
+    }));
+    res.json(parsed);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/machines', (req, res) => {
+  try {
+    const machine = { ...req.body };
+    if (machine.preventivePlan) {
+      machine.preventivePlan = JSON.stringify(machine.preventivePlan);
+    }
+    const columns = Object.keys(machine).join(', ');
+    const placeholders = Object.keys(machine).map(() => '?').join(', ');
+    const values = Object.values(machine);
+
+    db.prepare(`INSERT INTO machines (${columns}) VALUES (${placeholders})`).run(...values);
+
+    logAction(undefined, 'System', 'Create', 'Machine', machine.id, `Created machine ${machine.name}`);
+
+    // Log initial condition
+    if (machine.condition) {
+      db.prepare(`
+        INSERT INTO machine_condition_history (machineId, previousCondition, newCondition)
+        VALUES (?, ?, ?)
+      `).run(machine.id, null, machine.condition);
+    }
+
+    res.status(201).json({ message: 'Machine created' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.put('/api/machines/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const machine = { ...req.body };
+    machine.updatedAt = new Date().toISOString();
+
+    // Log condition change
+    if (machine.condition !== undefined) {
+      const oldMachine = db.prepare('SELECT condition FROM machines WHERE id = ?').get(id) as any;
+      if (oldMachine && oldMachine.condition !== machine.condition) {
+        db.prepare(`
+          INSERT INTO machine_condition_history (machineId, previousCondition, newCondition)
+          VALUES (?, ?, ?)
+        `).run(id, oldMachine.condition, machine.condition);
+      }
+    }
+
+    if (machine.preventivePlan) {
+      machine.preventivePlan = JSON.stringify(machine.preventivePlan);
+    }
+    if (machine.position3d) {
+      machine.position3d = JSON.stringify(machine.position3d);
+    }
+    const sets = Object.keys(machine).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(machine);
+
+    let userId = 'System';
+    let userName = 'System';
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        if (decoded && decoded.uid) {
+          userId = decoded.uid;
+          userName = decoded.username || decoded.name || 'User';
+        }
+      } catch (e) {
+        console.error("Token verification failed in update machine", e);
+      }
+    }
+
+    db.prepare(`UPDATE machines SET ${sets} WHERE id = ?`).run(...values, id);
+    logAction(userId === 'System' ? undefined : userId, userName, 'Update', 'Machine', id, `Updated machine ${id}`);
+    res.json({ message: 'Machine updated' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/machines/:id/condition-history', (req, res) => {
+  try {
+    const { id } = req.params;
+    const rows = db.prepare('SELECT * FROM machine_condition_history WHERE machineId = ? ORDER BY timestamp DESC').all(id);
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/machines/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM machines WHERE id = ?').run(id);
+    logAction(undefined, 'System', 'Delete', 'Machine', id, `Deleted machine ${id}`);
+    res.json({ message: 'Machine deleted' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Work Orders
+app.get('/api/work-orders', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM work_orders').all() as any[];
+    const parsed = rows.map(row => ({
+      ...row,
+      intervention: row.intervention ? JSON.parse(row.intervention) : null,
+      childFaultIds: row.childFaultIds ? JSON.parse(row.childFaultIds) : []
+    }));
+    res.json(parsed);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/work-orders', (req, res) => {
+  try {
+    const workOrder = { ...req.body };
+    if (workOrder.intervention) {
+      workOrder.intervention = JSON.stringify(workOrder.intervention);
+    }
+    if (workOrder.childFaultIds) {
+      workOrder.childFaultIds = JSON.stringify(workOrder.childFaultIds);
+    }
+    const columns = Object.keys(workOrder).join(', ');
+    const placeholders = Object.keys(workOrder).map(() => '?').join(', ');
+    const values = Object.values(workOrder);
+
+    db.prepare(`INSERT INTO work_orders (${columns}) VALUES (${placeholders})`).run(...values);
+    logAction(undefined, 'System', 'Create', 'WorkOrder', workOrder.id, `Created work order ${workOrder.title}`);
+    res.status(201).json({ message: 'Work order created' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.put('/api/work-orders/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const workOrder = { ...req.body };
+    workOrder.updatedAt = new Date().toISOString();
+
+    // Sync with intervention_reports table for analytics
+    if (workOrder.intervention) {
+      const report = workOrder.intervention;
+      const reportData = {
+        workOrderId: id,
+        issuerName: report.issuerName,
+        issuerSector: report.issuerSector,
+        requesterName: report.requesterName,
+        requestDate: report.requestDate,
+        technicians: report.technicians,
+        system: report.system,
+        date: report.date,
+        location: report.location,
+        malfunctionDescription: report.malfunctionDescription,
+        replacement: report.replacement ? 1 : 0,
+        diagnostic: report.diagnostic ? 1 : 0,
+        improvement: report.improvement ? 1 : 0,
+        control: report.control ? 1 : 0,
+        maintenanceType: report.maintenanceType,
+        failureCause: report.failureCause,
+        relatedCause: report.relatedCause,
+        interventionTime: report.interventionTime,
+        actions: report.actions,
+        difficulties: report.difficulties,
+        startTime: report.startTime,
+        endTime: report.endTime,
+        durationMinutes: report.durationMinutes,
+        comments: report.comments,
+        completedAt: report.completedAt || new Date().toISOString()
+      };
+
+      const columns = Object.keys(reportData).join(', ');
+      const placeholders = Object.keys(reportData).map(() => '?').join(', ');
+      const values = Object.values(reportData);
+
+      db.prepare(`INSERT OR REPLACE INTO intervention_reports (${columns}) VALUES (${placeholders})`).run(...values);
+
+      // Handle spare parts
+      if (report.partsUsed && Array.isArray(report.partsUsed)) {
+        db.prepare('DELETE FROM intervention_parts WHERE workOrderId = ?').run(id);
+        const insertPart = db.prepare('INSERT INTO intervention_parts (workOrderId, partId, quantity) VALUES (?, ?, ?)');
+        for (const part of report.partsUsed) {
+          insertPart.run(id, part.partId, part.quantity);
+        }
+      }
+
+      workOrder.intervention = JSON.stringify(workOrder.intervention);
+    }
+
+    if (workOrder.childFaultIds) {
+      workOrder.childFaultIds = JSON.stringify(workOrder.childFaultIds);
+    }
+
+    const sets = Object.keys(workOrder).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(workOrder);
+
+    db.prepare(`UPDATE work_orders SET ${sets} WHERE id = ?`).run(...values, id);
+    logAction(undefined, 'System', 'Update', 'WorkOrder', id, `Updated work order ${id}`);
+    res.json({ message: 'Work order updated' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/work-orders/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM work_orders WHERE id = ?').run(id);
+    logAction(undefined, 'System', 'Delete', 'WorkOrder', id, `Deleted work order ${id}`);
+    res.json({ message: 'Work order deleted' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Spare Parts
+app.get('/api/spare-parts', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM spare_parts').all();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/spare-parts', (req, res) => {
+  try {
+    const part = req.body;
+    const columns = Object.keys(part).join(', ');
+    const placeholders = Object.keys(part).map(() => '?').join(', ');
+    const values = Object.values(part);
+
+    db.prepare(`INSERT INTO spare_parts (${columns}) VALUES (${placeholders})`).run(...values);
+    logAction(undefined, 'System', 'Create', 'SparePart', part.id, `Created spare part ${part.name}`);
+    res.status(201).json({ message: 'Spare part created' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.put('/api/spare-parts/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const part = { ...req.body };
+    part.updatedAt = new Date().toISOString();
+    const sets = Object.keys(part).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(part);
+
+    db.prepare(`UPDATE spare_parts SET ${sets} WHERE id = ?`).run(...values, id);
+    logAction(undefined, 'System', 'Update', 'SparePart', id, `Updated spare part ${id}`);
+    res.json({ message: 'Spare part updated' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/spare-parts/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM spare_parts WHERE id = ?').run(id);
+    logAction(undefined, 'System', 'Delete', 'SparePart', id, `Deleted spare part ${id}`);
+    res.json({ message: 'Spare part deleted' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Users
+app.get('/api/users', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM users').all();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.put('/api/users/:uid', (req, res) => {
+  try {
+    const { uid } = req.params;
+    const user = { ...req.body };
+    user.updatedAt = new Date().toISOString();
+    const sets = Object.keys(user).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(user);
+
+    db.prepare(`UPDATE users SET ${sets} WHERE uid = ?`).run(...values, uid);
+    res.json({ message: 'User updated' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/users/:uid', (req, res) => {
+  try {
+    const { uid } = req.params;
+    db.prepare('DELETE FROM users WHERE uid = ?').run(uid);
+    res.json({ message: 'User deleted' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// --- Audit Logs ---
+app.get('/api/audit-logs', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM audit_logs ORDER BY createdAt DESC LIMIT 100').all();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// --- Analytics ---
+app.get('/api/analytics/downtime-trends', (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT DATE(completedAt) as date, SUM(durationMinutes) as downtimeMinutes 
+      FROM intervention_reports 
+      WHERE maintenanceType = 'corrective' 
+      GROUP BY DATE(completedAt) 
+      ORDER BY date DESC 
+      LIMIT 30
+    `).all();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/analytics/part-consumption', (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT sp.name as partName, SUM(ip.quantity) as quantity 
+      FROM intervention_parts ip 
+      JOIN spare_parts sp ON ip.partId = sp.id 
+      GROUP BY sp.name 
+      ORDER BY quantity DESC 
+      LIMIT 10
+    `).all();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/analytics/technician-performance', (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT technicians as technicianNames, durationMinutes 
+      FROM intervention_reports 
+      WHERE technicians IS NOT NULL AND technicians != ''
+    `).all();
+
+    const performanceMap: Record<string, { technicianName: string, completedOrders: number, totalDuration: number }> = {};
+
+    rows.forEach((row: any) => {
+      const names = row.technicianNames.split(',').map((n: string) => n.trim()).filter((n: string) => n.length > 0);
+      names.forEach((name: string) => {
+        if (!performanceMap[name]) {
+          performanceMap[name] = { technicianName: name, completedOrders: 0, totalDuration: 0 };
+        }
+        performanceMap[name].completedOrders += 1;
+        performanceMap[name].totalDuration += (row.durationMinutes || 0);
+      });
+    });
+
+    const result = Object.values(performanceMap).map(p => ({
+      technicianName: p.technicianName,
+      completedOrders: p.completedOrders,
+      avgDurationMinutes: Math.round(p.totalDuration / p.completedOrders)
+    })).sort((a, b) => b.completedOrders - a.completedOrders);
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/analytics/mttr-trends', (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT DATE(completedAt) as date, AVG(durationMinutes) as mttrMinutes 
+      FROM intervention_reports 
+      WHERE maintenanceType = 'corrective' 
+      GROUP BY DATE(completedAt) 
+      ORDER BY date ASC 
+      LIMIT 30
+    `).all();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/analytics/mtbf-trends', (req, res) => {
+  try {
+    const failuresPerDay = db.prepare(`
+      SELECT DATE(completedAt) as date, COUNT(*) as failureCount
+      FROM intervention_reports
+      WHERE maintenanceType = 'corrective'
+      GROUP BY DATE(completedAt)
+      ORDER BY date ASC
+      LIMIT 30
+    `).all();
+
+    const machineCount = db.prepare('SELECT COUNT(*) as count FROM machines').get().count || 1;
+    const dailyOperatingMinutesPerMachine = 8 * 60;
+    const totalDailyOperatingMinutes = machineCount * dailyOperatingMinutesPerMachine;
+
+    const rows = failuresPerDay.map((f: any) => ({
+      date: f.date,
+      mtbfHours: f.failureCount > 0 ? Number((totalDailyOperatingMinutes / f.failureCount / 60).toFixed(1)) : Number((totalDailyOperatingMinutes / 60).toFixed(1))
+    }));
+
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// --- File Uploads ---
+app.post('/api/upload', upload.single('file'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({ url: fileUrl });
+});
+
+// --- Vite Integration ---
+
+async function startServer() {
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer();
