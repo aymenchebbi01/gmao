@@ -14,6 +14,7 @@ export default function MobileStatusUpdater({ machineId }: Props) {
     const [updating, setUpdating] = useState(false);
 
     const [view, setView] = useState<'details' | 'status'>('details');
+    const [productInput, setProductInput] = useState('');
 
     useEffect(() => {
         if (!machineId) {
@@ -25,7 +26,10 @@ export default function MobileStatusUpdater({ machineId }: Props) {
             try {
                 const machines = await api.getMachines();
                 const found = machines.find(m => m.id === machineId);
-                if (found) setMachine(found);
+                if (found) {
+                    setMachine(found);
+                    setProductInput(found.injectingProduct || '');
+                }
             } catch (error) {
                 console.error("Failed to fetch machine:", error);
             } finally {
@@ -40,8 +44,8 @@ export default function MobileStatusUpdater({ machineId }: Props) {
         if (!machine) return;
         setUpdating(true);
         try {
-            await api.updateMachine(machine.id, { status: newStatus });
-            setMachine({ ...machine, status: newStatus });
+            await api.updateMachine(machine.id, { status: newStatus, injectingProduct: productInput });
+            setMachine({ ...machine, status: newStatus, injectingProduct: productInput });
             toast.success(`Status updated to ${newStatus}`);
             setView('details'); // Return to details view after updating
         } catch (error) {
@@ -79,8 +83,13 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                 </div>
                 <h1 className="text-3xl font-black mb-2 relative z-10">{machine.name}</h1>
                 <p className="text-blue-100 uppercase tracking-widest text-sm font-bold opacity-80 relative z-10">SN: {machine.serialNumber}</p>
+                {machine.injectingProduct && (
+                    <div className="mt-4 inline-block bg-white/20 backdrop-blur px-4 py-1.5 rounded-full text-sm font-bold border border-white/30 relative z-10">
+                        Product: {machine.injectingProduct}
+                    </div>
+                )}
                 {machine.siteNumber && (
-                    <div className="mt-4 inline-block bg-white/20 backdrop-blur px-4 py-1.5 rounded-full text-sm font-bold tracking-widest border border-white/30 relative z-10">
+                    <div className="mt-4 ml-2 inline-block bg-white/20 backdrop-blur px-4 py-1.5 rounded-full text-sm font-bold tracking-widest border border-white/30 relative z-10">
                         #{machine.siteNumber}
                     </div>
                 )}
@@ -96,8 +105,8 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                                 <span className="block text-xs font-bold text-gray-400 capitalize">Current Status</span>
                                 <div className="flex items-center mt-1">
                                     <span className={`inline-block w-3 h-3 rounded-full mr-2 ${machine.status === 'operational' ? 'bg-green-500' :
-                                            machine.status === 'down' ? 'bg-red-500' :
-                                                machine.status === 'maintenance' ? 'bg-amber-500' : 'bg-purple-500'
+                                        machine.status === 'down' ? 'bg-red-500' :
+                                            machine.status === 'maintenance' ? 'bg-amber-500' : 'bg-purple-500'
                                         }`} />
                                     <span className="font-bold text-gray-900 capitalize">{machine.status}</span>
                                 </div>
@@ -122,10 +131,32 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                 ) : (
                     <div className="mb-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Update Status</h2>
+                            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Update Status & Product</h2>
                             <button onClick={() => setView('details')} className="text-blue-600 text-xs font-bold uppercase tracking-widest hover:underline">
                                 Cancel
                             </button>
+                        </div>
+
+                        <div className="mb-6">
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Injecting Product</label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Enter current product..."
+                                    className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                    value={productInput}
+                                    onChange={(e) => setProductInput(e.target.value)}
+                                />
+                                {productInput !== (machine.injectingProduct || '') && (
+                                    <button
+                                        onClick={() => handleStatusChange(machine.status)}
+                                        disabled={updating}
+                                        className="px-4 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
+                                    >
+                                        Save
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">

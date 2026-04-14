@@ -81,6 +81,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
     id: '',
     name: '',
     serialNumber: '',
+    injectingProduct: '',
     type: 'Simple Injection',
     manufacturingYear: new Date().getFullYear(),
     location: '',
@@ -276,6 +277,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
         id: '',
         name: '',
         serialNumber: '',
+        injectingProduct: '',
         type: 'Simple Injection',
         manufacturingYear: new Date().getFullYear(),
         location: '',
@@ -301,6 +303,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
       id: machine.id || '',
       name: machine.name || '',
       serialNumber: machine.serialNumber || '',
+      injectingProduct: machine.injectingProduct || '',
       type: machine.type || 'Simple Injection',
       manufacturingYear: machine.manufacturingYear || new Date().getFullYear(),
       location: machine.location || '',
@@ -398,6 +401,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                   id: '',
                   name: '',
                   serialNumber: '',
+                  injectingProduct: '',
                   type: 'Simple Injection',
                   manufacturingYear: new Date().getFullYear(),
                   location: '',
@@ -711,7 +715,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                 </div>
 
                 <div className="md:col-span-2 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Machine Name</label>
                       <input
@@ -732,6 +736,16 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                         className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                         value={formData.serialNumber}
                         onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Injecting Product</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Plastic Casing"
+                        className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                        value={formData.injectingProduct || ''}
+                        onChange={(e) => setFormData({ ...formData, injectingProduct: e.target.value })}
                       />
                     </div>
                   </div>

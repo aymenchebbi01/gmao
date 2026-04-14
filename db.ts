@@ -42,6 +42,7 @@ db.exec(`
     failureCount INTEGER DEFAULT 0,
     condition TEXT,
     preventivePlan TEXT,
+    injectingProduct TEXT,
     manualUrl TEXT,
     imageUrl TEXT,
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -176,6 +177,7 @@ db.exec(`
 const migrations = [
   { table: 'machines', column: 'condition', type: 'TEXT' },
   { table: 'machines', column: 'preventivePlan', type: 'TEXT' },
+  { table: 'machines', column: 'injectingProduct', type: 'TEXT' },
   { table: 'machines', column: 'createdAt', type: 'TEXT DEFAULT CURRENT_TIMESTAMP' },
   { table: 'machines', column: 'updatedAt', type: 'TEXT DEFAULT CURRENT_TIMESTAMP' },
   { table: 'work_orders', column: 'intervention', type: 'TEXT' },
@@ -207,11 +209,11 @@ if (userCount.count === 0) {
   const salt = bcrypt.genSaltSync(10);
   const hashedPassword = bcrypt.hashSync('admin', salt);
   const uid = 'admin-uid';
-  
+
   db.prepare(
     'INSERT INTO users (uid, username, password, displayName, role) VALUES (?, ?, ?, ?, ?)'
   ).run(uid, 'admin', hashedPassword, 'Administrator', 'admin');
-  
+
   console.log('Default admin user created: admin / admin');
 }
 

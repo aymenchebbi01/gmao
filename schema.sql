@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS machines (
   totalDownTime INT DEFAULT 0,
   failureCount INT DEFAULT 0,
   manualUrl TEXT,
+  injectingProduct TEXT,
   imageUrl TEXT
 );
 
