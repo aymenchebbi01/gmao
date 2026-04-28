@@ -12,6 +12,7 @@ import AdvancedAnalytics from './components/AdvancedAnalytics';
 import FactoryLayout from './components/FactoryLayout';
 import Login from './components/Login';
 import MobileStatusUpdater from './components/MobileStatusUpdater';
+import PurchaseRequests from './components/PurchaseRequests';
 import { Toaster } from 'sonner';
 import { Machine } from './types';
 import { cn, calculateMachineLiveHours } from './lib/utils';
@@ -100,6 +101,7 @@ function AppContent() {
       case 'work-orders-list': return <WorkOrderList view="list" />;
       case 'intervention-reports': return <WorkOrderList view="reports" />;
       case 'inventory': return <Inventory />;
+      case 'purchase-requests': return isManager ? <PurchaseRequests /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
       case 'calendar': return <MaintenanceCalendar />;
       case 'audit-logs': return isManager ? <AuditLogList /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
       case 'analytics': return <AdvancedAnalytics />;

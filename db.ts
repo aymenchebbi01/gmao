@@ -206,13 +206,11 @@ for (const m of migrations) {
 // Create default admin user if none exists
 const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
 if (userCount.count === 0) {
-  const salt = bcrypt.genSaltSync(10);
-  const hashedPassword = bcrypt.hashSync('admin', salt);
   const uid = 'admin-uid';
 
   db.prepare(
     'INSERT INTO users (uid, username, password, displayName, role) VALUES (?, ?, ?, ?, ?)'
-  ).run(uid, 'admin', hashedPassword, 'Administrator', 'admin');
+  ).run(uid, 'admin', 'admin', 'Administrator', 'admin');
 
   console.log('Default admin user created: admin / admin');
 }

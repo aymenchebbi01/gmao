@@ -15,7 +15,8 @@ import {
   Calendar,
   History,
   BarChart3,
-  Factory
+  Factory,
+  ShoppingCart
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
@@ -82,6 +83,7 @@ export default function Sidebar({
       ]
     },
     { id: 'inventory', label: 'Inventory', icon: Package, roles: ['admin', 'manager'] },
+    { id: 'purchase-requests', label: 'Demande d\'Achat', icon: ShoppingCart, roles: ['admin', 'manager'] },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin', 'manager'] },
     { id: 'audit-logs', label: 'Audit Logs', icon: History, roles: ['admin', 'manager'] },
     { id: 'users', label: 'Users', icon: Users, roles: ['admin', 'manager'] },

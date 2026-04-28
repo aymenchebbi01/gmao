@@ -18,8 +18,10 @@ import { Trash2, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import TableFooter from './ui/TableFooter';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function UserManagement() {
+  const { isAdmin } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -61,8 +63,15 @@ export default function UserManagement() {
 
     try {
       if (isEditMode && formData.uid) {
+        if (formData.password && formData.password.length < 6) {
+          setError('Password must be at least 6 characters');
+          setLoading(false);
+          return;
+        }
+
         await api.updateUser(formData.uid, {
           displayName: formData.displayName,
+          password: formData.password,
           role: formData.role,
           updatedAt: new Date().toISOString()
         });
@@ -108,7 +117,7 @@ export default function UserManagement() {
     setFormData({
       uid: user.uid,
       username: user.username,
-      password: '', // Don't show password
+      password: user.password || '', // Show correct password
       displayName: user.displayName || '',
       role: user.role,
     });
@@ -194,14 +203,14 @@ export default function UserManagement() {
               onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
             />
           </div>
-          {!isEditMode && (
+          {(!isEditMode || isAdmin) && (
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input
-                  type="password"
-                  required
+                  type="text"
+                  required={!isEditMode}
                   placeholder="••••••••"
                   className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                   value={formData.password}

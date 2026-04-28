@@ -84,12 +84,11 @@ app.post('/api/auth/signup', async (req, res) => {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
     const uid = Math.random().toString(36).substring(2, 15);
 
     db.prepare(
       'INSERT INTO users (uid, username, password, displayName, role) VALUES (?, ?, ?, ?, ?)'
-    ).run(uid, username, hashedPassword, displayName, role);
+    ).run(uid, username, password, displayName, role);
 
     logAction(uid, username, 'Signup', 'User', uid, `User ${username} signed up`);
 
@@ -118,9 +117,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    const validPassword = await bcrypt.compare(password, user.password);
-
-    if (!validPassword) {
+    if (password !== user.password) {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
