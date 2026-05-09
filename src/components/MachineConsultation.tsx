@@ -175,8 +175,8 @@ export default function MachineConsultation() {
                                         </td>
                                         <td className="px-6 py-4">
                                             {machine.injectingProduct ? (
-                                                <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-xl border border-emerald-100 w-fit">
-                                                    <Package size={14} className="text-emerald-600" />
+                                                <div className="flex items-center gap-2 p-2 ">
+
                                                     <span className="text-xs font-bold text-emerald-700 font-inter">
                                                         {machine.injectingProduct}
                                                     </span>
