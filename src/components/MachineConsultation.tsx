@@ -87,14 +87,14 @@ export default function MachineConsultation() {
         <div className="space-y-6">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Consultation des produits injectés</h1>
+                    <h1 className="text-2xl font-bold text-gray-900">Injected Product Consultation</h1>
                 </div>
                 <button
                     onClick={fetchMachines}
                     className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded-xl hover:bg-blue-100 transition-all font-inter"
                 >
                     <RefreshCw size={18} className={cn(loading && "animate-spin")} />
-                    Actualiser
+                    Refresh
                 </button>
             </div>
 
@@ -103,7 +103,7 @@ export default function MachineConsultation() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                     <input
                         type="text"
-                        placeholder="Rechercher par produit, numéro de machine, ou nom..."
+                        placeholder="Search by product, machine number, or name..."
                         className="w-full pl-11 pr-4 py-3 text-sm bg-gray-50/50 border border-gray-100 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-inter font-medium"
                         value={searchTerm}
                         onChange={(e) => {
@@ -120,17 +120,17 @@ export default function MachineConsultation() {
                         <thead>
                             <tr className="bg-gray-50/50 border-b border-gray-100">
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                                    Machine
+                                    Machine #
                                 </th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                                    Nom
+                                    Name
                                 </th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Numéro de série</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Serial Number</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                                    Emplacement
+                                    Location
                                 </th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                                    Produit injecté
+                                    Injected Product
                                 </th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right font-inter">Actions</th>
                             </tr>
@@ -182,14 +182,14 @@ export default function MachineConsultation() {
                                                     </span>
                                                 </div>
                                             ) : (
-                                                <span className="text-xs text-gray-400 italic font-inter font-medium tracking-tight">Aucun produit assigné</span>
+                                                <span className="text-xs text-gray-400 italic font-inter font-medium tracking-tight">No product assigned</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <button
                                                 onClick={() => handleEditClick(machine)}
                                                 className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                title="Modifier le produit injecté"
+                                                title="Update Injected Product"
                                             >
                                                 <Edit2 size={16} />
                                             </button>
@@ -203,8 +203,8 @@ export default function MachineConsultation() {
                                             <div className="p-4 bg-gray-50 rounded-full mb-3">
                                                 <Search size={24} className="text-gray-300" />
                                             </div>
-                                            <p className="text-sm font-bold text-gray-900 font-inter">Aucune machine trouvée</p>
-                                            <p className="text-xs text-gray-500 mt-1 font-inter">Essayez de rechercher un autre produit ou numéro.</p>
+                                            <p className="text-sm font-bold text-gray-900 font-inter">No machines found</p>
+                                            <p className="text-xs text-gray-500 mt-1 font-inter">Try searching for a different product or machine number.</p>
                                         </div>
                                     </td>
                                 </tr>
@@ -227,18 +227,18 @@ export default function MachineConsultation() {
             <Modal
                 isOpen={isEditModalOpen}
                 onClose={() => setIsEditModalOpen(false)}
-                title={`Modifier le produit injecté - ${selectedMachine?.name}`}
+                title={`Update Injected Product - ${selectedMachine?.name}`}
             >
                 <div className="space-y-6 p-1">
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1 font-inter">
-                            Nom du produit injecté
+                            Injected Product Name
                         </label>
                         <div className="relative">
                             <Package className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                             <input
                                 type="text"
-                                placeholder="Entrer le nom du produit..."
+                                placeholder="Enter product name..."
                                 className="w-full pl-10 pr-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-inter font-medium"
                                 value={newProduct}
                                 onChange={(e) => setNewProduct(e.target.value)}
@@ -246,7 +246,7 @@ export default function MachineConsultation() {
                             />
                         </div>
                         <p className="mt-2 text-[11px] text-gray-400 ml-1 font-inter">
-                            Ce champ identifie le produit actuellement en cours de production sur cette machine.
+                            This field identifies the product currently being produced on this machine.
                         </p>
                     </div>
 
@@ -255,7 +255,7 @@ export default function MachineConsultation() {
                             onClick={() => setIsEditModalOpen(false)}
                             className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors font-inter"
                         >
-                            Annuler
+                            Cancel
                         </button>
                         <button
                             onClick={handleUpdateProduct}
@@ -270,7 +270,7 @@ export default function MachineConsultation() {
                             ) : (
                                 <Save size={16} />
                             )}
-                            Enregistrer
+                            Save Changes
                         </button>
                     </div>
                 </div>
