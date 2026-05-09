@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { Machine } from '../types';
-import { CheckCircle2, AlertCircle, Clock, Wrench, HardDrive, Loader2, Home } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Clock, Wrench, HardDrive, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Props {
     machineId: string | null;
 }
 
 export default function MobileStatusUpdater({ machineId }: Props) {
+    const { user } = useAuth();
     const [machine, setMachine] = useState<Machine | null>(null);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
+    const hasScanLogged = useRef(false);
 
     const [view, setView] = useState<'details' | 'status'>('details');
     const [productInput, setProductInput] = useState('');
@@ -29,6 +32,21 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                 if (found) {
                     setMachine(found);
                     setProductInput(found.injectingProduct || '');
+
+                    // Log QR scan only once per page load
+                    if (!hasScanLogged.current) {
+                        hasScanLogged.current = true;
+                        const userLabel = user?.displayName || user?.username || 'Unknown User';
+                        try {
+                            await api.logMachineAction(
+                                'SCAN_QR',
+                                found.id,
+                                `User "${userLabel}" scanned QR code and accessed Machine '${found.name}'`
+                            );
+                        } catch (e) {
+                            // Non-critical: don't block UI if audit log fails
+                        }
+                    }
                 }
             } catch (error) {
                 console.error("Failed to fetch machine:", error);
@@ -42,12 +60,26 @@ export default function MobileStatusUpdater({ machineId }: Props) {
 
     const handleStatusChange = async (newStatus: Machine['status']) => {
         if (!machine) return;
+        const oldStatus = machine.status;
         setUpdating(true);
         try {
+            const userLabel = user?.displayName || user?.username || 'Unknown User';
+            // Log status change before updating
+            if (oldStatus !== newStatus) {
+                try {
+                    await api.logMachineAction(
+                        'CHANGE_STATUS',
+                        machine.id,
+                        `User "${userLabel}" changed status of Machine '${machine.name}' from '${oldStatus}' to '${newStatus}'`
+                    );
+                } catch (e) {
+                    // Non-critical
+                }
+            }
             await api.updateMachine(machine.id, { status: newStatus, injectingProduct: productInput });
             setMachine({ ...machine, status: newStatus, injectingProduct: productInput });
             toast.success(`Status updated to ${newStatus}`);
-            setView('details'); // Return to details view after updating
+            setView('details');
         } catch (error) {
             console.error(error);
             toast.error('Failed to update status');

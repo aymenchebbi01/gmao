@@ -1256,7 +1256,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                 </div>
               </div>
 
-              {formData.type === 'corrective' && (
+              {/*{formData.type === 'corrective' && (
                 <div className="space-y-4 p-6 bg-blue-50/50 rounded-2xl border border-blue-100/50">
                   <h4 className="text-sm font-bold text-blue-900 flex items-center gap-2">
                     <AlertTriangle size={16} />
@@ -1301,7 +1301,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                     </div>
                   </div>
                 </div>
-              )}
+              )}*/}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="md:col-span-1">

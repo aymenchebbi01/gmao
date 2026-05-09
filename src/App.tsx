@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import MachineList from './components/MachineList';
+import MachineConsultation from './components/MachineConsultation';
 import WorkOrderList from './components/WorkOrderList';
 import Inventory from './components/Inventory';
 import UserManagement from './components/UserManagement';
@@ -97,13 +98,14 @@ function AppContent() {
       case 'dashboard': return <Dashboard setActiveTab={setActiveTab} />;
       case 'layout': return <FactoryLayout setActiveTab={setActiveTab} setHistoryMachineId={setHistoryMachineId} />;
       case 'machines': return <MachineList historyMachineId={historyMachineId} onHistoryClose={() => setHistoryMachineId(null)} />;
+      case 'consultation': return <MachineConsultation />;
       case 'work-orders':
       case 'work-orders-list': return <WorkOrderList view="list" />;
       case 'intervention-reports': return <WorkOrderList view="reports" />;
       case 'inventory': return <Inventory />;
       case 'purchase-requests': return isManager ? <PurchaseRequests /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
       case 'calendar': return <MaintenanceCalendar />;
-      case 'audit-logs': return isManager ? <AuditLogList /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
+      case 'audit-logs': return isAdmin ? <AuditLogList /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
       case 'analytics': return <AdvancedAnalytics />;
       case 'users': return isManager ? <UserManagement /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
       case 'mobile-status': return <MobileStatusUpdater machineId={deepLinkMachineId} />;

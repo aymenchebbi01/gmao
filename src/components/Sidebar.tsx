@@ -69,9 +69,10 @@ export default function Sidebar({
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'manager', 'technician'] },
-    { id: 'layout', label: 'Factory Layout', icon: Factory, roles: ['admin', 'manager', 'technician'] },
+    { id: 'layout', label: 'Factory Layout', icon: Factory, roles: ['admin', 'manager'] },
     { id: 'machines', label: 'Machines', icon: HardDrive, roles: ['admin', 'manager', 'technician'] },
-    { id: 'calendar', label: 'Calendar', icon: Calendar, roles: ['admin', 'manager', 'technician'] },
+    { id: 'consultation', label: 'Consultation', icon: BarChart3, roles: ['admin', 'manager'] },
+    { id: 'calendar', label: 'Calendar', icon: Calendar, roles: ['admin', 'manager'] },
     {
       id: 'work-orders',
       label: 'Work Orders',
@@ -85,8 +86,8 @@ export default function Sidebar({
     { id: 'inventory', label: 'Inventory', icon: Package, roles: ['admin', 'manager'] },
     { id: 'purchase-requests', label: 'Demande d\'Achat', icon: ShoppingCart, roles: ['admin', 'manager'] },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin', 'manager'] },
-    { id: 'audit-logs', label: 'Audit Logs', icon: History, roles: ['admin', 'manager'] },
-    { id: 'users', label: 'Users', icon: Users, roles: ['admin', 'manager'] },
+    { id: 'audit-logs', label: 'Audit Logs', icon: History, roles: ['admin'] },
+    { id: 'users', label: 'Users', icon: Users, roles: ['admin'] },
   ];
 
   const filteredItems = menuItems.filter(item => item.roles.includes(currentUser?.role || ''));

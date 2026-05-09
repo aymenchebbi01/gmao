@@ -1,8 +1,8 @@
-import { 
-  Machine, 
-  WorkOrder, 
-  SparePart, 
-  UserProfile, 
+import {
+  Machine,
+  WorkOrder,
+  SparePart,
+  UserProfile,
   FaultType,
   AuditLog,
   DowntimeTrend,
@@ -133,9 +133,23 @@ export const api = {
   },
 
   // Audit Logs
-  getAuditLogs: async (): Promise<AuditLog[]> => {
-    const res = await fetch(`${API_BASE}/audit-logs`);
+  getAuditLogs: async (date?: string, username?: string): Promise<AuditLog[]> => {
+    const params = new URLSearchParams();
+    if (date) params.append('date', date);
+    if (username) params.append('username', username);
+
+    const queryString = params.toString();
+    const url = queryString ? `${API_BASE}/audit-logs?${queryString}` : `${API_BASE}/audit-logs`;
+    const res = await fetch(url);
     return handleResponse(res);
+  },
+  logMachineAction: async (action: string, entityId: string, details: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/audit-logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, entityType: 'machine', entityId, details })
+    });
+    await handleResponse(res);
   },
 
   // Analytics

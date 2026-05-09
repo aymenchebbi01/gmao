@@ -72,6 +72,32 @@ function logAction(userId: string | undefined, username: string | undefined, act
   }
 }
 
+function getChangesString(entityType: string, entityName: string, oldObj: any, newObj: any): string {
+  const changes: string[] = [];
+  const ignoredKeys = [
+    // Identity / metadata
+    'id', 'createdAt', 'updatedAt', 'userId', 'uid',
+    // JSON blobs — too noisy / useless as plain text
+    'preventivePlan', 'position3d', 'childFaultIds', 'intervention',
+    // System-generated telemetry — updated automatically, not by users
+    'currentHours', 'lastHoursUpdate', 'totalOperatingTime', 'totalDownTime',
+    'failureCount', 'operationalStartTime', 'lastHoursSync',
+  ];
+  for (const key of Object.keys(newObj)) {
+    if (ignoredKeys.includes(key)) continue;
+    if (oldObj && oldObj[key] != newObj[key] && newObj[key] !== undefined) {
+      const oldVal = oldObj[key] !== null && oldObj[key] !== undefined && oldObj[key] !== '' ? oldObj[key] : 'None';
+      const newVal = newObj[key] !== null && newObj[key] !== undefined && newObj[key] !== '' ? newObj[key] : 'None';
+      changes.push(`'${key}' changed from '${oldVal}' to '${newVal}'`);
+    }
+  }
+  let baseMsg = `Updated ${entityType} "${entityName}"`;
+  if (changes.length > 0) {
+    return `${baseMsg} - ${changes.join(', ')}`;
+  }
+  return null; // Return null if no non-ignored changes found
+}
+
 // --- Auth Routes ---
 
 app.post('/api/auth/signup', async (req, res) => {
@@ -192,7 +218,7 @@ app.post('/api/machines', (req, res) => {
 
     db.prepare(`INSERT INTO machines (${columns}) VALUES (${placeholders})`).run(...values);
 
-    logAction(undefined, 'System', 'Create', 'Machine', machine.id, `Created machine ${machine.name}`);
+    logAction(undefined, 'System', 'Create', 'Machine', machine.id, `Created Machine "${machine.name || machine.serialNumber}"`);
 
     // Log initial condition
     if (machine.condition) {
@@ -214,9 +240,10 @@ app.put('/api/machines/:id', (req, res) => {
     const machine = { ...req.body };
     machine.updatedAt = new Date().toISOString();
 
+    const oldMachine = db.prepare('SELECT * FROM machines WHERE id = ?').get(id) as any;
+
     // Log condition change
     if (machine.condition !== undefined) {
-      const oldMachine = db.prepare('SELECT condition FROM machines WHERE id = ?').get(id) as any;
       if (oldMachine && oldMachine.condition !== machine.condition) {
         db.prepare(`
           INSERT INTO machine_condition_history (machineId, previousCondition, newCondition)
@@ -250,7 +277,11 @@ app.put('/api/machines/:id', (req, res) => {
     }
 
     db.prepare(`UPDATE machines SET ${sets} WHERE id = ?`).run(...values, id);
-    logAction(userId === 'System' ? undefined : userId, userName, 'Update', 'Machine', id, `Updated machine ${id}`);
+    const entityName = oldMachine ? (oldMachine.name || oldMachine.serialNumber) : id;
+    const detailsMsg = getChangesString('Machine', entityName, oldMachine, machine);
+    if (detailsMsg) {
+      logAction(userId === 'System' ? undefined : userId, userName, 'Update', 'Machine', id, detailsMsg);
+    }
     res.json({ message: 'Machine updated' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -270,8 +301,10 @@ app.get('/api/machines/:id/condition-history', (req, res) => {
 app.delete('/api/machines/:id', (req, res) => {
   try {
     const { id } = req.params;
+    const oldMachine = db.prepare('SELECT * FROM machines WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM machines WHERE id = ?').run(id);
-    logAction(undefined, 'System', 'Delete', 'Machine', id, `Deleted machine ${id}`);
+    const entityName = oldMachine ? (oldMachine.name || oldMachine.serialNumber) : id;
+    logAction(undefined, 'System', 'Delete', 'Machine', id, `Deleted Machine "${entityName}"`);
     res.json({ message: 'Machine deleted' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -307,7 +340,7 @@ app.post('/api/work-orders', (req, res) => {
     const values = Object.values(workOrder);
 
     db.prepare(`INSERT INTO work_orders (${columns}) VALUES (${placeholders})`).run(...values);
-    logAction(undefined, 'System', 'Create', 'WorkOrder', workOrder.id, `Created work order ${workOrder.title}`);
+    logAction(undefined, 'System', 'Create', 'WorkOrder', workOrder.id, `Created Work Order "${workOrder.title}"`);
     res.status(201).json({ message: 'Work order created' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -319,6 +352,8 @@ app.put('/api/work-orders/:id', (req, res) => {
     const { id } = req.params;
     const workOrder = { ...req.body };
     workOrder.updatedAt = new Date().toISOString();
+
+    const oldWorkOrder = db.prepare('SELECT * FROM work_orders WHERE id = ?').get(id) as any;
 
     // Sync with intervention_reports table for analytics
     if (workOrder.intervention) {
@@ -377,7 +412,11 @@ app.put('/api/work-orders/:id', (req, res) => {
     const values = Object.values(workOrder);
 
     db.prepare(`UPDATE work_orders SET ${sets} WHERE id = ?`).run(...values, id);
-    logAction(undefined, 'System', 'Update', 'WorkOrder', id, `Updated work order ${id}`);
+    const entityName = oldWorkOrder ? oldWorkOrder.title : id;
+    const detailsMsg = getChangesString('Work Order', entityName, oldWorkOrder, workOrder);
+    if (detailsMsg) {
+      logAction(undefined, 'System', 'Update', 'WorkOrder', id, detailsMsg);
+    }
     res.json({ message: 'Work order updated' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -387,8 +426,10 @@ app.put('/api/work-orders/:id', (req, res) => {
 app.delete('/api/work-orders/:id', (req, res) => {
   try {
     const { id } = req.params;
+    const oldWorkOrder = db.prepare('SELECT * FROM work_orders WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM work_orders WHERE id = ?').run(id);
-    logAction(undefined, 'System', 'Delete', 'WorkOrder', id, `Deleted work order ${id}`);
+    const entityName = oldWorkOrder ? oldWorkOrder.title : id;
+    logAction(undefined, 'System', 'Delete', 'WorkOrder', id, `Deleted Work Order "${entityName}"`);
     res.json({ message: 'Work order deleted' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -413,7 +454,7 @@ app.post('/api/spare-parts', (req, res) => {
     const values = Object.values(part);
 
     db.prepare(`INSERT INTO spare_parts (${columns}) VALUES (${placeholders})`).run(...values);
-    logAction(undefined, 'System', 'Create', 'SparePart', part.id, `Created spare part ${part.name}`);
+    logAction(undefined, 'System', 'Create', 'SparePart', part.id, `Created Spare Part "${part.name}"`);
     res.status(201).json({ message: 'Spare part created' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -425,11 +466,18 @@ app.put('/api/spare-parts/:id', (req, res) => {
     const { id } = req.params;
     const part = { ...req.body };
     part.updatedAt = new Date().toISOString();
+
+    const oldPart = db.prepare('SELECT * FROM spare_parts WHERE id = ?').get(id) as any;
+
     const sets = Object.keys(part).map(key => `${key} = ?`).join(', ');
     const values = Object.values(part);
 
     db.prepare(`UPDATE spare_parts SET ${sets} WHERE id = ?`).run(...values, id);
-    logAction(undefined, 'System', 'Update', 'SparePart', id, `Updated spare part ${id}`);
+    const entityName = oldPart ? oldPart.name : id;
+    const detailsMsg = getChangesString('Spare Part', entityName, oldPart, part);
+    if (detailsMsg) {
+      logAction(undefined, 'System', 'Update', 'SparePart', id, detailsMsg);
+    }
     res.json({ message: 'Spare part updated' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -439,8 +487,10 @@ app.put('/api/spare-parts/:id', (req, res) => {
 app.delete('/api/spare-parts/:id', (req, res) => {
   try {
     const { id } = req.params;
+    const oldPart = db.prepare('SELECT * FROM spare_parts WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM spare_parts WHERE id = ?').run(id);
-    logAction(undefined, 'System', 'Delete', 'SparePart', id, `Deleted spare part ${id}`);
+    const entityName = oldPart ? oldPart.name : id;
+    logAction(undefined, 'System', 'Delete', 'SparePart', id, `Deleted Spare Part "${entityName}"`);
     res.json({ message: 'Spare part deleted' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -462,10 +512,18 @@ app.put('/api/users/:uid', (req, res) => {
     const { uid } = req.params;
     const user = { ...req.body };
     user.updatedAt = new Date().toISOString();
+
+    const oldUser = db.prepare('SELECT * FROM users WHERE uid = ?').get(uid) as any;
+
     const sets = Object.keys(user).map(key => `${key} = ?`).join(', ');
     const values = Object.values(user);
 
     db.prepare(`UPDATE users SET ${sets} WHERE uid = ?`).run(...values, uid);
+    const entityName = oldUser ? (oldUser.displayName || oldUser.username) : uid;
+    const detailsMsg = getChangesString('User', entityName, oldUser, user);
+    if (detailsMsg) {
+      logAction(undefined, 'System', 'Update', 'User', uid, detailsMsg);
+    }
     res.json({ message: 'User updated' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -475,7 +533,10 @@ app.put('/api/users/:uid', (req, res) => {
 app.delete('/api/users/:uid', (req, res) => {
   try {
     const { uid } = req.params;
+    const oldUser = db.prepare('SELECT * FROM users WHERE uid = ?').get(uid) as any;
     db.prepare('DELETE FROM users WHERE uid = ?').run(uid);
+    const entityName = oldUser ? (oldUser.displayName || oldUser.username) : uid;
+    logAction(undefined, 'System', 'Delete', 'User', uid, `Deleted User "${entityName}"`);
     res.json({ message: 'User deleted' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -485,8 +546,67 @@ app.delete('/api/users/:uid', (req, res) => {
 // --- Audit Logs ---
 app.get('/api/audit-logs', (req, res) => {
   try {
-    const rows = db.prepare('SELECT * FROM audit_logs ORDER BY createdAt DESC LIMIT 100').all();
+    const { date, username } = req.query;
+    let query = 'SELECT * FROM audit_logs';
+    let params: any[] = [];
+    let conditions: string[] = [];
+
+    if (date) {
+      conditions.push('DATE(createdAt) = ?');
+      params.push(date);
+    }
+    if (username) {
+      conditions.push('username LIKE ?');
+      params.push(`%${username}%`);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+      // Limit to 500 for performance when searching
+      query += ' ORDER BY createdAt DESC LIMIT 500';
+    } else {
+      query += ' ORDER BY createdAt DESC LIMIT 100';
+    }
+
+    const rows = db.prepare(query).all(...params);
     res.json(rows);
+  } catch (error) {
+    console.error('Audit log fetch error:', error);
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Allowed action types for explicit logging
+const ALLOWED_ACTIONS = ['SCAN_QR', 'ACCESS_MACHINE', 'ASSIGN_MACHINE', 'CHANGE_STATUS', 'START_MACHINE', 'STOP_MACHINE'];
+
+app.post('/api/audit-logs', (req, res) => {
+  try {
+    const { action, entityType, entityId, details } = req.body;
+
+    if (!action || !entityType || !entityId || !details) {
+      return res.status(400).json({ error: 'Missing required fields: action, entityType, entityId, details' });
+    }
+    if (!ALLOWED_ACTIONS.includes(action)) {
+      return res.status(400).json({ error: `Invalid action. Must be one of: ${ALLOWED_ACTIONS.join(', ')}` });
+    }
+
+    let userId: string | undefined;
+    let userName = 'Unknown';
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        if (decoded?.uid) {
+          userId = decoded.uid;
+          userName = decoded.displayName || decoded.username || 'User';
+        }
+      } catch (e) {
+        // Ignore token errors — log with unknown user
+      }
+    }
+
+    logAction(userId, userName, action, entityType, entityId, details);
+    res.status(201).json({ message: 'Audit log created' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

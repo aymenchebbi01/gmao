@@ -41,6 +41,7 @@ export interface Machine {
   manualUrl?: string;
   preventivePlan: PreventiveTask[];
   injectingProduct?: string;
+  updatedAt?: string;
   position3d?: {
     position: [number, number, number];
     rotation: [number, number, number];

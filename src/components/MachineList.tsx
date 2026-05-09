@@ -996,7 +996,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
               <QRCodeCanvas
                 id="machine-qr-code"
                 value={window.location.hostname === 'localhost'
-                  ? `http://192.168.0.216:3000/?tab=mobile-status&id=${selectedMachine.id}`
+                  ? `http://192.168.0.181:3000/?tab=mobile-status&id=${selectedMachine.id}`
                   : `${window.location.origin}/?tab=mobile-status&id=${selectedMachine.id}`}
                 size={200}
                 level="H"

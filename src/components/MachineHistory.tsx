@@ -4,12 +4,12 @@ import { format } from 'date-fns';
 import { toDate, cn, calculateMachineLiveHours } from '../lib/utils';
 import { RECOMMENDED_TASKS } from '../constants/maintenanceTasks';
 import { api } from '../services/api';
-import { 
-  History, 
-  Calendar, 
-  User, 
-  Wrench, 
-  CheckCircle2, 
+import {
+  History,
+  Calendar,
+  User,
+  Wrench,
+  CheckCircle2,
   Clock,
   FileText,
   ChevronRight,
@@ -43,7 +43,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
           api.getWorkOrders(),
           api.getMachineConditionHistory(machineId)
         ]);
-        
+
         const machineData = machines.find(m => m.id === machineId);
         if (machineData) {
           setMachine(machineData);
@@ -52,7 +52,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
         const machineHistory = orders
           .filter(o => o.machineId === machineId && o.status === 'completed')
           .sort((a, b) => new Date(b.completedAt || '').getTime() - new Date(a.completedAt || '').getTime());
-        
+
         setHistory(machineHistory);
         setConditionHistory(condHistory);
         setLoading(false);
@@ -78,11 +78,11 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
 
   // Calculate Metrics
   const currentHours = machine ? calculateMachineLiveHours(machine) : 0;
-  
+
   // Calculate live operating time and live downtime
   let liveOperatingTime = machine?.totalOperatingTime || 0; // in minutes
   let liveDownTime = machine?.totalDownTime || 0; // in minutes
-  
+
   // Refine total downtime using completed work orders for more accuracy if needed
   const totalInterventionTime = history.reduce((acc, order) => acc + (order.intervention?.durationMinutes || 0), 0);
   // Use the larger of the two to be conservative, or just use machine.totalDownTime if it's already being updated correctly
@@ -105,11 +105,11 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
   const failureCount = machine?.failureCount || 0;
   const mtbfVal = failureCount > 0 ? (liveOperatingTime / failureCount / 60) : 0;
   const mttrVal = failureCount > 0 ? (liveDownTime / failureCount) : 0;
-  
+
   const mtbf = failureCount > 0 ? mtbfVal.toFixed(1) : 'N/A'; // in hours
   const mttr = failureCount > 0 ? mttrVal.toFixed(0) : 'N/A'; // in minutes
-  const availabilityVal = (liveOperatingTime + liveDownTime) > 0 
-    ? (liveOperatingTime / (liveOperatingTime + liveDownTime)) * 100 
+  const availabilityVal = (liveOperatingTime + liveDownTime) > 0
+    ? (liveOperatingTime / (liveOperatingTime + liveDownTime)) * 100
     : 100;
   const availability = availabilityVal.toFixed(1);
 
@@ -150,15 +150,42 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
     return "bg-white border-red-100 hover:border-red-200 hover:shadow-red-50 shadow-sm";
   };
 
-  // Get recommended tasks based on current hours
-  const nextTask = RECOMMENDED_TASKS.find(t => t.hours > currentHours) || RECOMMENDED_TASKS[RECOMMENDED_TASKS.length - 1];
-  const currentThreshold = RECOMMENDED_TASKS.slice().reverse().find(t => t.hours <= currentHours) || RECOMMENDED_TASKS[0];
+  // Cycle-based maintenance logic synced with DB values
+  const cycleSize = 20000;
+  const cycleIndex = Math.floor(currentHours / cycleSize);
+  const cycleStart = cycleIndex * cycleSize;
+  const hoursInCycle = currentHours - cycleStart;
+
+  // Use machine.nextMaintenanceHours as the authoritative next threshold
+  // If not present or in the past, fallback to next milestone in the cycle
+  const nextTargetHours = (machine?.nextMaintenanceHours && machine.nextMaintenanceHours > currentHours)
+    ? machine.nextMaintenanceHours
+    : (() => {
+      const nextInBase = RECOMMENDED_TASKS.find(t => t.hours > hoursInCycle);
+      return nextInBase ? (cycleStart + nextInBase.hours) : (cycleStart + cycleSize + RECOMMENDED_TASKS[0].hours);
+    })();
+
+  const nextTask = {
+    ...((RECOMMENDED_TASKS.find(t => (cycleStart + t.hours) >= nextTargetHours) || RECOMMENDED_TASKS[0])),
+    hours: nextTargetHours
+  };
+
+  // Find the last passed threshold to calculate progress interval
+  const lastThresholdBase = RECOMMENDED_TASKS.slice().reverse().find(t => t.hours <= hoursInCycle);
+  const lastThresholdHours = lastThresholdBase ? (cycleStart + lastThresholdBase.hours) : cycleStart;
+
+  const currentThreshold = lastThresholdBase || RECOMMENDED_TASKS[0];
+
+  // Calculate progress within the current milestone interval
+  const intervalTotal = Math.max(nextTargetHours - lastThresholdHours, 1);
+  const intervalCurrent = currentHours - lastThresholdHours;
+  const progressPercent = Math.min(Math.max((intervalCurrent / intervalTotal) * 100, 0), 100);
 
   return (
     <div className="space-y-8">
       {/* Mini Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <button 
+        <button
           onClick={() => setActiveMetric(activeMetric === 'mtbf' ? null : 'mtbf')}
           className={cn(
             "p-6 rounded-2xl border transition-all text-left group relative overflow-hidden",
@@ -168,10 +195,10 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
           <div className="flex items-center justify-between mb-4">
             <div className={cn(
               "p-2 rounded-xl",
-              activeMetric === 'mtbf' ? "bg-white/20 text-white" : 
-              mtbfVal >= 500 ? "bg-emerald-50 text-emerald-600" :
-              mtbfVal >= 200 ? "bg-amber-50 text-amber-600" :
-              mtbfVal > 0 ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
+              activeMetric === 'mtbf' ? "bg-white/20 text-white" :
+                mtbfVal >= 500 ? "bg-emerald-50 text-emerald-600" :
+                  mtbfVal >= 200 ? "bg-amber-50 text-amber-600" :
+                    mtbfVal > 0 ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
             )}>
               <Zap size={20} />
             </div>
@@ -187,7 +214,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
               <span className={cn(
                 "text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase",
                 mtbfVal >= 500 ? "bg-emerald-100 text-emerald-700" :
-                mtbfVal >= 200 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                  mtbfVal >= 200 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
               )}>
                 {mtbfVal >= 500 ? "Excellent" : mtbfVal >= 200 ? "Good" : "Poor"}
               </span>
@@ -195,7 +222,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
           </div>
         </button>
 
-        <button 
+        <button
           onClick={() => setActiveMetric(activeMetric === 'mttr' ? null : 'mttr')}
           className={cn(
             "p-6 rounded-2xl border transition-all text-left group relative overflow-hidden",
@@ -205,10 +232,10 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
           <div className="flex items-center justify-between mb-4">
             <div className={cn(
               "p-2 rounded-xl",
-              activeMetric === 'mttr' ? "bg-white/20 text-white" : 
-              mttrVal > 0 && mttrVal <= 60 ? "bg-emerald-50 text-emerald-600" :
-              mttrVal > 60 && mttrVal <= 180 ? "bg-amber-50 text-amber-600" :
-              mttrVal > 180 ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
+              activeMetric === 'mttr' ? "bg-white/20 text-white" :
+                mttrVal > 0 && mttrVal <= 60 ? "bg-emerald-50 text-emerald-600" :
+                  mttrVal > 60 && mttrVal <= 180 ? "bg-amber-50 text-amber-600" :
+                    mttrVal > 180 ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
             )}>
               <Clock size={20} />
             </div>
@@ -224,7 +251,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
               <span className={cn(
                 "text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase",
                 mttrVal <= 60 ? "bg-emerald-100 text-emerald-700" :
-                mttrVal <= 180 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
+                  mttrVal <= 180 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"
               )}>
                 {mttrVal <= 60 ? "Efficient" : mttrVal <= 180 ? "Average" : "Inefficient"}
               </span>
@@ -232,22 +259,22 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
           </div>
         </button>
 
-        <button 
+        <button
           onClick={() => setActiveMetric(activeMetric === 'availability' ? null : 'availability')}
           className={cn(
             "p-6 rounded-2xl border transition-all text-left group relative overflow-hidden",
-            activeMetric === 'availability' ? "bg-emerald-600 border-emerald-600 shadow-lg shadow-emerald-200" : 
-            availabilityVal >= 95 ? "bg-white border-emerald-100 hover:border-emerald-200 hover:shadow-emerald-50 shadow-sm" :
-            availabilityVal >= 85 ? "bg-white border-amber-100 hover:border-amber-200 hover:shadow-amber-50 shadow-sm" :
-            "bg-white border-red-100 hover:border-red-200 hover:shadow-red-50 shadow-sm"
+            activeMetric === 'availability' ? "bg-emerald-600 border-emerald-600 shadow-lg shadow-emerald-200" :
+              availabilityVal >= 95 ? "bg-white border-emerald-100 hover:border-emerald-200 hover:shadow-emerald-50 shadow-sm" :
+                availabilityVal >= 85 ? "bg-white border-amber-100 hover:border-amber-200 hover:shadow-amber-50 shadow-sm" :
+                  "bg-white border-red-100 hover:border-red-200 hover:shadow-red-50 shadow-sm"
           )}
         >
           <div className="flex items-center justify-between mb-4">
             <div className={cn(
               "p-2 rounded-xl",
-              activeMetric === 'availability' ? "bg-white/20 text-white" : 
-              availabilityVal >= 95 ? "bg-emerald-50 text-emerald-600" :
-              availabilityVal >= 85 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600"
+              activeMetric === 'availability' ? "bg-white/20 text-white" :
+                availabilityVal >= 95 ? "bg-emerald-50 text-emerald-600" :
+                  availabilityVal >= 85 ? "bg-amber-50 text-amber-600" : "bg-red-50 text-red-600"
             )}>
               <ShieldCheck size={20} />
             </div>
@@ -261,7 +288,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
           <p className={cn("text-xs font-bold uppercase tracking-wider mb-1", activeMetric === 'availability' ? "text-emerald-100" : "text-gray-400")}>Availability Rate</p>
           <h3 className={cn("text-3xl font-black", activeMetric === 'availability' ? "text-white" : getAvailabilityColor(availabilityVal))}>{availability}%</h3>
           <div className="mt-2 w-full h-1 bg-gray-100 rounded-full overflow-hidden">
-            <div 
+            <div
               className={cn("h-full transition-all duration-1000", activeMetric === 'availability' ? "bg-white" : availabilityVal >= 95 ? "bg-emerald-500" : availabilityVal >= 85 ? "bg-amber-500" : "bg-red-500")}
               style={{ width: `${availability}%` }}
             ></div>
@@ -281,14 +308,14 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
             </div>
             <div>
               <h4 className="text-sm font-bold text-gray-900 uppercase tracking-tight">
-                {activeMetric === 'mtbf' ? 'Mean Time Between Failures Analysis' : 
-                 activeMetric === 'mttr' ? 'Mean Time To Repair Analysis' : 
-                 'Availability & Performance Rate'}
+                {activeMetric === 'mtbf' ? 'Mean Time Between Failures Analysis' :
+                  activeMetric === 'mttr' ? 'Mean Time To Repair Analysis' :
+                    'Availability & Performance Rate'}
               </h4>
               <p className="text-xs text-gray-500">Detailed breakdown for {machineName}</p>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-4">
               <div className="bg-white p-4 rounded-xl border border-gray-100">
@@ -339,26 +366,26 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
             <span className="text-xs font-bold text-blue-600">{nextTask.hours} hrs ({nextTask.frequency})</span>
           </div>
         </div>
-        
+
         <div className="p-6">
           <div className="flex items-center gap-4 mb-6">
             <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-blue-600 transition-all duration-1000" 
-                style={{ width: `${Math.min((currentHours / nextTask.hours) * 100, 100)}%` }}
+              <div
+                className="h-full bg-blue-600 transition-all duration-1000"
+                style={{ width: `${progressPercent}%` }}
               ></div>
             </div>
-            <span className="text-xs font-bold text-gray-600">{Math.round((currentHours / nextTask.hours) * 100)}%</span>
+            <span className="text-xs font-bold text-gray-600">{Math.round(progressPercent)}%</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center">
                 <AlertTriangle size={14} className="mr-2 text-amber-500" />
-                Tasks for {currentThreshold.hours} hrs threshold
+                Tasks for {currentHours < RECOMMENDED_TASKS[0].hours ? RECOMMENDED_TASKS[0].hours : (lastThresholdHours || 500)} hrs threshold
               </h4>
               <ul className="space-y-2">
-                {currentThreshold.tasks.map((task, i) => (
+                {(currentHours < RECOMMENDED_TASKS[0].hours ? RECOMMENDED_TASKS[0] : currentThreshold).tasks.map((task, i) => (
                   <li key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100/50 text-xs text-gray-700">
                     <div className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></div>
                     {task}
@@ -373,7 +400,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
               <h4 className="text-sm font-bold text-gray-900 mb-2">Next Maintenance Cycle</h4>
               <p className="text-xs text-gray-500 mb-4">The machine will reach the next maintenance threshold in approximately</p>
               <div className="text-2xl font-black text-blue-600">
-                {Math.max(nextTask.hours - currentHours, 0).toFixed(1)} <span className="text-sm font-normal">hrs</span>
+                {(nextTask.hours - currentHours).toFixed(1)} <span className="text-sm font-normal">hrs</span>
               </div>
             </div>
           </div>
@@ -427,77 +454,77 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
           </h3>
         </div>
 
-      <div className="relative">
-        {/* Timeline Line */}
-        <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-100 ml-[1px]"></div>
+        <div className="relative">
+          {/* Timeline Line */}
+          <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-100 ml-[1px]"></div>
 
-        <div className="space-y-6">
-          {history.map((order, index) => (
-            <div key={order.id} className="relative pl-10 group">
-              {/* Timeline Dot */}
-              <div className="absolute left-0 top-1 w-9 h-9 flex items-center justify-center">
-                <div className="w-2.5 h-2.5 rounded-full bg-blue-600 ring-4 ring-blue-50 z-10"></div>
-              </div>
-
-              <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group-hover:border-blue-100">
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
-                        order.type === 'preventive' ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"
-                      )}>
-                        {order.type}
-                      </span>
-                      <h4 className="text-sm font-bold text-gray-900">{order.title}</h4>
-                    </div>
-                    <p className="text-xs text-gray-500 line-clamp-2">{order.description}</p>
-                  </div>
-                  
-                  <div className="flex flex-col items-end text-right shrink-0">
-                    <div className="flex items-center text-xs font-medium text-gray-900">
-                      <Calendar size={12} className="mr-1.5 text-gray-400" />
-                      {order.completedAt ? format(toDate(order.completedAt), 'MMM d, yyyy') : 'N/A'}
-                    </div>
-                    <div className="flex items-center text-[10px] text-gray-500 mt-1">
-                      <Clock size={10} className="mr-1 text-gray-400" />
-                      {order.intervention?.durationMinutes || 0} min duration
-                    </div>
-                  </div>
+          <div className="space-y-6">
+            {history.map((order, index) => (
+              <div key={order.id} className="relative pl-10 group">
+                {/* Timeline Dot */}
+                <div className="absolute left-0 top-1 w-9 h-9 flex items-center justify-center">
+                  <div className="w-2.5 h-2.5 rounded-full bg-blue-600 ring-4 ring-blue-50 z-10"></div>
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center text-xs text-gray-600">
-                      <User size={12} className="mr-1.5 text-gray-400" />
-                      {order.assignedName || 'Technician'}
-                    </div>
-                    {order.intervention?.partsUsed && order.intervention.partsUsed.length > 0 && (
-                      <div className="flex items-center text-xs text-gray-600">
-                        <Wrench size={12} className="mr-1.5 text-gray-400" />
-                        {order.intervention.partsUsed.length} parts used
+                <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group-hover:border-blue-100">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
+                          order.type === 'preventive' ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"
+                        )}>
+                          {order.type}
+                        </span>
+                        <h4 className="text-sm font-bold text-gray-900">{order.title}</h4>
                       </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-gray-400">#{order.id}</span>
-                  </div>
-                </div>
+                      <p className="text-xs text-gray-500 line-clamp-2">{order.description}</p>
+                    </div>
 
-                {/* Intervention Details (Expandable or just summary) */}
-                {order.intervention && (
-                  <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-100/50">
-                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Actions Taken</p>
-                    <p className="text-xs text-gray-600 italic">"{order.intervention.actions}"</p>
+                    <div className="flex flex-col items-end text-right shrink-0">
+                      <div className="flex items-center text-xs font-medium text-gray-900">
+                        <Calendar size={12} className="mr-1.5 text-gray-400" />
+                        {order.completedAt ? format(toDate(order.completedAt), 'MMM d, yyyy') : 'N/A'}
+                      </div>
+                      <div className="flex items-center text-[10px] text-gray-500 mt-1">
+                        <Clock size={10} className="mr-1 text-gray-400" />
+                        {order.intervention?.durationMinutes || 0} min duration
+                      </div>
+                    </div>
                   </div>
-                )}
+
+                  <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center text-xs text-gray-600">
+                        <User size={12} className="mr-1.5 text-gray-400" />
+                        {order.assignedName || 'Technician'}
+                      </div>
+                      {order.intervention?.partsUsed && order.intervention.partsUsed.length > 0 && (
+                        <div className="flex items-center text-xs text-gray-600">
+                          <Wrench size={12} className="mr-1.5 text-gray-400" />
+                          {order.intervention.partsUsed.length} parts used
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-gray-400">#{order.id}</span>
+                    </div>
+                  </div>
+
+                  {/* Intervention Details (Expandable or just summary) */}
+                  {order.intervention && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-100/50">
+                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Actions Taken</p>
+                      <p className="text-xs text-gray-600 italic">"{order.intervention.actions}"</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>
-  </div>
   );
 }
