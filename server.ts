@@ -39,6 +39,36 @@ try {
     db.prepare("ALTER TABLE machines ADD COLUMN siteNumber VARCHAR(255)").run();
     console.log("Added siteNumber column to machines table");
   }
+
+  // New products table for production items
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS products (
+      id VARCHAR(255) PRIMARY KEY,
+      item VARCHAR(255) NOT NULL,
+      description TEXT,
+      color VARCHAR(100),
+      cycleTime DOUBLE DEFAULT 0,
+      qtyProduced INT DEFAULT 0,
+      priceTN DOUBLE DEFAULT 0,
+      priceMalta DOUBLE DEFAULT 0,
+      updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
+
+  // New purchase_requests table for PR history
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS purchase_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      reference TEXT UNIQUE NOT NULL,
+      date TEXT NOT NULL,
+      requested_by TEXT,
+      department TEXT,
+      supplier TEXT,
+      items_count INTEGER,
+      pdf_data TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
 } catch (error) {
   console.error("Migration error:", error);
 }
@@ -190,6 +220,38 @@ app.get('/api/auth/me', (req, res) => {
 });
 
 // --- API Routes ---
+
+// Purchase Requests API
+app.get('/api/purchase-requests', (req, res) => {
+  try {
+    const requests = db.prepare('SELECT * FROM purchase_requests ORDER BY id DESC').all();
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/purchase-requests/last-ref', (req, res) => {
+  try {
+    const last = db.prepare('SELECT reference FROM purchase_requests ORDER BY id DESC LIMIT 1').get() as { reference: string } | undefined;
+    res.json({ lastRef: last ? last.reference : null });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/purchase-requests', (req, res) => {
+  const { reference, date, requested_by, department, supplier, items_count, pdf_data } = req.body;
+  try {
+    const info = db.prepare(`
+      INSERT INTO purchase_requests (reference, date, requested_by, department, supplier, items_count, pdf_data)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(reference, date, requested_by, department, supplier, items_count, pdf_data);
+    res.json({ id: info.lastInsertRowid });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
 
 // Machines
 app.get('/api/machines', (req, res) => {
@@ -441,6 +503,73 @@ app.get('/api/spare-parts', (req, res) => {
   try {
     const rows = db.prepare('SELECT * FROM spare_parts').all();
     res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Products (Production Items)
+app.get('/api/products', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM products ORDER BY item ASC').all();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/products', (req, res) => {
+  try {
+    const items = Array.isArray(req.body) ? req.body : [req.body];
+    const insert = db.prepare(`
+      INSERT OR REPLACE INTO products (id, item, description, color, cycleTime, qtyProduced, priceTN, priceMalta, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const transaction = db.transaction((products) => {
+      for (const p of products) {
+        insert.run(
+          p.id || `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          p.item,
+          p.description || '',
+          p.color || '',
+          p.cycleTime || 0,
+          p.qtyProduced || 0,
+          p.priceTN || 0,
+          p.priceMalta || 0,
+          new Date().toISOString()
+        );
+      }
+    });
+
+    transaction(items);
+    res.status(201).json({ message: `${items.length} products saved` });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.put('/api/products/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    updates.updatedAt = new Date().toISOString();
+
+    const sets = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(updates);
+
+    db.prepare(`UPDATE products SET ${sets} WHERE id = ?`).run(...values, id);
+    res.json({ message: 'Product updated' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/products/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM products WHERE id = ?').run(id);
+    res.json({ message: 'Product deleted' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

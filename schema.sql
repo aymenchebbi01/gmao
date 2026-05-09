@@ -157,3 +157,16 @@ CREATE TABLE IF NOT EXISTS machine_condition_history (
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (machineId) REFERENCES machines(id) ON DELETE CASCADE
 );
+
+-- Purchase Requests History
+CREATE TABLE IF NOT EXISTS purchase_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reference TEXT UNIQUE NOT NULL,
+    date TEXT NOT NULL,
+    requested_by TEXT,
+    department TEXT,
+    supplier TEXT,
+    items_count INTEGER,
+    pdf_data TEXT, -- Base64 encoded PDF
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

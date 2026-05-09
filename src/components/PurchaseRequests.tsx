@@ -8,6 +8,8 @@ import {
     RefreshCw,
     FileText,
     Package,
+    History,
+    CheckCircle2
 } from 'lucide-react';
 import { SparePart } from '../types';
 import { api } from '../services/api';
@@ -16,6 +18,7 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
+import { THERMOPLASTICS_LOGO_BASE64 } from '../constants/logo';
 
 interface PurchaseItem {
     id: string;
@@ -57,7 +60,41 @@ export default function PurchaseRequests() {
     const [supplier, setSupplier] = useState('');
     const [notes, setNotes] = useState('');
 
-    const refNum = `DA-${format(new Date(), 'yyyyMMdd')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+    const [activeView, setActiveTab] = useState<'generator' | 'history'>('generator');
+    const [history, setHistory] = useState<any[]>([]);
+    const [lastRef, setLastRef] = useState<string | null>(null);
+
+    const generateNextRef = (currentLastRef: string | null) => {
+        const year = new Date().getFullYear();
+        if (!currentLastRef) return `DA-${year}00001`;
+
+        const parts = currentLastRef.split('-');
+        if (parts.length < 2) return `DA-${year}00001`;
+
+        const refPart = parts[1]; // e.g. "202600001"
+        const refYear = parseInt(refPart.substring(0, 4));
+        const seq = parseInt(refPart.substring(4));
+
+        if (refYear < year) {
+            return `DA-${year}00001`;
+        }
+
+        const nextSeq = (seq + 1).toString().padStart(5, '0');
+        return `DA-${year}${nextSeq}`;
+    };
+
+    const currentRefNum = generateNextRef(lastRef);
+
+    const fetchHistory = async () => {
+        try {
+            const data = await api.getPurchaseRequests();
+            setHistory(data);
+            const lr = await api.getLastPurchaseRequestRef();
+            setLastRef(lr.lastRef);
+        } catch (err) {
+            console.error('Failed to load history', err);
+        }
+    };
 
     const fetchAndBuild = async () => {
         setLoading(true);
@@ -92,6 +129,7 @@ export default function PurchaseRequests() {
 
     useEffect(() => {
         fetchAndBuild();
+        fetchHistory();
     }, []);
 
     const updateItem = (id: string, field: keyof PurchaseItem, value: any) => {
@@ -117,10 +155,18 @@ export default function PurchaseRequests() {
         // ---- Header ----
         doc.setFillColor(30, 64, 175); // Blue
         doc.rect(0, 0, 210, 32, 'F');
+
+        // Add Logo
+        try {
+            doc.addImage(THERMOPLASTICS_LOGO_BASE64, 'PNG', 14, 6, 45, 12);
+        } catch (e) {
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(18);
+            doc.text('THERMOPLASTICS', 14, 13);
+        }
+
         doc.setTextColor(255, 255, 255);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(18);
-        doc.text('THERMOPLASTICS', 14, 13);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
         doc.text('Système de Gestion de Maintenance Assistée par Ordinateur', 14, 21);
@@ -130,7 +176,7 @@ export default function PurchaseRequests() {
         doc.text('DEMANDE D\'ACHAT', 210 - 14, 13, { align: 'right' });
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Réf: ${refNum}`, 210 - 14, 21, { align: 'right' });
+        doc.text(`Réf: ${currentRefNum}`, 210 - 14, 21, { align: 'right' });
         doc.text(`Date: ${format(new Date(), 'dd/MM/yyyy')}`, 210 - 14, 27, { align: 'right' });
 
         // ---- Info Block ----
@@ -230,8 +276,27 @@ export default function PurchaseRequests() {
             doc.text(`Page ${i}/${pageCount}`, 196, 290, { align: 'right' });
         }
 
-        doc.save(`Demande_Achat_${refNum}.pdf`);
-        toast.success('PDF téléchargé avec succès');
+        const pdfOutput = doc.output('bloburl');
+        const pdfBase64 = doc.output('datauristring');
+
+        doc.save(`Demande_Achat_${currentRefNum}.pdf`);
+
+        // Save to DB
+        api.savePurchaseRequest({
+            reference: currentRefNum,
+            date: format(new Date(), 'yyyy-MM-dd'),
+            requested_by: requestedBy,
+            department: department,
+            supplier: supplier,
+            items_count: items.length,
+            pdf_data: pdfBase64
+        }).then(() => {
+            fetchHistory();
+        }).catch(err => {
+            console.error('Failed to save PR to history', err);
+        });
+
+        toast.success('PDF téléchargé et enregistré dans l\'historique');
     };
 
     const lowStockCount = items.filter(i => !i.isManual).length;
@@ -240,239 +305,327 @@ export default function PurchaseRequests() {
         <div className="space-y-6">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Demande d'Achat</h1>
-                    <p className="text-gray-500 text-sm mt-0.5">
-                        Génération automatique basée sur les articles en rupture de stock.
-                    </p>
+                <div className="flex items-center gap-4">
+                    <div className="flex bg-gray-100 p-1 rounded-xl">
+                        <button
+                            onClick={() => setActiveTab('generator')}
+                            className={cn(
+                                "px-4 py-1.5 text-sm font-medium rounded-lg transition-all",
+                                activeView === 'generator' ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"
+                            )}
+                        >
+                            Générateur
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('history')}
+                            className={cn(
+                                "px-4 py-1.5 text-sm font-medium rounded-lg transition-all",
+                                activeView === 'history' ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"
+                            )}
+                        >
+                            Historique
+                        </button>
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Demande d'Achat</h1>
+                    </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={fetchAndBuild}
-                        disabled={loading}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
-                    >
-                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                        Actualiser
-                    </button>
-                    <button
-                        onClick={generatePDF}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-                    >
-                        <Download size={16} />
-                        Télécharger PDF
-                    </button>
+                    {activeView === 'generator' && (
+                        <>
+                            <button
+                                onClick={fetchAndBuild}
+                                disabled={loading}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
+                            >
+                                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                                Actualiser
+                            </button>
+                            <button
+                                onClick={generatePDF}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                            >
+                                <Download size={16} />
+                                Générer & Télécharger
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex items-center gap-4">
-                    <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <AlertTriangle size={20} className="text-red-500" />
+            {activeView === 'generator' ? (
+                <>
+                    {/* Stats */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex items-center gap-4">
+                            <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                                <AlertTriangle size={20} className="text-red-500" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Articles en rupture</p>
+                                <p className="text-2xl font-bold text-gray-900">{lowStockCount}</p>
+                            </div>
+                        </div>
+                        <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex items-center gap-4">
+                            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                                <ShoppingCart size={20} className="text-blue-500" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Total articles DA</p>
+                                <p className="text-2xl font-bold text-gray-900">{items.length}</p>
+                            </div>
+                        </div>
+                        <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex items-center gap-4">
+                            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                                <FileText size={20} className="text-emerald-500" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Référence (Prochaine)</p>
+                                <p className="text-sm font-bold text-gray-900 font-mono">{currentRefNum}</p>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Articles en rupture</p>
-                        <p className="text-2xl font-bold text-gray-900">{lowStockCount}</p>
-                    </div>
-                </div>
-                <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex items-center gap-4">
-                    <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <ShoppingCart size={20} className="text-blue-500" />
-                    </div>
-                    <div>
-                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Total articles DA</p>
-                        <p className="text-2xl font-bold text-gray-900">{items.length}</p>
-                    </div>
-                </div>
-                <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex items-center gap-4">
-                    <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <FileText size={20} className="text-emerald-500" />
-                    </div>
-                    <div>
-                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Référence</p>
-                        <p className="text-sm font-bold text-gray-900 font-mono">{refNum}</p>
-                    </div>
-                </div>
-            </div>
 
-            {/* Header Form */}
-            <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-6">
-                <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Informations de la demande</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Demandeur</label>
-                        <input
-                            type="text"
-                            placeholder="Votre nom"
-                            className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                            value={requestedBy}
-                            onChange={e => setRequestedBy(e.target.value)}
-                        />
+                    {/* Header Form */}
+                    <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-6">
+                        <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Informations de la demande</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Demandeur</label>
+                                <input
+                                    type="text"
+                                    placeholder="Votre nom"
+                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                    value={requestedBy}
+                                    onChange={e => setRequestedBy(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Département</label>
+                                <input
+                                    type="text"
+                                    placeholder="ex: Maintenance"
+                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                    value={department}
+                                    onChange={e => setDepartment(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Fournisseur</label>
+                                <input
+                                    type="text"
+                                    placeholder="Fournisseur souhaité"
+                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                    value={supplier}
+                                    onChange={e => setSupplier(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Notes</label>
+                                <input
+                                    type="text"
+                                    placeholder="Observations..."
+                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                    value={notes}
+                                    onChange={e => setNotes(e.target.value)}
+                                />
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Département</label>
-                        <input
-                            type="text"
-                            placeholder="ex: Maintenance"
-                            className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                            value={department}
-                            onChange={e => setDepartment(e.target.value)}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Fournisseur</label>
-                        <input
-                            type="text"
-                            placeholder="Fournisseur souhaité"
-                            className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                            value={supplier}
-                            onChange={e => setSupplier(e.target.value)}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Notes</label>
-                        <input
-                            type="text"
-                            placeholder="Observations..."
-                            className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                            value={notes}
-                            onChange={e => setNotes(e.target.value)}
-                        />
-                    </div>
-                </div>
-            </div>
 
-            {/* Items Table */}
-            <div className="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
-                    <h2 className="text-sm font-bold text-gray-700">Articles à commander</h2>
-                    <button
-                        onClick={addManualItem}
-                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                    >
-                        <Plus size={14} />
-                        Ajouter manuellement
-                    </button>
-                </div>
-                {loading ? (
-                    <div className="flex items-center justify-center py-16">
-                        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    {/* Items Table */}
+                    <div className="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+                            <h2 className="text-sm font-bold text-gray-700">Articles à commander</h2>
+                            <button
+                                onClick={addManualItem}
+                                className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                            >
+                                <Plus size={14} />
+                                Ajouter manuellement
+                            </button>
+                        </div>
+                        {loading ? (
+                            <div className="flex items-center justify-center py-16">
+                                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                            </div>
+                        ) : items.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                                <Package size={40} className="mb-3 text-gray-300" />
+                                <p className="font-semibold text-gray-500">Aucun article en rupture de stock</p>
+                                <p className="text-sm mt-1">Tous les stocks sont à des niveaux suffisants.</p>
+                            </div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead>
+                                        <tr className="bg-gray-50/70 border-b border-gray-100">
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Désignation</th>
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Référence</th>
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Catégorie</th>
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider text-center">Stock actuel</th>
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider text-center">Stock min.</th>
+                                            <th className="px-4 py-3 text-xs font-semibold text-blue-500 uppercase tracking-wider text-center">Qté à commander</th>
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Unité</th>
+                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Remarque</th>
+                                            <th className="px-4 py-3" />
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {items.map(item => (
+                                            <tr key={item.id} className={cn('group hover:bg-gray-50/60 transition-colors', item.isManual && 'bg-blue-50/30')}>
+                                                <td className="px-4 py-3">
+                                                    {item.isManual ? (
+                                                        <input
+                                                            className="w-full min-w-[140px] bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                                                            value={item.name}
+                                                            placeholder="Nom de la pièce"
+                                                            onChange={e => updateItem(item.id, 'name', e.target.value)}
+                                                        />
+                                                    ) : (
+                                                        <span className="font-semibold text-gray-800">{item.name}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {item.isManual ? (
+                                                        <input
+                                                            className="w-28 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-mono focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                                                            value={item.sku}
+                                                            placeholder="Réf."
+                                                            onChange={e => updateItem(item.id, 'sku', e.target.value)}
+                                                        />
+                                                    ) : (
+                                                        <span className="text-gray-500">{item.sku}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-500">{item.category}</td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {item.isManual ? '—' : (
+                                                        <span className={cn('font-bold', item.currentStock <= item.minStock ? 'text-red-600' : 'text-gray-800')}>
+                                                            {item.currentStock}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-center text-gray-500">{item.isManual ? '—' : item.minStock}</td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        className="w-20 text-center bg-white border border-blue-200 rounded-lg px-2 py-1 text-sm font-bold text-blue-700 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none"
+                                                        value={item.qtyToOrder}
+                                                        onChange={e => updateItem(item.id, 'qtyToOrder', Math.max(1, parseInt(e.target.value) || 1))}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {item.isManual ? (
+                                                        <input
+                                                            className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
+                                                            value={item.unit}
+                                                            onChange={e => updateItem(item.id, 'unit', e.target.value)}
+                                                        />
+                                                    ) : (
+                                                        <span className="text-gray-500">{item.unit}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <input
+                                                        className="w-full min-w-[120px] bg-transparent border-b border-gray-200 focus:border-blue-400 px-1 py-0.5 text-sm outline-none transition-colors"
+                                                        value={item.remark}
+                                                        placeholder="Remarque..."
+                                                        onChange={e => updateItem(item.id, 'remark', e.target.value)}
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <button
+                                                        onClick={() => removeItem(item.id)}
+                                                        className="p-1.5 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                                        title="Retirer"
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                        {items.length > 0 && (
+                            <div className="px-6 py-4 border-t border-gray-50 flex items-center justify-between">
+                                <p className="text-xs text-gray-400">{items.length} article(s) dans la demande</p>
+                                <button
+                                    onClick={generatePDF}
+                                    className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                                >
+                                    <Download size={16} />
+                                    Télécharger la Demande d'Achat (PDF)
+                                </button>
+                            </div>
+                        )}
                     </div>
-                ) : items.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                        <Package size={40} className="mb-3 text-gray-300" />
-                        <p className="font-semibold text-gray-500">Aucun article en rupture de stock</p>
-                        <p className="text-sm mt-1">Tous les stocks sont à des niveaux suffisants.</p>
-                    </div>
-                ) : (
+                </>
+            ) : (
+                /* History View */
+                <div className="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                             <thead>
                                 <tr className="bg-gray-50/70 border-b border-gray-100">
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Désignation</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Référence</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Catégorie</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider text-center">Stock actuel</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider text-center">Stock min.</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-blue-500 uppercase tracking-wider text-center">Qté à commander</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Unité</th>
-                                    <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Remarque</th>
-                                    <th className="px-4 py-3" />
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Référence</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Demandeur</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Fournisseur</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Articles</th>
+                                    <th className="px-6 py-4 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
-                                {items.map(item => (
-                                    <tr key={item.id} className={cn('group hover:bg-gray-50/60 transition-colors', item.isManual && 'bg-blue-50/30')}>
-                                        <td className="px-4 py-3">
-                                            {item.isManual ? (
-                                                <input
-                                                    className="w-full min-w-[140px] bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                                                    value={item.name}
-                                                    placeholder="Nom de la pièce"
-                                                    onChange={e => updateItem(item.id, 'name', e.target.value)}
-                                                />
-                                            ) : (
-                                                <span className="font-semibold text-gray-800">{item.name}</span>
-                                            )}
+                                {history.map((req) => (
+                                    <tr key={req.id} className="hover:bg-gray-50/60 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <span className="font-mono font-bold text-blue-600">{req.reference}</span>
                                         </td>
-                                        <td className="px-4 py-3">
-                                            {item.isManual ? (
-                                                <input
-                                                    className="w-28 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-mono focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                                                    value={item.sku}
-                                                    placeholder="Réf."
-                                                    onChange={e => updateItem(item.id, 'sku', e.target.value)}
-                                                />
-                                            ) : (
-                                                <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">{item.sku || '—'}</code>
-                                            )}
+                                        <td className="px-6 py-4 text-gray-600">
+                                            {format(new Date(req.date), 'dd/MM/yyyy')}
                                         </td>
-                                        <td className="px-4 py-3 text-gray-500">{item.category || '—'}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            {item.isManual ? '—' : (
-                                                <span className={cn('font-bold', item.currentStock <= item.minStock ? 'text-red-600' : 'text-gray-800')}>
-                                                    {item.currentStock}
-                                                </span>
-                                            )}
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm font-medium text-gray-900">{req.requested_by}</div>
+                                            <div className="text-xs text-gray-500">{req.department}</div>
                                         </td>
-                                        <td className="px-4 py-3 text-center text-gray-500">{item.isManual ? '—' : item.minStock}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                className="w-20 text-center bg-white border border-blue-200 rounded-lg px-2 py-1 text-sm font-bold text-blue-700 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none"
-                                                value={item.qtyToOrder}
-                                                onChange={e => updateItem(item.id, 'qtyToOrder', Math.max(1, parseInt(e.target.value) || 1))}
-                                            />
+                                        <td className="px-6 py-4 text-gray-600">{req.supplier || '—'}</td>
+                                        <td className="px-6 py-4">
+                                            <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
+                                                {req.items_count} positions
+                                            </span>
                                         </td>
-                                        <td className="px-4 py-3">
-                                            {item.isManual ? (
-                                                <input
-                                                    className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
-                                                    value={item.unit}
-                                                    onChange={e => updateItem(item.id, 'unit', e.target.value)}
-                                                />
-                                            ) : (
-                                                <span className="text-gray-500">{item.unit}</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <input
-                                                className="w-full min-w-[120px] bg-transparent border-b border-gray-200 focus:border-blue-400 px-1 py-0.5 text-sm outline-none transition-colors"
-                                                value={item.remark}
-                                                placeholder="Remarque..."
-                                                onChange={e => updateItem(item.id, 'remark', e.target.value)}
-                                            />
-                                        </td>
-                                        <td className="px-4 py-3">
+                                        <td className="px-6 py-4 text-right">
                                             <button
-                                                onClick={() => removeItem(item.id)}
-                                                className="p-1.5 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                                title="Retirer"
+                                                onClick={() => {
+                                                    const link = document.createElement('a');
+                                                    link.href = req.pdf_data;
+                                                    link.download = `Demande_Achat_${req.reference}.pdf`;
+                                                    link.click();
+                                                }}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
                                             >
-                                                <Trash2 size={15} />
+                                                <Download size={14} />
+                                                PDF
                                             </button>
                                         </td>
                                     </tr>
                                 ))}
+                                {history.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic">
+                                            Aucune demande d'achat dans l'historique.
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
-                )}
-                {items.length > 0 && (
-                    <div className="px-6 py-4 border-t border-gray-50 flex items-center justify-between">
-                        <p className="text-xs text-gray-400">{items.length} article(s) dans la demande</p>
-                        <button
-                            onClick={generatePDF}
-                            className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-                        >
-                            <Download size={16} />
-                            Télécharger la Demande d'Achat (PDF)
-                        </button>
-                    </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }

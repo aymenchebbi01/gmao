@@ -65,31 +65,75 @@ export default function Sidebar({
 }) {
   const { user, logout } = useAuth();
   const [isOpen, setIsOpen] = React.useState(false);
+  const [expandedGroups, setExpandedGroups] = React.useState<string[]>([]);
 
   const currentUser = user;
 
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'manager', 'technician'] },
-    { id: 'layout', label: 'Factory Layout', icon: Factory, roles: ['admin', 'manager'] },
-    { id: 'machines', label: 'Machines', icon: HardDrive, roles: ['admin', 'manager', 'technician'] },
-    { id: 'consultation', label: 'Consultation', icon: Search, roles: ['admin', 'manager'] },
-    { id: 'calendar', label: 'Calendar', icon: Calendar, roles: ['admin', 'manager'] },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'manager'] },
     {
-      id: 'work-orders',
-      label: 'Work Orders',
-      icon: Wrench,
+      id: 'machine-mgmt',
+      label: 'Machine Management',
+      icon: HardDrive,
       roles: ['admin', 'manager', 'technician'],
       subItems: [
-        { id: 'work-orders-list', label: 'Work Orders List' },
-        { id: 'intervention-reports', label: 'Intervention Reports' }
+        { id: 'layout', label: 'Factory Layout' },
+        { id: 'machines', label: 'Machines' },
+        { id: 'consultation', label: 'Consultation' }
       ]
     },
-    { id: 'inventory', label: 'Inventory', icon: Package, roles: ['admin', 'manager'] },
-    { id: 'purchase-requests', label: 'Demande d\'Achat', icon: ShoppingCart, roles: ['admin', 'manager'] },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin', 'manager'] },
-    { id: 'audit-logs', label: 'Audit Logs', icon: History, roles: ['admin'] },
-    { id: 'users', label: 'Users', icon: Users, roles: ['admin'] },
+    {
+      id: 'maintenance-mgmt',
+      label: 'Maintenance',
+      icon: Wrench,
+      roles: ['admin', 'manager'],
+      subItems: [
+        { id: 'work-orders-list', label: 'Maintenance Orders' },
+        { id: 'intervention-reports', label: 'Intervention Reports' },
+        { id: 'calendar', label: 'Calendar' }
+      ]
+    },
+    {
+      id: 'stock-mgmt',
+      label: 'Stock Management',
+      icon: Package,
+      roles: ['admin', 'manager'],
+      subItems: [
+        { id: 'inventory', label: 'Inventory' },
+        { id: 'purchase-requests', label: 'Demande d\'Achat' },
+        { id: 'products', label: 'Items Data' }
+      ]
+    },
+    {
+      id: 'user-mgmt',
+      label: 'User Management',
+      icon: Users,
+      roles: ['admin'],
+      subItems: [
+        { id: 'analytics', label: 'Analytics' },
+        { id: 'audit-logs', label: 'Audit Logs' },
+        { id: 'users', label: 'Users' }
+      ]
+    },
   ];
+
+  // Auto-expand the group that contains the active tab
+  React.useEffect(() => {
+    const activeGroup = menuItems.find(item =>
+      item.subItems?.some(si => si.id === activeTab)
+    );
+    if (activeGroup && !expandedGroups.includes(activeGroup.id)) {
+      setExpandedGroups(prev => [...prev, activeGroup.id]);
+    }
+  }, [activeTab]);
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev =>
+      prev.includes(groupId)
+        ? prev.filter(id => id !== groupId)
+        : [...prev, groupId]
+    );
+  };
 
   const filteredItems = menuItems.filter(item => item.roles.includes(currentUser?.role || ''));
 
@@ -168,11 +212,15 @@ export default function Sidebar({
                   active={activeTab === item.id || (item.subItems?.some(si => activeTab === si.id))}
                   collapsed={isCollapsed}
                   onClick={() => {
-                    setActiveTab(item.id);
+                    if (item.subItems && item.subItems.length > 0) {
+                      toggleGroup(item.id);
+                    } else {
+                      setActiveTab(item.id);
+                    }
                     setIsOpen(false);
                   }}
                 />
-                {!isCollapsed && item.subItems && (activeTab === item.id || item.subItems.some(si => activeTab === si.id)) && (
+                {!isCollapsed && item.subItems && expandedGroups.includes(item.id) && (
                   <div className="ml-9 space-y-1 animate-in slide-in-from-top-2 duration-200">
                     {item.subItems.map((subItem) => (
                       <button

@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import MachineList from './components/MachineList';
 import MachineConsultation from './components/MachineConsultation';
+import ProductManagement from './components/ProductManagement';
 import WorkOrderList from './components/WorkOrderList';
 import Inventory from './components/Inventory';
 import UserManagement from './components/UserManagement';
@@ -99,6 +100,7 @@ function AppContent() {
       case 'layout': return <FactoryLayout setActiveTab={setActiveTab} setHistoryMachineId={setHistoryMachineId} />;
       case 'machines': return <MachineList historyMachineId={historyMachineId} onHistoryClose={() => setHistoryMachineId(null)} />;
       case 'consultation': return <MachineConsultation />;
+      case 'products': return <ProductManagement />;
       case 'work-orders':
       case 'work-orders-list': return <WorkOrderList view="list" />;
       case 'intervention-reports': return <WorkOrderList view="reports" />;

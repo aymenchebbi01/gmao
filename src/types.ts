@@ -48,6 +48,18 @@ export interface Machine {
   };
 }
 
+export interface ProductionProduct {
+  id: string;
+  item: string;
+  description: string;
+  color: string;
+  cycleTime: number;
+  qtyProduced: number;
+  priceTN: number;
+  priceMalta: number;
+  updatedAt?: string;
+}
+
 export interface FaultType {
   id: string;
   name: string;

@@ -664,7 +664,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {view === 'reports' ? 'Intervention Reports' : 'Work Orders'}
+              {view === 'reports' ? 'Intervention Reports' : 'Maintenance Orders'}
             </h1>
 
           </div>

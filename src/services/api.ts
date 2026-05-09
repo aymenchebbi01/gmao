@@ -10,7 +10,8 @@ import {
   TechnicianPerformance,
   MttrTrend,
   MtbfTrend,
-  MachineConditionHistory
+  MachineConditionHistory,
+  ProductionProduct
 } from '../types';
 
 const API_BASE = '/api';
@@ -183,5 +184,49 @@ export const api = {
       body: formData
     });
     return handleResponse(res);
+  },
+
+  // Production Products
+  getProducts: async (): Promise<ProductionProduct[]> => {
+    const res = await fetch(`${API_BASE}/products`);
+    return handleResponse(res);
+  },
+  saveProducts: async (products: ProductionProduct[] | ProductionProduct): Promise<void> => {
+    const res = await fetch(`${API_BASE}/products`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(products)
+    });
+    await handleResponse(res);
+  },
+  updateProduct: async (id: string, product: Partial<ProductionProduct>): Promise<void> => {
+    const res = await fetch(`${API_BASE}/products/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(product)
+    });
+    await handleResponse(res);
+  },
+  deleteProduct: async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/products/${id}`, { method: 'DELETE' });
+    await handleResponse(res);
+  },
+
+  // Purchase Requests
+  getPurchaseRequests: async (): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/purchase-requests`);
+    return handleResponse(res);
+  },
+  getLastPurchaseRequestRef: async (): Promise<{ lastRef: string | null }> => {
+    const res = await fetch(`${API_BASE}/purchase-requests/last-ref`);
+    return handleResponse(res);
+  },
+  savePurchaseRequest: async (data: any): Promise<void> => {
+    const res = await fetch(`${API_BASE}/purchase-requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    await handleResponse(res);
   }
 };
