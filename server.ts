@@ -10,6 +10,8 @@ import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import fs from 'fs';
 import db from './db.js';
+import os from 'os';
+
 
 dotenv.config();
 
@@ -69,6 +71,7 @@ try {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `).run();
+
 } catch (error) {
   console.error("Migration error:", error);
 }
@@ -87,7 +90,8 @@ const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(cookieParser());
 app.use('/uploads', express.static(uploadsDir));
 
@@ -858,6 +862,61 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
   res.json({ url: fileUrl });
 });
 
+// --- Machine Rendement ---
+app.get('/api/machine-rendement', (req, res) => {
+  try {
+    const { date } = req.query;
+    let query = 'SELECT * FROM machine_rendement';
+    const params: any[] = [];
+    if (date) {
+      query += ' WHERE date = ?';
+      params.push(date);
+    }
+    query += ' ORDER BY date DESC, id DESC';
+    const rows = db.prepare(query).all(...params);
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/machine-rendement', (req, res) => {
+  try {
+    const { date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3 } = req.body;
+    const info = db.prepare(`
+      INSERT INTO machine_rendement (date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3);
+    res.status(201).json({ id: info.lastInsertRowid });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.put('/api/machine-rendement/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3 } = req.body;
+    db.prepare(`
+      UPDATE machine_rendement SET date=?, machineNumber=?, item=?, targetQty=?, qtyShift1=?, qtyShift2=?, qtyShift3=?,
+        efficiencyShift1=?, efficiencyShift2=?, efficiencyShift3=? WHERE id=?
+    `).run(date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, id);
+    res.json({ message: 'Record updated' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/machine-rendement/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM machine_rendement WHERE id = ?').run(id);
+    res.json({ message: 'Record deleted' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // --- Vite Integration ---
 
 async function startServer() {
@@ -876,7 +935,19 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`\n Server is running!`);
+    console.log(`Local: http://localhost:${PORT}`);
+
+    // Get network interfaces to show the IP address for VPN/Local Network sharing
+    const interfaces = os.networkInterfaces();
+    Object.keys(interfaces).forEach((ifname) => {
+      interfaces[ifname]?.forEach((iface) => {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          console.log(`Network (${ifname}): http://${iface.address}:${PORT}`);
+        }
+      });
+    });
+    console.log(`\nPress Ctrl+C to stop the server\n`);
   });
 }
 

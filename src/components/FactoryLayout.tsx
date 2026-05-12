@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, Suspense } from 'react';
 const SITES = ['Site A', 'Site C'] as const;
 type SiteName = typeof SITES[number];
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Environment, ContactShadows } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Environment, ContactShadows, Sky } from '@react-three/drei';
 import { FactoryFloor } from './3d/FactoryFloor';
 import { Machine } from './3d/Machine';
 import { PropertiesPanel } from './3d/PropertiesPanel';
@@ -185,7 +185,8 @@ export default function FactoryLayout({ setActiveTab, setHistoryMachineId }: Fac
             />
 
             <Suspense fallback={null}>
-              <Environment preset="warehouse" />
+              <color attach="background" args={['#f8fafc']} />
+              <Sky distance={450000} sunPosition={[5, 1, 8]} inclination={0} azimuth={0.25} />
               <FactoryFloor />
               {siteMachines.map((machine) => (
                 <Machine

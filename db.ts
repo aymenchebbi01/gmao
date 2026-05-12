@@ -26,6 +26,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     serialNumber TEXT NOT NULL,
+    siteNumber TEXT,
     type TEXT,
     manufacturingYear INTEGER,
     location TEXT,
@@ -171,6 +172,21 @@ db.exec(`
     timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (machineId) REFERENCES machines(id) ON DELETE CASCADE
   );
+
+  CREATE TABLE IF NOT EXISTS machine_rendement (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    machineNumber TEXT DEFAULT '',
+    item TEXT NOT NULL,
+    targetQty REAL DEFAULT 0,
+    qtyShift1 REAL DEFAULT 0,
+    qtyShift2 REAL DEFAULT 0,
+    qtyShift3 REAL DEFAULT 0,
+    efficiencyShift1 REAL DEFAULT 0,
+    efficiencyShift2 REAL DEFAULT 0,
+    efficiencyShift3 REAL DEFAULT 0,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 // Safe migrations for missing columns
@@ -192,7 +208,9 @@ const migrations = [
   { table: 'users', column: 'updatedAt', type: 'TEXT DEFAULT CURRENT_TIMESTAMP' },
   { table: 'spare_parts', column: 'createdAt', type: 'TEXT DEFAULT CURRENT_TIMESTAMP' },
   { table: 'spare_parts', column: 'updatedAt', type: 'TEXT DEFAULT CURRENT_TIMESTAMP' },
-  { table: 'machines', column: 'imageUrl', type: 'TEXT' }
+  { table: 'machines', column: 'imageUrl', type: 'TEXT' },
+  { table: 'machines', column: 'siteNumber', type: 'TEXT' },
+  { table: 'machine_rendement', column: 'machineNumber', type: 'TEXT DEFAULT \'\'' }
 ];
 
 for (const m of migrations) {

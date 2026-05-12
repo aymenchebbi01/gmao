@@ -169,7 +169,6 @@ export default function PurchaseRequests() {
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text('Système de Gestion de Maintenance Assistée par Ordinateur', 14, 21);
 
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');

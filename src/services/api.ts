@@ -11,7 +11,8 @@ import {
   MttrTrend,
   MtbfTrend,
   MachineConditionHistory,
-  ProductionProduct
+  ProductionProduct,
+  MachineRendement
 } from '../types';
 
 const API_BASE = '/api';
@@ -228,5 +229,32 @@ export const api = {
       body: JSON.stringify(data)
     });
     await handleResponse(res);
-  }
+  },
+
+  // Machine Rendement
+  getRendement: async (date?: string): Promise<MachineRendement[]> => {
+    const url = date ? `${API_BASE}/machine-rendement?date=${date}` : `${API_BASE}/machine-rendement`;
+    const res = await fetch(url);
+    return handleResponse(res);
+  },
+  createRendement: async (data: MachineRendement): Promise<{ id: number }> => {
+    const res = await fetch(`${API_BASE}/machine-rendement`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return handleResponse(res);
+  },
+  updateRendement: async (id: number, data: MachineRendement): Promise<void> => {
+    const res = await fetch(`${API_BASE}/machine-rendement/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    await handleResponse(res);
+  },
+  deleteRendement: async (id: number): Promise<void> => {
+    const res = await fetch(`${API_BASE}/machine-rendement/${id}`, { method: 'DELETE' });
+    await handleResponse(res);
+  },
 };

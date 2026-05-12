@@ -79,7 +79,8 @@ export default function Sidebar({
       subItems: [
         { id: 'layout', label: 'Factory Layout' },
         { id: 'machines', label: 'Machines' },
-        { id: 'consultation', label: 'Consultation' }
+        { id: 'consultation', label: 'Consultation' },
+        { id: 'rendement', label: 'Rendement' },
       ]
     },
     {

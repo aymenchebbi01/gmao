@@ -15,6 +15,7 @@ import FactoryLayout from './components/FactoryLayout';
 import Login from './components/Login';
 import MobileStatusUpdater from './components/MobileStatusUpdater';
 import PurchaseRequests from './components/PurchaseRequests';
+import MachineRendement from './components/MachineRendement';
 import { Toaster } from 'sonner';
 import { Machine } from './types';
 import { cn, calculateMachineLiveHours } from './lib/utils';
@@ -111,6 +112,7 @@ function AppContent() {
       case 'analytics': return <AdvancedAnalytics />;
       case 'users': return isManager ? <UserManagement /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
       case 'mobile-status': return <MobileStatusUpdater machineId={deepLinkMachineId} />;
+      case 'rendement': return <MachineRendement />;
       default: return <Dashboard setActiveTab={setActiveTab} />;
     }
   };

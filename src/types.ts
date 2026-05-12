@@ -192,3 +192,18 @@ export interface MachineConditionHistory {
   newCondition: string;
   timestamp: string;
 }
+
+export interface MachineRendement {
+  id?: number;
+  date: string;
+  machineNumber: string;
+  item: string;
+  targetQty: number;
+  qtyShift1: number;
+  qtyShift2: number;
+  qtyShift3: number;
+  efficiencyShift1: number;
+  efficiencyShift2: number;
+  efficiencyShift3: number;
+  createdAt?: string;
+}

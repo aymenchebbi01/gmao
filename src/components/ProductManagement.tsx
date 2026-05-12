@@ -254,12 +254,7 @@ export default function ProductManagement() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2">
-                                                {p.color && (
-                                                    <div
-                                                        className="w-3 h-3 rounded-full border border-gray-200"
-                                                        style={{ backgroundColor: p.color.toLowerCase() }}
-                                                    />
-                                                )}
+
                                                 <span className="text-sm text-gray-600 font-medium font-inter capitalize">
                                                     {p.color}
                                                 </span>
