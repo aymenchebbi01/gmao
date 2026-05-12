@@ -205,5 +205,9 @@ export interface MachineRendement {
   efficiencyShift1: number;
   efficiencyShift2: number;
   efficiencyShift3: number;
+  actualCycleTime?: number;
+  actualCavitiesRunning?: number;
+  trs?: number;
+  comment?: string;
   createdAt?: string;
 }

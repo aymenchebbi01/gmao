@@ -159,6 +159,11 @@ function calcEfficiency(qty: number, target: number): number {
     return Math.round((qty / target) * 100);
 }
 
+function calcTRS(cycleTime: number, cavities: number): number {
+    if (!cycleTime || cycleTime === 0) return 0;
+    return Math.round((3600 * cavities / cycleTime) * 8);
+}
+
 function effColor(pct: number) {
     if (pct >= 90) return 'text-emerald-600 bg-emerald-50';
     if (pct >= 70) return 'text-amber-600 bg-amber-50';
@@ -186,6 +191,10 @@ const emptyForm = (): Omit<MachineRendementType, 'id' | 'createdAt'> => ({
     efficiencyShift1: 0,
     efficiencyShift2: 0,
     efficiencyShift3: 0,
+    actualCycleTime: 0,
+    actualCavitiesRunning: 0,
+    trs: 0,
+    comment: '',
 });
 
 // ─── component ──────────────────────────────────────────────────────────────
@@ -257,6 +266,16 @@ export default function MachineRendement() {
         });
     };
 
+    const handleTRSInputChange = (field: 'actualCycleTime' | 'actualCavitiesRunning', value: number) => {
+        setForm(f => {
+            const next = { ...f, [field]: value };
+            return {
+                ...next,
+                trs: calcTRS(next.actualCycleTime || 0, next.actualCavitiesRunning || 0)
+            };
+        });
+    };
+
     // ── open modal ────────────────────────────────────────────────────────────
 
     const openCreate = () => {
@@ -278,6 +297,10 @@ export default function MachineRendement() {
             efficiencyShift1: rec.efficiencyShift1,
             efficiencyShift2: rec.efficiencyShift2,
             efficiencyShift3: rec.efficiencyShift3,
+            actualCycleTime: rec.actualCycleTime || 0,
+            actualCavitiesRunning: rec.actualCavitiesRunning || 0,
+            trs: rec.trs || 0,
+            comment: rec.comment || '',
         });
         setIsModalOpen(true);
     };
@@ -343,7 +366,7 @@ export default function MachineRendement() {
     const handleExport = () => {
         const rows = filtered.map(r => ({
             Date: r.date,
-            'Site No': r.machineNumber,
+            'Mch N°': r.machineNumber,
             Item: r.item,
             'Target Qty': r.targetQty,
             'Qty Shift 1': r.qtyShift1,
@@ -354,6 +377,8 @@ export default function MachineRendement() {
             'Efficiency Shift 2 (%)': r.efficiencyShift2,
             'Efficiency Shift 3 (%)': r.efficiencyShift3,
             'Avg Efficiency (%)': ((r.efficiencyShift1 + r.efficiencyShift2 + r.efficiencyShift3) / 3).toFixed(1),
+            'TRS': r.trs || 0,
+            'Comment': r.comment || '',
         }));
         const ws = XLSX.utils.json_to_sheet(rows);
         const wb = XLSX.utils.book_new();
@@ -384,7 +409,7 @@ export default function MachineRendement() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        Machine Rendement
+                        Rendement Machines
                     </h1>
                 </div>
                 <div className="flex gap-2 flex-wrap">
@@ -400,7 +425,7 @@ export default function MachineRendement() {
                         className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
                     >
                         <Plus size={16} />
-                        Add new rendement
+                        Add Rendement
                     </button>
                     <button
                         onClick={fetchAll}
@@ -452,39 +477,39 @@ export default function MachineRendement() {
                             <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="colorQty" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
-                                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
+                                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis 
-                                    dataKey="name" 
-                                    axisLine={false} 
-                                    tickLine={false} 
+                                <XAxis
+                                    dataKey="name"
+                                    axisLine={false}
+                                    tickLine={false}
                                     tick={{ fontSize: 10, fontWeight: 600, fill: '#94a3b8' }}
                                     dy={10}
                                 />
-                                <YAxis 
-                                    axisLine={false} 
-                                    tickLine={false} 
+                                <YAxis
+                                    axisLine={false}
+                                    tickLine={false}
                                     tick={{ fontSize: 10, fontWeight: 600, fill: '#94a3b8' }}
                                 />
-                                <Tooltip 
-                                    contentStyle={{ 
-                                        borderRadius: '12px', 
-                                        border: 'none', 
+                                <Tooltip
+                                    contentStyle={{
+                                        borderRadius: '12px',
+                                        border: 'none',
                                         boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
                                         fontSize: '12px',
                                         fontWeight: '700'
-                                    }} 
+                                    }}
                                 />
-                                <Area 
-                                    type="monotone" 
-                                    dataKey="qty" 
-                                    stroke="#2563eb" 
+                                <Area
+                                    type="monotone"
+                                    dataKey="qty"
+                                    stroke="#2563eb"
                                     strokeWidth={3}
-                                    fillOpacity={1} 
-                                    fill="url(#colorQty)" 
+                                    fillOpacity={1}
+                                    fill="url(#colorQty)"
                                     animationDuration={1500}
                                 />
                             </AreaChart>
@@ -581,6 +606,8 @@ export default function MachineRendement() {
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Eff. S2</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Shift 3 Qty</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Eff. S3</th>
+                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">TRS</th>
+                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Comment</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
@@ -634,6 +661,16 @@ export default function MachineRendement() {
                                             {rec.qtyShift3.toLocaleString()}
                                         </td>
                                         <td className="px-5 py-4 text-center">{effBadge(rec.efficiencyShift3)}</td>
+                                        <td className="px-5 py-4 text-center">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold tabular-nums">
+                                                {(rec.trs || 0).toLocaleString()}
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-4">
+                                            <p className="text-xs text-gray-500 max-w-[200px] truncate" title={rec.comment}>
+                                                {rec.comment || '---'}
+                                            </p>
+                                        </td>
                                         <td className="px-5 py-4 text-right">
                                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
@@ -734,6 +771,47 @@ export default function MachineRendement() {
                                 </div>
                             </div>
 
+                            {/* TRS Calculation Section */}
+                            <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="p-1.5 bg-blue-100 rounded-lg text-blue-600">
+                                        <TrendingUp size={16} />
+                                    </div>
+                                    <h3 className="text-sm font-bold text-gray-900">TRS</h3>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Actual Cycle Time (sec)</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-bold tabular-nums"
+                                            value={form.actualCycleTime}
+                                            onChange={e => handleTRSInputChange('actualCycleTime', Number(e.target.value))}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Actual Cavities Running</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            className="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-bold tabular-nums"
+                                            value={form.actualCavitiesRunning}
+                                            onChange={e => handleTRSInputChange('actualCavitiesRunning', Number(e.target.value))}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-2 border-t border-gray-200/50">
+                                    <span className="text-xs font-bold text-gray-500">TRS:</span>
+                                    <span className="text-lg font-black text-blue-600 tabular-nums">
+                                        {(form.trs || 0).toLocaleString()}
+                                    </span>
+                                </div>
+                            </div>
+
                             {/* Shifts */}
                             <div className="space-y-3">
                                 {([1, 2, 3] as const).map(shift => (
@@ -765,6 +843,17 @@ export default function MachineRendement() {
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+
+                            {/* Comment */}
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Comment / Problems encountered</label>
+                                <textarea
+                                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium min-h-[80px]"
+                                    placeholder="Describe any problems or notes here..."
+                                    value={form.comment}
+                                    onChange={e => setForm(f => ({ ...f, comment: e.target.value }))}
+                                />
                             </div>
 
                             {/* Actions */}

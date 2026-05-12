@@ -153,129 +153,118 @@ export default function PurchaseRequests() {
         const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
         // ---- Header ----
-        doc.setFillColor(30, 64, 175); // Blue
-        doc.rect(0, 0, 210, 32, 'F');
-
-        // Add Logo
+        // Logo
         try {
-            doc.addImage(THERMOPLASTICS_LOGO_BASE64, 'PNG', 14, 6, 45, 12);
+            doc.addImage(THERMOPLASTICS_LOGO_BASE64, 'PNG', 14, 10, 35, 15);
         } catch (e) {
-            doc.setTextColor(255, 255, 255);
             doc.setFont('helvetica', 'bold');
-            doc.setFontSize(18);
-            doc.text('THERMOPLASTICS', 14, 13);
+            doc.setFontSize(14);
+            doc.text('THERMOPLASTICS', 14, 20);
         }
 
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-
+        // Title
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(16);
+        doc.text('DEMANDE D\'ACHAT', 105, 18, { align: 'center' });
+
+        // Horizontal Line
+        doc.setDrawColor(0);
+        doc.setLineWidth(0.4);
+        doc.line(14, 30, 196, 30);
+
+        // Meta Info
+        doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.text('DEMANDE D\'ACHAT', 210 - 14, 13, { align: 'right' });
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Réf: ${currentRefNum}`, 210 - 14, 21, { align: 'right' });
-        doc.text(`Date: ${format(new Date(), 'dd/MM/yyyy')}`, 210 - 14, 27, { align: 'right' });
-
-        // ---- Info Block ----
-        doc.setTextColor(30, 30, 30);
-        doc.setFillColor(245, 247, 250);
-        doc.rect(14, 38, 182, 30, 'F');
-        doc.setDrawColor(220, 225, 235);
-        doc.rect(14, 38, 182, 30, 'S');
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(100, 110, 130);
-        doc.text('DEMANDEUR', 20, 46);
-        doc.text('DÉPARTEMENT', 75, 46);
-        doc.text('FOURNISSEUR SOUHAITÉ', 130, 46);
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.setTextColor(20, 20, 20);
-        doc.text(requestedBy || '—', 20, 54);
-        doc.text(department || '—', 75, 54);
-        doc.text(supplier || '—', 130, 54);
+        doc.text(`N° DA : ${currentRefNum}`, 14, 40);
+        doc.text(`Date d’émission : ${format(new Date(), 'dd/MM/yyyy')}`, 130, 40);
 
         // ---- Table ----
-        const tableBody = items.map((item, i) => [
-            String(i + 1),
+        const tableBody = items.map((item) => [
+            item.sku || '',
             item.name,
-            item.sku || '—',
-            item.category || '—',
             String(item.qtyToOrder),
             item.unit,
-            item.location || '—',
-            item.remark || '',
+            item.isManual ? '' : String(item.currentStock),
+            supplier || '',
         ]);
 
+        // Add 3 empty rows to match the "form" look if the list is short
+        if (tableBody.length < 5) {
+            for (let i = 0; i < 3; i++) {
+                tableBody.push(['', '', '', '', '', '']);
+            }
+        }
+
         autoTable(doc, {
-            startY: 75,
-            head: [['N°', 'Désignation', 'Référence', 'Catégorie', 'Qté', 'Unité', 'Emplacement', 'Remarque']],
+            startY: 46,
+            head: [['Reference', 'Désignation Article', 'Quantité', 'unité', 'Stock actuel', 'Fournisseur']],
             body: tableBody,
             theme: 'grid',
             headStyles: {
-                fillColor: [30, 64, 175],
-                textColor: 255,
+                fillColor: [255, 255, 255],
+                textColor: [0, 0, 0],
                 fontStyle: 'bold',
-                fontSize: 8,
+                fontSize: 9,
                 halign: 'center',
+                lineWidth: 0.2,
+                lineColor: [0, 0, 0]
             },
-            bodyStyles: { fontSize: 8, cellPadding: 2.5 },
+            bodyStyles: {
+                fontSize: 9,
+                cellPadding: 3,
+                textColor: [0, 0, 0],
+                lineWidth: 0.2,
+                lineColor: [0, 0, 0]
+            },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 10 },
-                4: { halign: 'center', cellWidth: 12 },
-                5: { halign: 'center', cellWidth: 14 },
+                0: { cellWidth: 30 },
+                1: { cellWidth: 45 },
+                2: { halign: 'center', cellWidth: 20 },
+                3: { halign: 'center', cellWidth: 15 },
+                4: { halign: 'center', cellWidth: 25 },
+                5: { halign: 'center' },
             },
-            alternateRowStyles: { fillColor: [248, 250, 252] },
             margin: { left: 14, right: 14 },
         });
 
-        const finalY = (doc as any).lastAutoTable.finalY + 12;
+        let finalY = (doc as any).lastAutoTable.finalY + 15;
 
-        // ---- Notes ----
-        if (notes) {
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(8);
-            doc.setTextColor(80, 90, 110);
-            doc.text('NOTES / OBSERVATIONS:', 14, finalY);
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(8);
-            doc.setTextColor(30, 30, 30);
-            const noteLines = doc.splitTextToSize(notes, 182);
-            doc.text(noteLines, 14, finalY + 6);
+        // Ensure we don't go off page
+        if (finalY > 230) {
+            doc.addPage();
+            finalY = 20;
         }
 
-        // ---- Signature ----
-        const sigY = Math.min(finalY + (notes ? 20 : 4), 260);
-        doc.setDrawColor(200, 210, 220);
-        doc.setFillColor(250, 251, 253);
-        doc.rect(14, sigY, 85, 25, 'FD');
-        doc.rect(111, sigY, 85, 25, 'FD');
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(100, 110, 130);
-        doc.text('Signature Demandeur', 56.5, sigY + 6, { align: 'center' });
-        doc.text('Visa Responsable', 153.5, sigY + 6, { align: 'center' });
-
-        // ---- Footer ----
-        doc.setFontSize(7);
-        doc.setTextColor(160, 170, 185);
+        // ---- Remark ----
+        doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        const pageCount = doc.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-            doc.setPage(i);
-            doc.text(
-                `Document généré le ${format(new Date(), 'dd/MM/yyyy à HH:mm')} — GMAO Thermoplastics`,
-                105, 290, { align: 'center' }
-            );
-            doc.text(`Page ${i}/${pageCount}`, 196, 290, { align: 'right' });
-        }
+        const remarkText = notes ? `Remarque : ${notes}` : 'Remarque : ..............................................................................................................................................';
+        doc.text(remarkText, 14, finalY);
 
-        const pdfOutput = doc.output('bloburl');
+        finalY += 10;
+
+        // ---- Signatures Block ----
+        doc.setLineWidth(0.2);
+        doc.rect(14, finalY, 91, 14); // Demandeur box
+        doc.rect(105, finalY, 91, 14); // Validation box
+
+        doc.setFontSize(9);
+        doc.text(`Demandeur : ....................................................`, 16, finalY + 5);
+        doc.text(`Visa : .................................................................`, 16, finalY + 11);
+
+        doc.text(`Validation supérieur hiérarchique: .............................`, 107, finalY + 5);
+        doc.text(`Date : .................................................................`, 107, finalY + 11);
+
+        finalY += 25;
+
+        // Director Signature
+        doc.text(`Visa Directeur des opérations: .........................................................................`, 105, finalY, { align: 'center' });
+
+        // ---- Bottom Footer ----
+        doc.setFontSize(8);
+        doc.text('Page : 1 / 1', 14, 285);
+        doc.text('DASACH03/V01/01032025/WN', 196, 285, { align: 'right' });
+
         const pdfBase64 = doc.output('datauristring');
 
         doc.save(`Demande_Achat_${currentRefNum}.pdf`);
@@ -295,7 +284,7 @@ export default function PurchaseRequests() {
             console.error('Failed to save PR to history', err);
         });
 
-        toast.success('PDF téléchargé et enregistré dans l\'historique');
+        toast.success('Demande d\'achat générée selon le modèle');
     };
 
     const lowStockCount = items.filter(i => !i.isManual).length;

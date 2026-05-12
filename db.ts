@@ -185,6 +185,10 @@ db.exec(`
     efficiencyShift1 REAL DEFAULT 0,
     efficiencyShift2 REAL DEFAULT 0,
     efficiencyShift3 REAL DEFAULT 0,
+    actualCycleTime REAL DEFAULT 0,
+    actualCavitiesRunning INTEGER DEFAULT 0,
+    trs REAL DEFAULT 0,
+    comment TEXT DEFAULT '',
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
@@ -210,7 +214,11 @@ const migrations = [
   { table: 'spare_parts', column: 'updatedAt', type: 'TEXT DEFAULT CURRENT_TIMESTAMP' },
   { table: 'machines', column: 'imageUrl', type: 'TEXT' },
   { table: 'machines', column: 'siteNumber', type: 'TEXT' },
-  { table: 'machine_rendement', column: 'machineNumber', type: 'TEXT DEFAULT \'\'' }
+  { table: 'machine_rendement', column: 'machineNumber', type: 'TEXT DEFAULT \'\'' },
+  { table: 'machine_rendement', column: 'actualCycleTime', type: 'REAL DEFAULT 0' },
+  { table: 'machine_rendement', column: 'actualCavitiesRunning', type: 'INTEGER DEFAULT 0' },
+  { table: 'machine_rendement', column: 'trs', type: 'REAL DEFAULT 0' },
+  { table: 'machine_rendement', column: 'comment', type: 'TEXT DEFAULT \'\'' }
 ];
 
 for (const m of migrations) {
