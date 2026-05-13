@@ -209,5 +209,6 @@ export interface MachineRendement {
   actualCavitiesRunning?: number;
   trs?: number;
   comment?: string;
+  priceMarket?: 'TN' | 'Malta';
   createdAt?: string;
 }

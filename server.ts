@@ -882,11 +882,11 @@ app.get('/api/machine-rendement', (req, res) => {
 
 app.post('/api/machine-rendement', (req, res) => {
   try {
-    const { date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, actualCycleTime, actualCavitiesRunning, trs, comment } = req.body;
+    const { date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, actualCycleTime, actualCavitiesRunning, trs, comment, priceMarket } = req.body;
     const info = db.prepare(`
-      INSERT INTO machine_rendement (date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, actualCycleTime, actualCavitiesRunning, trs, comment)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, actualCycleTime || 0, actualCavitiesRunning || 0, trs || 0, comment || '');
+      INSERT INTO machine_rendement (date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, actualCycleTime, actualCavitiesRunning, trs, comment, priceMarket)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, actualCycleTime || 0, actualCavitiesRunning || 0, trs || 0, comment || '', priceMarket || 'TN');
     res.status(201).json({ id: info.lastInsertRowid });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -896,11 +896,11 @@ app.post('/api/machine-rendement', (req, res) => {
 app.put('/api/machine-rendement/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, actualCycleTime, actualCavitiesRunning, trs, comment } = req.body;
+    const { date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, actualCycleTime, actualCavitiesRunning, trs, comment, priceMarket } = req.body;
     db.prepare(`
       UPDATE machine_rendement SET date=?, machineNumber=?, item=?, targetQty=?, qtyShift1=?, qtyShift2=?, qtyShift3=?,
-        efficiencyShift1=?, efficiencyShift2=?, efficiencyShift3=?, actualCycleTime=?, actualCavitiesRunning=?, trs=?, comment=? WHERE id=?
-    `).run(date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, actualCycleTime || 0, actualCavitiesRunning || 0, trs || 0, comment || '', id);
+        efficiencyShift1=?, efficiencyShift2=?, efficiencyShift3=?, actualCycleTime=?, actualCavitiesRunning=?, trs=?, comment=?, priceMarket=? WHERE id=?
+    `).run(date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, actualCycleTime || 0, actualCavitiesRunning || 0, trs || 0, comment || '', priceMarket || 'TN', id);
     res.json({ message: 'Record updated' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });

@@ -11,6 +11,10 @@ import {
     Target,
     TrendingUp,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
     Download,
     Search,
     Monitor,
@@ -195,6 +199,7 @@ const emptyForm = (): Omit<MachineRendementType, 'id' | 'createdAt'> => ({
     actualCavitiesRunning: 0,
     trs: 0,
     comment: '',
+    priceMarket: 'TN',
 });
 
 // ─── component ──────────────────────────────────────────────────────────────
@@ -207,9 +212,14 @@ export default function MachineRendement() {
     const [filterDate, setFilterDate] = useState('');
     const [filterItem, setFilterItem] = useState('');
     const [filterMachine, setFilterMachine] = useState('');
+    const [filterMarket, setFilterMarket] = useState<'TN' | 'Malta' | ''>('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<MachineRendementType | null>(null);
     const [form, setForm] = useState(emptyForm());
+
+    // ── pagination state ──────────────────────────────────────────────────────
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
 
     // ── fetch ────────────────────────────────────────────────────────────────
 
@@ -301,6 +311,7 @@ export default function MachineRendement() {
             actualCavitiesRunning: rec.actualCavitiesRunning || 0,
             trs: rec.trs || 0,
             comment: rec.comment || '',
+            priceMarket: rec.priceMarket || 'TN',
         });
         setIsModalOpen(true);
     };
@@ -346,9 +357,10 @@ export default function MachineRendement() {
             const matchesDate = !filterDate || r.date === filterDate;
             const matchesItem = !filterItem || r.item.toLowerCase().includes(filterItem.toLowerCase());
             const matchesMachine = !filterMachine || (r.machineNumber || '').toLowerCase().includes(filterMachine.toLowerCase());
-            return matchesDate && matchesItem && matchesMachine;
+            const matchesMarket = !filterMarket || r.priceMarket === filterMarket;
+            return matchesDate && matchesItem && matchesMachine && matchesMarket;
         });
-    }, [records, filterDate, filterItem, filterMachine]);
+    }, [records, filterDate, filterItem, filterMachine, filterMarket]);
 
     const chartData = useMemo(() => {
         const map = new Map<string, number>();
@@ -373,6 +385,19 @@ export default function MachineRendement() {
             'Qty Shift 2': r.qtyShift2,
             'Qty Shift 3': r.qtyShift3,
             'Total Qty': r.qtyShift1 + r.qtyShift2 + r.qtyShift3,
+            'Price Target': (() => {
+                const prod = products.find(p => p.item === r.item);
+                if (!prod) return 0;
+                const price = r.priceMarket === 'Malta' ? prod.priceMalta : prod.priceTN;
+                return Number(((r.targetQty / 1000) * price).toFixed(2));
+            })(),
+            'Price Actual': (() => {
+                const prod = products.find(p => p.item === r.item);
+                if (!prod) return 0;
+                const price = r.priceMarket === 'Malta' ? prod.priceMalta : prod.priceTN;
+                const totalQty = r.qtyShift1 + r.qtyShift2 + r.qtyShift3;
+                return Number(((totalQty / 1000) * price).toFixed(2));
+            })(),
             'Efficiency Shift 1 (%)': r.efficiencyShift1,
             'Efficiency Shift 2 (%)': r.efficiencyShift2,
             'Efficiency Shift 3 (%)': r.efficiencyShift3,
@@ -400,6 +425,32 @@ export default function MachineRendement() {
         filtered.reduce((acc, r) => acc + r.qtyShift1 + r.qtyShift2 + r.qtyShift3, 0),
         [filtered]
     );
+
+    const totals = useMemo(() => {
+        return filtered.reduce((acc, r) => {
+            const prod = products.find(p => p.item === r.item);
+            const price = r.priceMarket === 'Malta' ? (prod?.priceMalta || 0) : (prod?.priceTN || 0);
+            const totalActualQty = r.qtyShift1 + r.qtyShift2 + r.qtyShift3;
+
+            acc.targetQty += r.targetQty;
+            acc.qty1 += r.qtyShift1;
+            acc.qty2 += r.qtyShift2;
+            acc.qty3 += r.qtyShift3;
+            acc.priceTarget += (r.targetQty / 1000) * price;
+            acc.priceActual += (totalActualQty / 1000) * price;
+            return acc;
+        }, { targetQty: 0, qty1: 0, qty2: 0, qty3: 0, priceTarget: 0, priceActual: 0 });
+    }, [filtered, products]);
+
+    // ── pagination logic ──────────────────────────────────────────────────────
+    const totalItems = filtered.length;
+    const totalPages = Math.ceil(totalItems / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const paginatedRecords = filtered.slice(startIndex, startIndex + pageSize);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filterDate, filterItem, filterMachine, filterMarket, pageSize]);
 
     // ── render ────────────────────────────────────────────────────────────────
 
@@ -519,7 +570,7 @@ export default function MachineRendement() {
             )}
 
             {/* ── Filters ── */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-white border border-gray-100 shadow-sm rounded-2xl">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white border border-gray-100 shadow-sm rounded-2xl">
                 <div className="flex items-center gap-4">
                     <Calendar size={18} className="text-gray-400 flex-shrink-0" />
                     <div className="flex items-center gap-2 flex-1">
@@ -588,6 +639,21 @@ export default function MachineRendement() {
                         </div>
                     </div>
                 </div>
+                <div className="flex items-center gap-4">
+                    <Target size={18} className="text-gray-400 flex-shrink-0" />
+                    <div className="flex items-center gap-2 flex-1">
+                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Market</label>
+                        <select
+                            value={filterMarket}
+                            onChange={e => setFilterMarket(e.target.value as any)}
+                            className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium"
+                        >
+                            <option value="">All Markets</option>
+                            <option value="TN">TN Price</option>
+                            <option value="Malta">Malta Price</option>
+                        </select>
+                    </div>
+                </div>
             </div>
 
             {/* ── Table ── */}
@@ -599,6 +665,7 @@ export default function MachineRendement() {
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Date</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Mch N°</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Item</th>
+                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Market</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Target Qty</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Shift 1 Qty</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Eff. S1</th>
@@ -607,6 +674,8 @@ export default function MachineRendement() {
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Shift 3 Qty</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Eff. S3</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">TRS</th>
+                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Price Target</th>
+                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Price Actual</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Comment</th>
                                 <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Actions</th>
                             </tr>
@@ -615,14 +684,14 @@ export default function MachineRendement() {
                             {loading ? (
                                 Array.from({ length: 5 }).map((_, i) => (
                                     <tr key={i} className="animate-pulse">
-                                        <td colSpan={11} className="px-5 py-5">
+                                        <td colSpan={16} className="px-5 py-5">
                                             <div className="h-4 bg-gray-100 rounded w-full" />
                                         </td>
                                     </tr>
                                 ))
                             ) : filtered.length === 0 ? (
                                 <tr>
-                                    <td colSpan={11} className="px-5 py-16 text-center">
+                                    <td colSpan={16} className="px-5 py-16 text-center">
                                         <div className="inline-flex flex-col items-center">
                                             <div className="p-4 bg-gray-50 rounded-full mb-3">
                                                 <Activity size={28} className="text-gray-300" />
@@ -633,7 +702,7 @@ export default function MachineRendement() {
                                     </td>
                                 </tr>
                             ) : (
-                                filtered.map(rec => (
+                                paginatedRecords.map(rec => (
                                     <tr key={rec.id} className="hover:bg-blue-50/20 transition-colors group">
                                         <td className="px-5 py-4 text-sm font-semibold text-gray-700">{rec.date}</td>
                                         <td className="px-5 py-4">
@@ -643,6 +712,14 @@ export default function MachineRendement() {
                                         </td>
                                         <td className="px-5 py-4">
                                             <span className="text-sm font-bold text-gray-900">{rec.item}</span>
+                                        </td>
+                                        <td className="px-5 py-4">
+                                            <span className={cn(
+                                                "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                                                rec.priceMarket === 'Malta' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                                            )}>
+                                                {rec.priceMarket || 'TN'}
+                                            </span>
                                         </td>
                                         <td className="px-5 py-4 text-center">
                                             <span className="text-sm font-bold text-gray-700 tabular-nums">
@@ -664,6 +741,27 @@ export default function MachineRendement() {
                                         <td className="px-5 py-4 text-center">
                                             <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold tabular-nums">
                                                 {(rec.trs || 0).toLocaleString()}
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-4 text-center">
+                                            <span className="text-sm font-bold text-emerald-600 tabular-nums">
+                                                {(() => {
+                                                    const prod = products.find(p => p.item === rec.item);
+                                                    if (!prod) return '0.00';
+                                                    const price = rec.priceMarket === 'Malta' ? prod.priceMalta : prod.priceTN;
+                                                    return ((rec.targetQty / 1000) * price).toFixed(2);
+                                                })()}
+                                            </span>
+                                        </td>
+                                        <td className="px-5 py-4 text-center">
+                                            <span className="text-sm font-bold text-blue-600 tabular-nums">
+                                                {(() => {
+                                                    const prod = products.find(p => p.item === rec.item);
+                                                    if (!prod) return '0.00';
+                                                    const price = rec.priceMarket === 'Malta' ? prod.priceMalta : prod.priceTN;
+                                                    const totalQty = rec.qtyShift1 + rec.qtyShift2 + rec.qtyShift3;
+                                                    return ((totalQty / 1000) * price).toFixed(2);
+                                                })()}
                                             </span>
                                         </td>
                                         <td className="px-5 py-4">
@@ -691,7 +789,112 @@ export default function MachineRendement() {
                                 ))
                             )}
                         </tbody>
+                        {filtered.length > 0 && (
+                            <tfoot className="sticky bottom-0 z-20 bg-white border-t-4 border-gray-100 font-bold shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
+                                <tr className="divide-x divide-gray-50">
+                                    <td colSpan={4} className="px-5 py-4 text-xs font-black text-gray-500 uppercase tracking-wider bg-gray-50/95 backdrop-blur-sm">Totals</td>
+                                    <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
+                                        {totals.targetQty.toLocaleString()}
+                                    </td>
+                                    <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
+                                        {totals.qty1.toLocaleString()}
+                                    </td>
+                                    <td className="px-5 py-4 text-center bg-gray-50/95 backdrop-blur-sm">
+                                        {effBadge(calcEfficiency(totals.qty1, totals.targetQty))}
+                                    </td>
+                                    <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
+                                        {totals.qty2.toLocaleString()}
+                                    </td>
+                                    <td className="px-5 py-4 text-center bg-gray-50/95 backdrop-blur-sm">
+                                        {effBadge(calcEfficiency(totals.qty2, totals.targetQty))}
+                                    </td>
+                                    <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
+                                        {totals.qty3.toLocaleString()}
+                                    </td>
+                                    <td className="px-5 py-4 text-center bg-gray-50/95 backdrop-blur-sm">
+                                        {effBadge(calcEfficiency(totals.qty3, totals.targetQty))}
+                                    </td>
+                                    <td className="px-5 py-4 text-center bg-gray-50/95 backdrop-blur-sm">
+                                        {/* TRS Total/Avg */}
+                                    </td>
+                                    <td className="px-5 py-4 text-center text-sm text-emerald-700 tabular-nums bg-emerald-50/50 backdrop-blur-sm">
+                                        {totals.priceTarget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td className="px-5 py-4 text-center text-sm text-blue-700 tabular-nums bg-blue-50/50 backdrop-blur-sm">
+                                        {totals.priceActual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                    <td colSpan={2} className="bg-gray-50/95 backdrop-blur-sm"></td>
+                                </tr>
+                            </tfoot>
+                        )}
                     </table>
+                </div>
+
+                {/* ── Pagination Footer ── */}
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-8">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Items</span>
+                            <span className="text-sm font-bold text-gray-700">{totalItems}</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Selected Items</span>
+                            <span className="text-sm font-bold text-gray-700">0</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Page Size:</span>
+                            <select
+                                value={pageSize}
+                                onChange={(e) => setPageSize(Number(e.target.value))}
+                                className="bg-white border border-gray-200 rounded-lg text-xs font-bold px-2 py-1.5 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                            >
+                                {[10, 25, 50, 100].map(sz => (
+                                    <option key={sz} value={sz}>{sz}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setCurrentPage(1)}
+                                disabled={currentPage === 1}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                            >
+                                <ChevronsLeft size={16} />
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                            >
+                                <ChevronLeft size={16} />
+                            </button>
+
+                            <div className="flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-lg">
+                                <span className="text-xs font-bold text-blue-600">{currentPage}</span>
+                                <span className="mx-2 text-gray-300 text-xs">/</span>
+                                <span className="text-xs font-bold text-gray-400">{totalPages || 1}</span>
+                            </div>
+
+                            <button
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages || totalPages === 0}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                            >
+                                <ChevronRight size={16} />
+                            </button>
+                            <button
+                                onClick={() => setCurrentPage(totalPages)}
+                                disabled={currentPage === totalPages || totalPages === 0}
+                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                            >
+                                <ChevronsRight size={16} />
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -739,18 +942,31 @@ export default function MachineRendement() {
                                 </div>
                             </div>
 
-                            {/* Item */}
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Item</label>
-                                <SearchableSelect
-                                    options={products}
-                                    value={form.item}
-                                    getLabel={p => p.item}
-                                    getValue={p => p.item}
-                                    getDescription={p => p.description}
-                                    onChange={val => setForm(f => ({ ...f, item: val }))}
-                                    placeholder="Select item..."
-                                />
+                            {/* Item and Price Market */}
+                            <div className="grid grid-cols-3 gap-4">
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Item</label>
+                                    <SearchableSelect
+                                        options={products}
+                                        value={form.item}
+                                        getLabel={p => p.item}
+                                        getValue={p => p.item}
+                                        getDescription={p => p.description}
+                                        onChange={val => setForm(f => ({ ...f, item: val }))}
+                                        placeholder="Select item..."
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Price Market</label>
+                                    <select
+                                        className="w-full px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-medium h-[42px]"
+                                        value={form.priceMarket || 'TN'}
+                                        onChange={e => setForm(f => ({ ...f, priceMarket: e.target.value as 'TN' | 'Malta' }))}
+                                    >
+                                        <option value="TN">TN Price</option>
+                                        <option value="Malta">Malta Price</option>
+                                    </select>
+                                </div>
                             </div>
 
                             {/* Target Qty (read-only) */}

@@ -218,7 +218,8 @@ const migrations = [
   { table: 'machine_rendement', column: 'actualCycleTime', type: 'REAL DEFAULT 0' },
   { table: 'machine_rendement', column: 'actualCavitiesRunning', type: 'INTEGER DEFAULT 0' },
   { table: 'machine_rendement', column: 'trs', type: 'REAL DEFAULT 0' },
-  { table: 'machine_rendement', column: 'comment', type: 'TEXT DEFAULT \'\'' }
+  { table: 'machine_rendement', column: 'comment', type: 'TEXT DEFAULT \'\'' },
+  { table: 'machine_rendement', column: 'priceMarket', type: 'TEXT DEFAULT \'TN\'' }
 ];
 
 for (const m of migrations) {
