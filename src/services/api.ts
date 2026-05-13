@@ -153,6 +153,14 @@ export const api = {
     });
     await handleResponse(res);
   },
+  logSparePartAction: async (action: string, entityId: string, details: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/audit-logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, entityType: 'spare-part', entityId, details })
+    });
+    await handleResponse(res);
+  },
 
   // Analytics
   getDowntimeTrends: async (): Promise<DowntimeTrend[]> => {

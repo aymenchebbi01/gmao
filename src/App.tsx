@@ -14,6 +14,7 @@ import AdvancedAnalytics from './components/AdvancedAnalytics';
 import FactoryLayout from './components/FactoryLayout';
 import Login from './components/Login';
 import MobileStatusUpdater from './components/MobileStatusUpdater';
+import MobileStockUpdater from './components/MobileStockUpdater';
 import PurchaseRequests from './components/PurchaseRequests';
 import MachineRendement from './components/MachineRendement';
 import { Toaster } from 'sonner';
@@ -26,7 +27,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [historyMachineId, setHistoryMachineId] = useState<string | null>(null);
-  const [deepLinkMachineId, setDeepLinkMachineId] = useState<string | null>(null);
+  const [deepLinkId, setDeepLinkId] = useState<string | null>(null);
 
   // Parse deep links
   useEffect(() => {
@@ -35,7 +36,7 @@ function AppContent() {
     const machineId = params.get('id');
 
     if (machineId) {
-      setDeepLinkMachineId(machineId);
+      setDeepLinkId(machineId);
     }
     if (initialTab) {
       setActiveTab(initialTab);
@@ -111,7 +112,8 @@ function AppContent() {
       case 'audit-logs': return isAdmin ? <AuditLogList /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
       case 'analytics': return <AdvancedAnalytics />;
       case 'users': return isManager ? <UserManagement /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
-      case 'mobile-status': return <MobileStatusUpdater machineId={deepLinkMachineId} />;
+      case 'mobile-status': return <MobileStatusUpdater machineId={deepLinkId} />;
+      case 'mobile-stock': return <MobileStockUpdater partId={deepLinkId} />;
       case 'rendement': return <MachineRendement />;
       default: return <Dashboard setActiveTab={setActiveTab} />;
     }
@@ -120,7 +122,7 @@ function AppContent() {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Toaster position="top-right" richColors />
-      {activeTab !== 'mobile-status' && (
+      {activeTab !== 'mobile-status' && activeTab !== 'mobile-stock' && (
         <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -131,7 +133,7 @@ function AppContent() {
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Header */}
-        {activeTab !== 'mobile-status' && (
+        {activeTab !== 'mobile-status' && activeTab !== 'mobile-stock' && (
           <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 flex-shrink-0">
             <div className="flex-1 max-w-xl hidden md:block">
               <div className="relative">

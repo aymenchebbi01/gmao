@@ -9,8 +9,13 @@ import {
   History,
   Tag,
   DollarSign,
-  Download
+  Download,
+  QrCode,
+  Printer,
+  RotateCw,
+  X
 } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { SparePart } from '../types';
 import { cn } from '../lib/utils';
 import Modal from './ui/Modal';
@@ -29,6 +34,8 @@ export default function Inventory() {
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(13);
+  const [selectedPartForQR, setSelectedPartForQR] = useState<SparePart | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -42,18 +49,23 @@ export default function Inventory() {
     location: ''
   });
 
-  useEffect(() => {
-    const fetchParts = async () => {
-      try {
-        const items = await api.getSpareParts();
-        setParts(items);
-      } catch (error) {
-        console.error("Error fetching parts:", error);
-      }
-    };
+  const fetchParts = async (showToast = false) => {
+    if (showToast) setRefreshing(true);
+    try {
+      const items = await api.getSpareParts();
+      setParts(items);
+      if (showToast) toast.success('Inventory refreshed');
+    } catch (error) {
+      console.error("Error fetching parts:", error);
+      if (showToast) toast.error('Failed to refresh inventory');
+    } finally {
+      if (showToast) setRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
     fetchParts();
-    const interval = setInterval(fetchParts, 30000);
+    const interval = setInterval(() => fetchParts(false), 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -154,6 +166,17 @@ export default function Inventory() {
             >
               <Download size={18} />
               Export CSV
+            </button>
+            <button
+              onClick={() => fetchParts(true)}
+              disabled={refreshing}
+              className={cn(
+                "p-2 text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all",
+                refreshing && "animate-spin text-blue-600"
+              )}
+              title="Refresh Inventory"
+            >
+              <RotateCw size={18} />
             </button>
             <button
               onClick={() => {
@@ -259,6 +282,13 @@ export default function Inventory() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={() => setSelectedPartForQR(part)}
+                          className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                          title="Generate QR Code"
+                        >
+                          <QrCode size={18} />
+                        </button>
                         <button
                           onClick={() => handleEditClick(part)}
                           className="p-2 text-gray-400 hover:text-amber-600 transition-colors"
@@ -421,6 +451,101 @@ export default function Inventory() {
           </div>
         </div>
       )}
+
+      {/* QR Code Modal */}
+      {selectedPartForQR && (
+        <QRCodeModal
+          part={selectedPartForQR}
+          onClose={() => setSelectedPartForQR(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── QR Code Modal Sub-component ──────────────────────────────────────────────
+
+function QRCodeModal({ part, onClose }: { part: SparePart; onClose: () => void }) {
+  const qrUrl = window.location.hostname === 'localhost'
+    ? `http://192.168.0.181:3000/?tab=mobile-stock&id=${part.id}`
+    : `${window.location.origin}/?tab=mobile-stock&id=${part.id}`;
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-300">
+        {/* Header */}
+        <div className="relative h-24 bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center">
+          <div className="absolute top-4 right-4">
+            <button
+              onClick={onClose}
+              className="p-2 text-white/50 hover:text-white bg-white/10 hover:bg-white/20 rounded-xl transition-all"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="bg-white p-3 rounded-2xl shadow-xl transform translate-y-8">
+            <QrCode size={32} className="text-blue-600" />
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="px-8 pt-12 pb-8 text-center print:p-4">
+          <h3 className="text-xl font-bold text-gray-900 mb-1">{part.name}</h3>
+          <p className="text-sm font-medium text-gray-500 uppercase tracking-widest mb-6">Part Reference: {part.sku}</p>
+
+          <div className="inline-block p-6 bg-gray-50 rounded-3xl border border-gray-100 mb-6 print:border-none print:bg-white">
+            <QRCodeCanvas
+              value={qrUrl}
+              size={180}
+              level="H"
+              includeMargin={false}
+              className="mx-auto"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Current Stock</p>
+              <p className="text-lg font-bold text-gray-900">{part.stock} {part.unit}</p>
+            </div>
+            <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Location</p>
+              <p className="text-lg font-bold text-gray-900">{part.location || 'N/A'}</p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 no-print">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-3 text-sm font-bold text-gray-500 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all"
+            >
+              Close
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+            >
+              <Printer size={18} />
+              Print Label
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          .no-print { display: none !important; }
+          body * { visibility: hidden; }
+          .fixed { position: absolute !important; inset: 0 !important; background: white !important; backdrop-filter: none !important; }
+          .bg-white { box-shadow: none !important; }
+          .fixed * { visibility: visible; }
+          .fixed { left: 0; top: 0; width: 100%; }
+        }
+      `}} />
     </div>
   );
 }

@@ -13,7 +13,8 @@ import {
   ChevronRight,
   Calendar,
   HardDrive,
-  Download
+  Download,
+  RotateCw
 } from 'lucide-react';
 import { WorkOrder, Machine, FaultType, SparePart, UserProfile } from '../types';
 import { cn, toDate, calculateMachineLiveHours } from '../lib/utils';
@@ -51,6 +52,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(13);
+  const [refreshing, setRefreshing] = useState(false);
 
   const generateWorkOrderId = () => {
     const year = new Date().getFullYear();
@@ -143,26 +145,31 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
     setFilterStatus('all');
   }, [view]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [ordersData, machinesData, usersData, sparePartsData] = await Promise.all([
-          api.getWorkOrders(),
-          api.getMachines(),
-          api.getUsers(),
-          api.getSpareParts()
-        ]);
-        setOrders(ordersData);
-        setMachines(machinesData);
-        setUsers(usersData);
-        setSpareParts(sparePartsData);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    };
+  const fetchData = async (showToast = false) => {
+    if (showToast) setRefreshing(true);
+    try {
+      const [ordersData, machinesData, usersData, sparePartsData] = await Promise.all([
+        api.getWorkOrders(),
+        api.getMachines(),
+        api.getUsers(),
+        api.getSpareParts()
+      ]);
+      setOrders(ordersData);
+      setMachines(machinesData);
+      setUsers(usersData);
+      setSpareParts(sparePartsData);
+      if (showToast) toast.success('Data refreshed');
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      if (showToast) toast.error('Failed to refresh data');
+    } finally {
+      if (showToast) setRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 30000); // Poll every 30 seconds
+    const interval = setInterval(() => fetchData(false), 30000); // Poll every 30 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -675,6 +682,17 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
             >
               <Download size={18} />
               Export CSV
+            </button>
+            <button
+              onClick={() => fetchData(true)}
+              disabled={refreshing}
+              className={cn(
+                "p-2 text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all",
+                refreshing && "animate-spin text-blue-600"
+              )}
+              title="Refresh Data"
+            >
+              <RotateCw size={18} />
             </button>
             {view === 'list' && (
               <button

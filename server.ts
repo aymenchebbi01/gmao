@@ -710,7 +710,7 @@ app.get('/api/audit-logs', (req, res) => {
 });
 
 // Allowed action types for explicit logging
-const ALLOWED_ACTIONS = ['SCAN_QR', 'ACCESS_MACHINE', 'ASSIGN_MACHINE', 'CHANGE_STATUS', 'START_MACHINE', 'STOP_MACHINE'];
+const ALLOWED_ACTIONS = ['SCAN_QR', 'ACCESS_MACHINE', 'ASSIGN_MACHINE', 'CHANGE_STATUS', 'START_MACHINE', 'STOP_MACHINE', 'UPDATE_STOCK'];
 
 app.post('/api/audit-logs', (req, res) => {
   try {

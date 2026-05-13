@@ -17,6 +17,7 @@ import {
   Download,
   Camera,
   Upload,
+  RotateCw,
   X
 } from 'lucide-react';
 import { Machine } from '../types';
@@ -53,6 +54,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
   const [currentTime, setCurrentTime] = useState(new Date());
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(13);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Update current time every minute to refresh live hours display
   useEffect(() => {
@@ -112,37 +114,42 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
     description: ''
   });
 
-  useEffect(() => {
-    const fetchMachines = async () => {
-      try {
-        const items = await api.getMachines();
+  const fetchMachines = async (showToast = false) => {
+    if (showToast) setRefreshing(true);
+    try {
+      const items = await api.getMachines();
 
-        // Check for status changes to trigger notifications
-        items.forEach(machine => {
-          const prevStatus = prevStatuses.current[machine.id];
-          if (prevStatus && prevStatus !== machine.status) {
-            if (machine.status === 'down') {
-              toast.error(`Machine "${machine.name}" is DOWN!`, {
-                description: `Location: ${machine.location}`,
-                duration: 5000,
-              });
-            } else if (machine.status === 'maintenance') {
-              toast.warning(`Machine "${machine.name}" is now in maintenance.`, {
-                description: `Location: ${machine.location}`,
-              });
-            }
+      // Check for status changes to trigger notifications
+      items.forEach(machine => {
+        const prevStatus = prevStatuses.current[machine.id];
+        if (prevStatus && prevStatus !== machine.status) {
+          if (machine.status === 'down') {
+            toast.error(`Machine "${machine.name}" is DOWN!`, {
+              description: `Location: ${machine.location}`,
+              duration: 5000,
+            });
+          } else if (machine.status === 'maintenance') {
+            toast.warning(`Machine "${machine.name}" is now in maintenance.`, {
+              description: `Location: ${machine.location}`,
+            });
           }
-          prevStatuses.current[machine.id] = machine.status;
-        });
+        }
+        prevStatuses.current[machine.id] = machine.status;
+      });
 
-        setMachines(items);
-      } catch (error) {
-        console.error("Error fetching machines:", error);
-      }
-    };
+      setMachines(items);
+      if (showToast) toast.success('Machine list refreshed');
+    } catch (error) {
+      console.error("Error fetching machines:", error);
+      if (showToast) toast.error('Failed to refresh machines');
+    } finally {
+      if (showToast) setRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
     fetchMachines();
-    const interval = setInterval(fetchMachines, 30000); // Poll every 30 seconds
+    const interval = setInterval(() => fetchMachines(false), 30000); // Poll every 30 seconds
     return () => clearInterval(interval);
   }, []);
 
@@ -393,6 +400,17 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
             >
               <Download size={18} />
               Export CSV
+            </button>
+            <button
+              onClick={() => fetchMachines(true)}
+              disabled={refreshing}
+              className={cn(
+                "p-2 text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all",
+                refreshing && "animate-spin text-blue-600"
+              )}
+              title="Refresh Machines"
+            >
+              <RotateCw size={18} />
             </button>
             <button
               onClick={() => {

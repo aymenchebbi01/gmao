@@ -706,7 +706,7 @@ export default function MachineRendement() {
                                     <tr key={rec.id} className="hover:bg-blue-50/20 transition-colors group">
                                         <td className="px-5 py-4 text-sm font-semibold text-gray-700">{rec.date}</td>
                                         <td className="px-5 py-4">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-blue-50 text-black-700 text-xs font-bold">
                                                 #{String(rec.machineNumber || '').trim() || '---'}
                                             </span>
                                         </td>
