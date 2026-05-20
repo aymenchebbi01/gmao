@@ -520,7 +520,7 @@ export default function MachineRendement() {
                         </div>
                         <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-lg">
                             <TrendingUp size={14} className="text-blue-600" />
-                            <span className="text-xs font-bold text-blue-700">Live Trend</span>
+                            <span className="text-xs font-bold text-blue-700">Live Production Data</span>
                         </div>
                     </div>
                     <div className="h-[250px] w-full">

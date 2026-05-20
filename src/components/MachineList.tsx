@@ -92,6 +92,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
     condition: 'Excellent',
     status: 'operational' as Machine['status'],
     nextMaintenance: '',
+    installationDate: '',
     currentHours: 0,
     imageUrl: '',
     preventivePlan: [] as any[]
@@ -293,6 +294,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
         clampingForce: 0,
         status: 'operational',
         nextMaintenance: '',
+        installationDate: '',
         currentHours: 0,
         imageUrl: '',
         preventivePlan: []
@@ -319,6 +321,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
       condition: machine.condition || 'Excellent',
       status: machine.status || 'operational',
       nextMaintenance: machine.nextMaintenance || '',
+      installationDate: machine.installationDate || '',
       currentHours: liveHours,
       imageUrl: machine.imageUrl || '',
       preventivePlan: machine.preventivePlan || []
@@ -428,6 +431,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                   clampingForce: 0,
                   status: 'operational',
                   nextMaintenance: '',
+                  installationDate: '',
                   currentHours: 0,
                   imageUrl: '',
                   preventivePlan: generateRecommendedPlan()
@@ -551,6 +555,11 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                         )}>
                           {item.status}
                         </span>
+                        {item.statusReason && (item.status === 'down' || item.status === 'maintenance') && (
+                          <span className="text-[10px] text-red-600 font-bold italic max-w-[150px] truncate" title={item.statusReason}>
+                            Reason: {item.statusReason}
+                          </span>
+                        )}
                         <div className="flex flex-col mt-1 gap-0.5">
                           {item.nextMaintenanceHours && (
                             <span className="text-[10px] text-blue-600 font-bold">
@@ -797,6 +806,15 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                     onChange={(e) => setFormData({ ...formData, manufacturingYear: parseInt(e.target.value) || new Date().getFullYear() })}
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Installation Date (Start Running)</label>
+                  <input
+                    type="date"
+                    className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    value={formData.installationDate}
+                    onChange={(e) => setFormData({ ...formData, installationDate: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1014,7 +1032,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
               <QRCodeCanvas
                 id="machine-qr-code"
                 value={window.location.hostname === 'localhost'
-                  ? `http://192.168.0.181:3000/?tab=mobile-status&id=${selectedMachine.id}`
+                  ? `http://192.168.0.216:3000/?tab=mobile-status&id=${selectedMachine.id}`
                   : `${window.location.origin}/?tab=mobile-status&id=${selectedMachine.id}`}
                 size={200}
                 level="H"

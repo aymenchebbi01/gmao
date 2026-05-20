@@ -66,6 +66,7 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
   const [stats, setStats] = useState({
     totalMachines: 0,
     downMachines: 0,
+    maintenanceMachines: 0,
     pendingOrders: 0,
     completedOrders: 0,
     mttr: '0h',
@@ -110,7 +111,12 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
         const maintenance = machinesData.filter(i => i.status === 'maintenance').length;
         const idle = machinesData.filter(i => i.status === 'idle').length;
 
-        setStats(prev => ({ ...prev, totalMachines: total, downMachines: down }));
+        setStats(prev => ({ 
+          ...prev, 
+          totalMachines: total, 
+          downMachines: down,
+          maintenanceMachines: maintenance 
+        }));
         setStatusData([
           { name: 'Operational', value: operational },
           { name: 'Down', value: down },
@@ -197,30 +203,60 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
       {/* Maintenance Alerts */}
       <MaintenanceAlerts />
 
-      {/* Critical Alerts Section */}
-      {stats.downMachines > 0 && (
-        <div className="p-6 bg-red-50 border border-red-100 rounded-2xl flex flex-col gap-4">
+      {/* Critical & Maintenance Alerts Section */}
+      {(stats.downMachines > 0 || stats.maintenanceMachines > 0) && (
+        <div className={cn(
+          "p-6 rounded-2xl flex flex-col gap-4 border",
+          stats.downMachines > 0 ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"
+        )}>
           <div className="flex items-start gap-4">
-            <div className="p-2 bg-red-500 rounded-lg animate-pulse">
+            <div className={cn(
+              "p-2 rounded-lg animate-pulse",
+              stats.downMachines > 0 ? "bg-red-500" : "bg-amber-500"
+            )}>
               <AlertTriangle className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-red-900">Critical Alert: {stats.downMachines} Machine(s) Currently Down</h4>
-
+              <h4 className={cn(
+                "text-sm font-bold",
+                stats.downMachines > 0 ? "text-red-900" : "text-amber-900"
+              )}>
+                {stats.downMachines > 0 ? `Critical Alert: ${stats.downMachines} Machine(s) Currently Down` : `Maintenance Alert: ${stats.maintenanceMachines} Machine(s) in Maintenance`}
+              </h4>
+              {stats.downMachines > 0 && stats.maintenanceMachines > 0 && (
+                <p className="text-xs text-red-700 mt-1">Also {stats.maintenanceMachines} machine(s) in maintenance.</p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-            {machines.filter(m => m.status === 'down').map(machine => (
+            {machines.filter(m => m.status === 'down' || m.status === 'maintenance').map(machine => (
               <div
                 key={machine.id}
                 onClick={() => setActiveTab('machines')}
-                className="flex items-center p-3 bg-white border border-red-200 rounded-xl shadow-sm cursor-pointer hover:bg-red-50 transition-colors"
+                className={cn(
+                  "flex items-center p-3 bg-white border rounded-xl shadow-sm cursor-pointer transition-colors",
+                  machine.status === 'down' ? "border-red-200 hover:bg-red-50" : "border-amber-200 hover:bg-amber-50"
+                )}
               >
-                <div className="w-2 h-2 rounded-full bg-red-500 mr-3 animate-ping"></div>
-                <div>
-                  <p className="text-sm font-bold text-gray-900">{machine.name}</p>
+                <div className={cn(
+                  "w-2 h-2 rounded-full mr-3 animate-ping",
+                  machine.status === 'down' ? "bg-red-500" : "bg-amber-500"
+                )}></div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-gray-900">{machine.name}</p>
+                    <span className={cn(
+                      "text-[8px] px-1.5 py-0.5 rounded uppercase font-bold",
+                      machine.status === 'down' ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                    )}>
+                      {machine.status}
+                    </span>
+                  </div>
                   <p className="text-[10px] text-gray-500 font-mono">{machine.serialNumber}</p>
+                  {machine.statusReason && (
+                    <p className="text-[9px] text-gray-400 italic mt-1 truncate">"{machine.statusReason}"</p>
+                  )}
                 </div>
               </div>
             ))}
@@ -293,7 +329,7 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
       {/* Recent Activity */}
       <div className="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-bold text-gray-900">Recent Work Orders</h3>
+          <h3 className="text-lg font-bold text-gray-900">Recent Maintenance Orders</h3>
           <button
             onClick={() => setActiveTab('work-orders-list')}
             className="text-sm font-medium text-blue-600 hover:text-blue-700"

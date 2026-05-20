@@ -21,6 +21,8 @@ export interface Machine {
   id: string;
   name: string;
   serialNumber: string;
+  installationDate?: string;
+  statusReason?: string;
   type: string;
   manufacturingYear: number;
   location: string;
@@ -41,11 +43,21 @@ export interface Machine {
   manualUrl?: string;
   preventivePlan: PreventiveTask[];
   injectingProduct?: string;
+  currentMoule?: string;
   updatedAt?: string;
   position3d?: {
     position: [number, number, number];
     rotation: [number, number, number];
   };
+}
+
+export interface MachineProductionHistory {
+  id: number;
+  machineId: string;
+  productName: string;
+  mouleName: string;
+  startDate: string;
+  endDate?: string;
 }
 
 export interface ProductionProduct {

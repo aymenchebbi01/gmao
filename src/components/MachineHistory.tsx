@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { WorkOrder, Machine, MachineConditionHistory } from '../types';
+import { WorkOrder, Machine, MachineConditionHistory, MachineProductionHistory } from '../types';
 import { format } from 'date-fns';
 import { toDate, cn, calculateMachineLiveHours } from '../lib/utils';
 import { RECOMMENDED_TASKS } from '../constants/maintenanceTasks';
@@ -18,8 +18,14 @@ import {
   Zap,
   ShieldCheck,
   TrendingUp,
-  AlertTriangle
+  AlertTriangle,
+  Download,
+  Package
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { THERMOPLASTICS_LOGO_BASE64 } from '../constants/logo';
+import { toast } from 'sonner';
 
 interface MachineHistoryProps {
   machineId: string;
@@ -30,6 +36,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
   const [history, setHistory] = useState<WorkOrder[]>([]);
   const [conditionHistory, setConditionHistory] = useState<MachineConditionHistory[]>([]);
   const [machine, setMachine] = useState<Machine | null>(null);
+  const [productionHistory, setProductionHistory] = useState<MachineProductionHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeMetric, setActiveMetric] = useState<'mttr' | 'mtbf' | 'availability' | null>(null);
 
@@ -38,10 +45,11 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
 
     const fetchData = async () => {
       try {
-        const [machines, orders, condHistory] = await Promise.all([
+        const [machines, orders, condHistory, prodHistory] = await Promise.all([
           api.getMachines(),
           api.getWorkOrders(),
-          api.getMachineConditionHistory(machineId)
+          api.getMachineConditionHistory(machineId),
+          api.getMachineProductionHistory(machineId)
         ]);
 
         const machineData = machines.find(m => m.id === machineId);
@@ -55,6 +63,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
 
         setHistory(machineHistory);
         setConditionHistory(condHistory);
+        setProductionHistory(prodHistory);
         setLoading(false);
       } catch (error) {
         console.error("Error fetching machine history:", error);
@@ -180,6 +189,143 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
   const intervalTotal = Math.max(nextTargetHours - lastThresholdHours, 1);
   const intervalCurrent = currentHours - lastThresholdHours;
   const progressPercent = Math.min(Math.max((intervalCurrent / intervalTotal) * 100, 0), 100);
+
+  const generateHistoryReport = () => {
+    if (!machine) return;
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const today = new Date();
+
+    // ---- Header & Logo ----
+    try {
+      doc.addImage(THERMOPLASTICS_LOGO_BASE64, 'PNG', 14, 10, 35, 15);
+    } catch (e) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('THERMOPLASTICS', 14, 20);
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('MACHINE MAINTENANCE REPORT', 105, 40, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated on: ${format(today, 'dd/MM/yyyy HH:mm')}`, 105, 47, { align: 'center' });
+
+    // ---- 1. Machine Information ----
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('1. Machine Information', 14, 60);
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const machineInfo = [
+      ['Machine Name', machine.name],
+      ['Site Number', machine.siteNumber || 'N/A'],
+      ['Serial Number', machine.serialNumber || 'N/A'],
+      ['Installation Date', machine.installationDate ? format(new Date(machine.installationDate), 'dd/MM/yyyy') : 'N/A'],
+      ['Location', machine.location || 'N/A'],
+      ['Current Status', machine.status.toUpperCase()],
+      ['Operating Hours', `${currentHours.toFixed(1)} hrs`]
+    ];
+
+    autoTable(doc, {
+      startY: 63,
+      body: machineInfo,
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 2 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 50 } }
+    });
+
+    let finalY = (doc as any).lastAutoTable.finalY + 12;
+
+    // ---- 2. Preventive Maintenance Planning ----
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('2. Preventive Maintenance Schedule', 14, finalY);
+    
+    finalY += 3;
+    const planningInfo = [
+      ['Next Maintenance', `${nextTask.hours} hrs`],
+      ['Hours Remaining', `${Math.max(0, nextTask.hours - currentHours).toFixed(1)} hrs`],
+      ['Cycle Frequency', nextTask.frequency]
+    ];
+
+    autoTable(doc, {
+      startY: finalY,
+      body: planningInfo,
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 3 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 } },
+      headStyles: { fillColor: [59, 130, 246] }
+    });
+
+    finalY = (doc as any).lastAutoTable.finalY + 12;
+
+    // ---- 3. Maintenance Recommendations ----
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('3. Maintenance Recommendations', 14, finalY);
+    
+    finalY += 3;
+    const recTasks = (currentHours < RECOMMENDED_TASKS[0].hours ? RECOMMENDED_TASKS[0] : currentThreshold).tasks.map(t => [t]);
+
+    autoTable(doc, {
+      startY: finalY,
+      head: [[`Recommended tasks for the ${currentThreshold.hours} hrs threshold`]],
+      body: recTasks,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] },
+      styles: { fontSize: 9 }
+    });
+
+    finalY = (doc as any).lastAutoTable.finalY + 12;
+
+    // ---- 4. Completed Interventions History ----
+    if (finalY > 240) {
+      doc.addPage();
+      finalY = 20;
+    }
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('4. Completed Interventions History', 14, finalY);
+    
+    finalY += 3;
+    const historyData = history.map(order => [
+      order.completedAt ? format(new Date(order.completedAt), 'dd/MM/yyyy') : 'N/A',
+      order.type.toUpperCase(),
+      order.title,
+      order.intervention?.actions || 'N/A',
+      order.assignedName || 'N/A'
+    ]);
+
+    autoTable(doc, {
+      startY: finalY,
+      head: [['Date', 'Type', 'Title', 'Actions Taken', 'Technician']],
+      body: historyData.length > 0 ? historyData : [['N/A', 'N/A', 'N/A', 'No interventions recorded', 'N/A']],
+      theme: 'grid',
+      headStyles: { fillColor: [16, 185, 129] },
+      styles: { fontSize: 8 },
+      columnStyles: {
+        2: { cellWidth: 35 },
+        3: { cellWidth: 80 }
+      }
+    });
+
+    // Footer
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    doc.setFontSize(8);
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.text(`Page ${i} of ${pageCount}`, 196, 285, { align: 'right' });
+      doc.text('MAINTENANCE MANAGEMENT SYSTEM (CMMS)', 14, 285);
+    }
+
+    doc.save(`Maintenance_Report_${machine.siteNumber || machine.name}_${format(today, 'yyyyMMdd')}.pdf`);
+    toast.success('PDF Report generated successfully');
+  };
 
   return (
     <div className="space-y-8">
@@ -449,9 +595,64 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-bold text-gray-900 flex items-center">
+            <Package className="w-4 h-4 mr-2 text-blue-600" />
+            Production & Mold History ({productionHistory.length})
+          </h3>
+        </div>
+
+        {productionHistory.length > 0 ? (
+          <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50 border-b border-gray-100">
+                  <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Product</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Mold (Moule)</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Start Date</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">End Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {productionHistory.map((entry) => (
+                  <tr key={entry.id} className="hover:bg-blue-50/30 transition-colors">
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-bold text-emerald-700">{entry.productName || 'N/A'}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-bold text-blue-700">{entry.mouleName || 'N/A'}</span>
+                    </td>
+                    <td className="px-6 py-4 text-xs text-gray-500 font-medium">
+                      {format(new Date(entry.startDate), 'MMM d, yyyy HH:mm')}
+                    </td>
+                    <td className="px-6 py-4 text-xs text-gray-500 font-medium">
+                      {entry.endDate ? format(new Date(entry.endDate), 'MMM d, yyyy HH:mm') : (
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold uppercase">Current</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="bg-gray-50 rounded-xl p-6 text-center border border-dashed border-gray-200">
+            <p className="text-xs text-gray-500 italic">No production history recorded yet.</p>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-bold text-gray-900 flex items-center">
             <History className="w-4 h-4 mr-2 text-blue-600" />
             Completed Interventions ({history.length})
           </h3>
+          <button
+            onClick={generateHistoryReport}
+            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+          >
+            <Download size={14} />
+            Download History Report
+          </button>
         </div>
 
         <div className="relative">

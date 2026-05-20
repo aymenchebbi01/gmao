@@ -63,6 +63,10 @@ export const api = {
     const res = await fetch(`${API_BASE}/machines/${id}/condition-history`);
     return handleResponse(res);
   },
+  getMachineProductionHistory: async (id: string): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/machines/${id}/production-history`);
+    return handleResponse(res);
+  },
 
   // Work Orders
   getWorkOrders: async (): Promise<WorkOrder[]> => {

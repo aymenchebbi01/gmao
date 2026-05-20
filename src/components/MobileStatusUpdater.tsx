@@ -18,6 +18,9 @@ export default function MobileStatusUpdater({ machineId }: Props) {
 
     const [view, setView] = useState<'details' | 'status'>('details');
     const [productInput, setProductInput] = useState('');
+    const [mouleInput, setMouleInput] = useState('');
+    const [reasonInput, setReasonInput] = useState('');
+    const [pendingStatus, setPendingStatus] = useState<Machine['status'] | null>(null);
 
     useEffect(() => {
         if (!machineId) {
@@ -32,6 +35,9 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                 if (found) {
                     setMachine(found);
                     setProductInput(found.injectingProduct || '');
+                    setMouleInput(found.currentMoule || '');
+                    setReasonInput(found.statusReason || '');
+                    setPendingStatus(found.status);
 
                     // Log QR scan only once per page load
                     if (!hasScanLogged.current) {
@@ -76,9 +82,26 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                     // Non-critical
                 }
             }
-            await api.updateMachine(machine.id, { status: newStatus, injectingProduct: productInput });
-            setMachine({ ...machine, status: newStatus, injectingProduct: productInput });
-            toast.success(`Status updated to ${newStatus}`);
+            if ((newStatus === 'down' || newStatus === 'maintenance') && !reasonInput.trim()) {
+                toast.error('Please provide a reason for this status change');
+                return;
+            }
+
+            await api.updateMachine(machine.id, { 
+                status: newStatus, 
+                injectingProduct: productInput,
+                currentMoule: mouleInput,
+                statusReason: (newStatus === 'operational' || newStatus === 'idle') ? '' : reasonInput
+            });
+            setMachine({ 
+                ...machine, 
+                status: newStatus, 
+                injectingProduct: productInput,
+                currentMoule: mouleInput,
+                statusReason: (newStatus === 'operational' || newStatus === 'idle') ? '' : reasonInput
+            });
+            toast.success(`Machine updated successfully`);
+            if (newStatus === 'operational' || newStatus === 'idle') setReasonInput('');
             setView('details');
         } catch (error) {
             console.error(error);
@@ -116,13 +139,23 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                 <h1 className="text-3xl font-black mb-2 relative z-10">{machine.name}</h1>
                 <p className="text-blue-100 uppercase tracking-widest text-sm font-bold opacity-80 relative z-10">SN: {machine.serialNumber}</p>
                 {machine.injectingProduct && (
-                    <div className="mt-4 inline-block bg-white/20 backdrop-blur px-4 py-1.5 rounded-full text-sm font-bold border border-white/30 relative z-10">
+                    <div className="mt-4 inline-block bg-white/20 backdrop-blur px-4 py-1.5 rounded-full text-[11px] font-bold border border-white/30 relative z-10">
                         Product: {machine.injectingProduct}
+                    </div>
+                )}
+                {machine.currentMoule && (
+                    <div className="mt-4 ml-2 inline-block bg-white/20 backdrop-blur px-4 py-1.5 rounded-full text-[11px] font-bold border border-white/30 relative z-10">
+                        Moule: {machine.currentMoule}
                     </div>
                 )}
                 {machine.siteNumber && (
                     <div className="mt-4 ml-2 inline-block bg-white/20 backdrop-blur px-4 py-1.5 rounded-full text-sm font-bold tracking-widest border border-white/30 relative z-10">
                         #{machine.siteNumber}
+                    </div>
+                )}
+                {machine.statusReason && (machine.status === 'down' || machine.status === 'maintenance') && (
+                    <div className="mt-4 px-4 py-2 bg-red-500/20 backdrop-blur rounded-xl text-[10px] font-medium border border-red-500/30 text-white relative z-10 w-full text-left italic">
+                        Reason: {machine.statusReason}
                     </div>
                 )}
             </div>
@@ -169,39 +202,54 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                             </button>
                         </div>
 
-                        <div className="mb-6">
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Injecting Product</label>
-                            <div className="flex gap-2">
+                        <div className="space-y-4 mb-6">
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Current Product</label>
                                 <input
                                     type="text"
                                     placeholder="Enter current product..."
-                                    className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                                     value={productInput}
                                     onChange={(e) => setProductInput(e.target.value)}
                                 />
-                                {productInput !== (machine.injectingProduct || '') && (
-                                    <button
-                                        onClick={() => handleStatusChange(machine.status)}
-                                        disabled={updating}
-                                        className="px-4 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition"
-                                    >
-                                        Save
-                                    </button>
-                                )}
                             </div>
+                            
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Current Moule (Mold)</label>
+                                <input
+                                    type="text"
+                                    placeholder="Enter mold name..."
+                                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                    value={mouleInput}
+                                    onChange={(e) => setMouleInput(e.target.value)}
+                                />
+                            </div>
+
+                            {(productInput !== (machine.injectingProduct || '') || mouleInput !== (machine.currentMoule || '')) && (
+                                <button
+                                    onClick={() => handleStatusChange(machine.status)}
+                                    disabled={updating}
+                                    className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-500/20"
+                                >
+                                    Save Setup Changes
+                                </button>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
                             <button
-                                onClick={() => handleStatusChange('operational')}
+                                onClick={() => {
+                                    setPendingStatus('operational');
+                                    handleStatusChange('operational');
+                                }}
                                 disabled={updating || machine.status === 'operational'}
-                                className={`flex items-center p-5 rounded-2xl border-2 transition-all w-full text-left ${machine.status === 'operational'
+                                className={`flex items-center p-5 rounded-2xl border-2 transition-all w-full text-left ${pendingStatus === 'operational'
                                     ? 'border-green-500 bg-green-50 text-green-700 shadow-md shadow-green-100 font-bold'
                                     : 'border-transparent bg-white hover:bg-gray-50 hover:border-green-200 text-gray-700 shadow-sm'
                                     }`}
                             >
-                                <div className={`p-3 rounded-full mr-4 ${machine.status === 'operational' ? 'bg-green-100' : 'bg-gray-100'}`}>
-                                    <CheckCircle2 className={`w-8 h-8 ${machine.status === 'operational' ? 'text-green-600' : 'text-gray-400'}`} />
+                                <div className={`p-3 rounded-full mr-4 ${pendingStatus === 'operational' ? 'bg-green-100' : 'bg-gray-100'}`}>
+                                    <CheckCircle2 className={`w-8 h-8 ${pendingStatus === 'operational' ? 'text-green-600' : 'text-gray-400'}`} />
                                 </div>
                                 <div className="flex-1">
                                     <span className="block text-xl font-bold">Operational</span>
@@ -210,15 +258,15 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                             </button>
 
                             <button
-                                onClick={() => handleStatusChange('down')}
+                                onClick={() => setPendingStatus('down')}
                                 disabled={updating || machine.status === 'down'}
-                                className={`flex items-center p-5 rounded-2xl border-2 transition-all w-full text-left ${machine.status === 'down'
+                                className={`flex items-center p-5 rounded-2xl border-2 transition-all w-full text-left ${pendingStatus === 'down'
                                     ? 'border-red-500 bg-red-50 text-red-700 shadow-md shadow-red-100 font-bold'
                                     : 'border-transparent bg-white hover:bg-gray-50 hover:border-red-200 text-gray-700 shadow-sm'
                                     }`}
                             >
-                                <div className={`p-3 rounded-full mr-4 ${machine.status === 'down' ? 'bg-red-100' : 'bg-gray-100'}`}>
-                                    <AlertCircle className={`w-8 h-8 ${machine.status === 'down' ? 'text-red-600' : 'text-gray-400'}`} />
+                                <div className={`p-3 rounded-full mr-4 ${pendingStatus === 'down' ? 'bg-red-100' : 'bg-gray-100'}`}>
+                                    <AlertCircle className={`w-8 h-8 ${pendingStatus === 'down' ? 'text-red-600' : 'text-gray-400'}`} />
                                 </div>
                                 <div className="flex-1">
                                     <span className="block text-xl font-bold">Down</span>
@@ -227,15 +275,15 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                             </button>
 
                             <button
-                                onClick={() => handleStatusChange('maintenance')}
+                                onClick={() => setPendingStatus('maintenance')}
                                 disabled={updating || machine.status === 'maintenance'}
-                                className={`flex items-center p-5 rounded-2xl border-2 transition-all w-full text-left ${machine.status === 'maintenance'
+                                className={`flex items-center p-5 rounded-2xl border-2 transition-all w-full text-left ${pendingStatus === 'maintenance'
                                     ? 'border-amber-500 bg-amber-50 text-amber-700 shadow-md shadow-amber-100 font-bold'
                                     : 'border-transparent bg-white hover:bg-gray-50 hover:border-amber-200 text-gray-700 shadow-sm'
                                     }`}
                             >
-                                <div className={`p-3 rounded-full mr-4 ${machine.status === 'maintenance' ? 'bg-amber-100' : 'bg-gray-100'}`}>
-                                    <Wrench className={`w-8 h-8 ${machine.status === 'maintenance' ? 'text-amber-600' : 'text-gray-400'}`} />
+                                <div className={`p-3 rounded-full mr-4 ${pendingStatus === 'maintenance' ? 'bg-amber-100' : 'bg-gray-100'}`}>
+                                    <Wrench className={`w-8 h-8 ${pendingStatus === 'maintenance' ? 'text-amber-600' : 'text-gray-400'}`} />
                                 </div>
                                 <div className="flex-1">
                                     <span className="block text-xl font-bold">Maintenance</span>
@@ -244,15 +292,18 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                             </button>
 
                             <button
-                                onClick={() => handleStatusChange('idle')}
+                                onClick={() => {
+                                    setPendingStatus('idle');
+                                    handleStatusChange('idle');
+                                }}
                                 disabled={updating || machine.status === 'idle'}
-                                className={`flex items-center p-5 rounded-2xl border-2 transition-all w-full text-left ${machine.status === 'idle'
+                                className={`flex items-center p-5 rounded-2xl border-2 transition-all w-full text-left ${pendingStatus === 'idle'
                                     ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-md shadow-purple-100 font-bold'
                                     : 'border-transparent bg-white hover:bg-gray-50 hover:border-purple-200 text-gray-700 shadow-sm'
                                     }`}
                             >
-                                <div className={`p-3 rounded-full mr-4 ${machine.status === 'idle' ? 'bg-purple-100' : 'bg-gray-100'}`}>
-                                    <Clock className={`w-8 h-8 ${machine.status === 'idle' ? 'text-purple-600' : 'text-gray-400'}`} />
+                                <div className={`p-3 rounded-full mr-4 ${pendingStatus === 'idle' ? 'bg-purple-100' : 'bg-gray-100'}`}>
+                                    <Clock className={`w-8 h-8 ${pendingStatus === 'idle' ? 'text-purple-600' : 'text-gray-400'}`} />
                                 </div>
                                 <div className="flex-1">
                                     <span className="block text-xl font-bold">Idle / Standby</span>
@@ -260,6 +311,28 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                                 </div>
                             </button>
                         </div>
+
+                        {(pendingStatus === 'down' || pendingStatus === 'maintenance') && (
+                            <div className="mt-8 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                                    <label className="block text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-2 ml-1">Reason for {pendingStatus} Status</label>
+                                    <textarea
+                                        placeholder="Explain why the machine is being stopped..."
+                                        className="w-full px-4 py-3 bg-white border border-amber-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all resize-none min-h-[100px]"
+                                        value={reasonInput}
+                                        onChange={(e) => setReasonInput(e.target.value)}
+                                        autoFocus
+                                    />
+                                    <button
+                                        onClick={() => handleStatusChange(pendingStatus!)}
+                                        disabled={updating || !reasonInput.trim()}
+                                        className="w-full mt-4 py-4 bg-amber-600 text-white font-bold rounded-xl shadow-lg shadow-amber-500/30 transition-all active:scale-95 disabled:opacity-50"
+                                    >
+                                        Confirm {pendingStatus} Status
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

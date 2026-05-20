@@ -536,7 +536,8 @@ function QRCodeModal({ part, onClose }: { part: SparePart; onClose: () => void }
         </div>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @media print {
           .no-print { display: none !important; }
           body * { visibility: hidden; }

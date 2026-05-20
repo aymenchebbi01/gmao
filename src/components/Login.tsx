@@ -87,10 +87,10 @@ export default function Login() {
           </div>
 
           <h2 className="text-xl font-bold text-center text-gray-900 mb-2">
-            {isSignUp ? 'Create Account' : 'Welcome Back'}
+            {isSignUp ? 'Create Account' : 'Welcome'}
           </h2>
           <p className="text-sm text-center text-gray-500 mb-8">
-            {isSignUp ? 'Join the maintenance team' : 'Sign in with your username'}
+            {isSignUp ? 'Join the maintenance team' : ''}
           </p>
 
           {error && (

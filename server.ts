@@ -42,6 +42,36 @@ try {
     console.log("Added siteNumber column to machines table");
   }
 
+  const hasInstallationDate = tableInfo.some((col: any) => col.name === 'installationDate');
+  if (!hasInstallationDate) {
+    db.prepare("ALTER TABLE machines ADD COLUMN installationDate TEXT").run();
+    console.log("Added installationDate column to machines table");
+  }
+
+  const hasCurrentMoule = tableInfo.some((col: any) => col.name === 'currentMoule');
+  if (!hasCurrentMoule) {
+    db.prepare("ALTER TABLE machines ADD COLUMN currentMoule TEXT").run();
+    console.log("Added currentMoule column to machines table");
+  }
+
+  const hasStatusReason = tableInfo.some((col: any) => col.name === 'statusReason');
+  if (!hasStatusReason) {
+    db.prepare("ALTER TABLE machines ADD COLUMN statusReason TEXT").run();
+    console.log("Added statusReason column to machines table");
+  }
+
+  // New table for production history (tracking product/mold changes)
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS machine_production_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      machineId TEXT NOT NULL,
+      productName TEXT,
+      mouleName TEXT,
+      startDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+      endDate DATETIME
+    )
+  `).run();
+
   // New products table for production items
   db.prepare(`
     CREATE TABLE IF NOT EXISTS products (
@@ -294,6 +324,14 @@ app.post('/api/machines', (req, res) => {
       `).run(machine.id, null, machine.condition);
     }
 
+    // Log initial production info
+    if (machine.injectingProduct || machine.currentMoule) {
+      db.prepare(`
+        INSERT INTO machine_production_history (machineId, productName, mouleName, startDate)
+        VALUES (?, ?, ?, ?)
+      `).run(machine.id, machine.injectingProduct || '', machine.currentMoule || '', new Date().toISOString());
+    }
+
     res.status(201).json({ message: 'Machine created' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -315,6 +353,23 @@ app.put('/api/machines/:id', (req, res) => {
           INSERT INTO machine_condition_history (machineId, previousCondition, newCondition)
           VALUES (?, ?, ?)
         `).run(id, oldMachine.condition, machine.condition);
+      }
+    }
+
+    // Log production change (Product or Mold)
+    if (machine.injectingProduct !== undefined || machine.currentMoule !== undefined) {
+      const newProduct = machine.injectingProduct !== undefined ? machine.injectingProduct : (oldMachine ? oldMachine.injectingProduct : undefined);
+      const newMoule = machine.currentMoule !== undefined ? machine.currentMoule : (oldMachine ? oldMachine.currentMoule : undefined);
+      
+      if (oldMachine && (oldMachine.injectingProduct !== newProduct || oldMachine.currentMoule !== newMoule)) {
+        // End the previous history entry
+        db.prepare('UPDATE machine_production_history SET endDate = ? WHERE machineId = ? AND endDate IS NULL').run(new Date().toISOString(), id);
+        
+        // Start a new history entry
+        db.prepare(`
+          INSERT INTO machine_production_history (machineId, productName, mouleName, startDate)
+          VALUES (?, ?, ?, ?)
+        `).run(id, newProduct || '', newMoule || '', new Date().toISOString());
       }
     }
 
@@ -358,6 +413,16 @@ app.get('/api/machines/:id/condition-history', (req, res) => {
   try {
     const { id } = req.params;
     const rows = db.prepare('SELECT * FROM machine_condition_history WHERE machineId = ? ORDER BY timestamp DESC').all(id);
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/machines/:id/production-history', (req, res) => {
+  try {
+    const { id } = req.params;
+    const rows = db.prepare('SELECT * FROM machine_production_history WHERE machineId = ? ORDER BY startDate DESC').all(id);
     res.json(rows);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });

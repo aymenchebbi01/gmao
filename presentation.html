@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMAO Platform Presentation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-soft: #dbeafe;
+            --secondary: #10b981;
+            --secondary-soft: #d1fae5;
+            --bg: #f8fafc;
+            --text-dark: #0f172a;
+            --text-gray: #475569;
+            --text-light: #94a3b8;
+            --white: #ffffff;
+            --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            --transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-dark);
+            overflow: hidden;
+        }
+
+        .presentation-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            transition: transform 0.8s cubic-bezier(0.85, 0, 0.15, 1);
+        }
+
+        .slide {
+            min-width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            position: relative;
+            background-color: var(--bg);
+            overflow: hidden;
+        }
+
+        /* Abstract background shapes */
+        .shape {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.4;
+            z-index: 0;
+        }
+        .shape-1 { width: 500px; height: 500px; background: var(--primary-soft); top: -100px; right: -100px; }
+        .shape-2 { width: 400px; height: 400px; background: var(--secondary-soft); bottom: -100px; left: -100px; }
+
+        .content-box {
+            max-width: 1100px;
+            width: 100%;
+            z-index: 1;
+            text-align: left;
+            padding: 3rem;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border-radius: 2.5rem;
+            border: 1px solid var(--white);
+            box-shadow: var(--card-shadow);
+        }
+
+        .center-content {
+            text-align: center;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.6rem 1.2rem;
+            background: var(--primary-soft);
+            color: var(--primary);
+            border-radius: 100px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            font-size: 4.5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            color: var(--text-dark);
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+        }
+
+        h1 span {
+            color: var(--primary);
+        }
+
+        h2 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        h2 i {
+            color: var(--primary);
+        }
+
+        p {
+            font-size: 1.4rem;
+            color: var(--text-gray);
+            line-height: 1.6;
+            margin-bottom: 2.5rem;
+            max-width: 800px;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .feature-card {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: 1.5rem;
+            border: 1px solid var(--card-border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08);
+            border-color: var(--primary-soft);
+        }
+
+        .icon-box {
+            width: 50px;
+            height: 50px;
+            background: var(--primary-soft);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+        }
+
+        .feature-card h3 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .feature-card p {
+            font-size: 1.05rem;
+            margin-bottom: 0;
+            color: var(--text-gray);
+        }
+
+        /* Controls */
+        .controls {
+            position: fixed;
+            bottom: 3rem;
+            right: 3rem;
+            display: flex;
+            gap: 1rem;
+            z-index: 100;
+        }
+
+        .btn {
+            background: var(--white);
+            color: var(--text-dark);
+            width: 4rem;
+            height: 4rem;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--white);
+        }
+
+        .btn:hover {
+            background: var(--primary);
+            color: var(--white);
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.05);
+            z-index: 1000;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        .slide-number {
+            position: fixed;
+            bottom: 3rem;
+            left: 3rem;
+            font-weight: 700;
+            color: var(--text-light);
+            font-size: 1.2rem;
+            letter-spacing: 0.1em;
+        }
+
+        /* Hero Image placeholder style */
+        .hero-visual {
+            width: 100%;
+            height: 150px;
+            background: linear-gradient(135deg, var(--primary-soft), var(--secondary-soft));
+            border-radius: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-fade {
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="progress-container">
+        <div class="progress-bar" id="progress"></div>
+    </div>
+
+    <div class="slide-number" id="slideNum">01 / 08</div>
+
+    <div class="presentation-container" id="container">
+        
+        <!-- SLIDE 1: TITLE -->
+        <section class="slide">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="content-box center-content animate-fade">
+                <div class="badge">Next-Gen Industrial Solutions</div>
+                <h1>Smart <span>GMAO</span><br>Platform</h1>
+                <p style="margin-left: auto; margin-right: auto;">Digitalizing maintenance workflows to drive operational excellence and maximize asset performance.</p>
+                <div class="hero-visual">
+                    <i data-lucide="cpu" size="64"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 2: WHAT IS GMAO -->
+        <section class="slide">
+            <div class="content-box animate-fade">
+                <div class="badge">Core Concept</div>
+                <h2><i data-lucide="info"></i> What is GMAO?</h2>
+                <p>A centralized digital ecosystem designed to monitor, track, and optimize all technical assets and maintenance operations in one unified platform.</p>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="database"></i></div>
+                        <h3>Centralized Data</h3>
+                        <p>A single source of truth for all machines, spare parts, and historical interventions.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="activity"></i></div>
+                        <h3>Real-time Tracking</h3>
+                        <p>Live visibility into machine status, performance KPIs, and technician activities.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 3: WHY WE NEED IT -->
+        <section class="slide">
+            <div class="content-box animate-fade">
+                <div class="badge">Strategic Value</div>
+                <h2><i data-lucide="trending-up"></i> Why we need it?</h2>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="zap"></i></div>
+                        <h3>Performance (OEE)</h3>
+                        <p>Track Machine Rendement in real-time to eliminate bottlenecks and maximize output.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="shield-check"></i></div>
+                        <h3>Risk Mitigation</h3>
+                        <p>Prevent catastrophic failures with data-driven preventive maintenance schedules.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="bar-chart-3"></i></div>
+                        <h3>Cost Control</h3>
+                        <p>Optimize maintenance spend and reduce emergency shipping of critical parts.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="users"></i></div>
+                        <h3>Accountability</h3>
+                        <p>Full audit logs and traceability for every action taken on the shop floor.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 4: MAINTENANCE -->
+        <section class="slide">
+            <div class="content-box animate-fade">
+                <div class="badge">Operational Core</div>
+                <h2><i data-lucide="wrench"></i> Maintenance Flow</h2>
+                <p>Streamlined lifecycle management from fault detection to final intervention reporting.</p>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="file-text"></i></div>
+                        <h3>Work Orders</h3>
+                        <p>Seamlessly create and assign corrective and preventive tasks with full documentation.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="calendar"></i></div>
+                        <h3>Smart Calendar</h3>
+                        <p>Automated scheduling based on live machine operating hours and manufacturer guidelines.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 5: INVENTORY -->
+        <section class="slide">
+            <div class="content-box animate-fade">
+                <div class="badge">Supply Chain</div>
+                <h2><i data-lucide="package"></i> Smart Inventory</h2>
+                <p>Advanced stock management to ensure zero production halts due to missing components.</p>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="box"></i></div>
+                        <h3>Live Stock Control</h3>
+                        <p>Instant visibility of part locations, quantities, and critical stock alerts.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="shopping-cart"></i></div>
+                        <h3>Auto-Procurement</h3>
+                        <p>Automated "Demande d'Achat" generation when stock levels hit safety thresholds.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 6: MOBILE QR -->
+        <section class="slide">
+            <div class="content-box animate-fade">
+                <div class="badge">Innovation</div>
+                <h2><i data-lucide="smartphone"></i> Mobile-First Floor</h2>
+                <p>Empowering technicians with rapid QR-based tools directly at the machine side.</p>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="qr-code"></i></div>
+                        <h3>Machine Scanning</h3>
+                        <p>Scan machine QR to instantly update <b>status</b> or change the <b>injected product</b>.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="scan"></i></div>
+                        <h3>Parts Scanning</h3>
+                        <p>Scan spare part QR codes to adjust <b>stock quantities</b> instantly from the warehouse.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 7: 3D & ANALYTICS -->
+        <section class="slide">
+            <div class="content-box animate-fade">
+                <div class="badge">Advanced Visibility</div>
+                <h2><i data-lucide="layout"></i> Visual Power</h2>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="box"></i></div>
+                        <h3>3D Factory Layout</h3>
+                        <p>Interactive spatial mapping for rapid machine localization and floor planning.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="icon-box"><i data-lucide="line-chart"></i></div>
+                        <h3>Deep Analytics</h3>
+                        <p>Comprehensive reporting on MTTR, MTBF, and individual worker efficiency.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SLIDE 8: CONCLUSION -->
+        <section class="slide">
+            <div class="shape shape-1"></div>
+            <div class="content-box center-content animate-fade">
+                <div class="badge">Final Vision</div>
+                <h2 style="justify-content: center;">Digital Transformation Complete</h2>
+                <p style="margin-left: auto; margin-right: auto;">Our GMAO platform is more than a tool—it is the foundation of a data-driven, highly efficient manufacturing future.</p>
+                <div class="hero-visual" style="height: 100px; background: var(--secondary-soft); color: var(--secondary);">
+                    <i data-lucide="check-circle" size="48"></i>
+                </div>
+                <div class="badge" style="background: var(--text-dark); color: var(--white); margin-top: 2rem;">Ready for Implementation</div>
+            </div>
+        </section>
+
+    </div>
+
+    <div class="controls">
+        <div class="btn" onclick="prevSlide()"><i data-lucide="chevron-left"></i></div>
+        <div class="btn" onclick="nextSlide()"><i data-lucide="chevron-right"></i></div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let currentSlide = 0;
+        const totalSlides = document.querySelectorAll('.slide').length;
+        const container = document.getElementById('container');
+        const progress = document.getElementById('progress');
+        const slideNum = document.getElementById('slideNum');
+
+        function updateSlide() {
+            container.style.transform = `translateX(-${currentSlide * 100}vw)`;
+            progress.style.width = `${((currentSlide + 1) / totalSlides) * 100}%`;
+            slideNum.innerText = `${(currentSlide + 1).toString().padStart(2, '0')} / ${totalSlides.toString().padStart(2, '0')}`;
+            
+            // Re-trigger animations
+            const currentSlideEl = document.querySelectorAll('.slide')[currentSlide];
+            const content = currentSlideEl.querySelector('.content-box');
+            content.style.animation = 'none';
+            content.offsetHeight; // trigger reflow
+            content.style.animation = null;
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                currentSlide++;
+                updateSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                updateSlide();
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
+            if (e.key === 'ArrowLeft') prevSlide();
+        });
+
+        updateSlide();
+    </script>
+</body>
+</html>

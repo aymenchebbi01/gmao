@@ -661,6 +661,8 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
     }
   };
 
+  const technicians = users.filter(u => u.role?.toLowerCase() === 'technician');
+
   return (
     <div className="relative min-h-[600px]">
       {/* Main Content with Blur Effect */}
@@ -711,7 +713,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                     assignedTo: '',
                     issuerName: '',
                     issuerSector: '',
-                    requesterName: '',
+                    requesterName: user?.displayName || user?.username || '',
                     requestDate: format(new Date(), 'yyyy-MM-dd'),
                     location: '',
                     malfunctionDescription: '',
@@ -1329,11 +1331,19 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                     <select
                       className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none"
                       value={formData.assignedTo}
-                      onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                      onChange={(e) => {
+                        const uid = e.target.value;
+                        const tech = technicians.find(t => t.uid === uid);
+                        setFormData({ 
+                          ...formData, 
+                          assignedTo: uid,
+                          issuerName: tech ? (tech.displayName || tech.username) : ''
+                        });
+                      }}
                     >
                       <option value="">Unassigned</option>
-                      {users.map(u => (
-                        <option key={u.uid} value={u.uid}>{u.displayName || u.username} ({u.role})</option>
+                      {technicians.map(u => (
+                        <option key={u.uid} value={u.uid}>{u.displayName || u.username}</option>
                       ))}
                     </select>
                   </div>

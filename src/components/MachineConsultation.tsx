@@ -27,6 +27,7 @@ export default function MachineConsultation() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
     const [newProduct, setNewProduct] = useState('');
+    const [newMoule, setNewMoule] = useState('');
     const [saving, setSaving] = useState(false);
 
     const fetchMachines = async () => {
@@ -48,6 +49,7 @@ export default function MachineConsultation() {
     const handleEditClick = (machine: Machine) => {
         setSelectedMachine(machine);
         setNewProduct(machine.injectingProduct || '');
+        setNewMoule(machine.currentMoule || '');
         setIsEditModalOpen(true);
     };
 
@@ -57,9 +59,10 @@ export default function MachineConsultation() {
         try {
             await api.updateMachine(selectedMachine.id, {
                 injectingProduct: newProduct,
+                currentMoule: newMoule,
                 updatedAt: new Date().toISOString()
             });
-            toast.success('Produit injecté mis à jour avec succès');
+            toast.success('Production information updated successfully');
             setIsEditModalOpen(false);
             fetchMachines();
         } catch (error) {
@@ -132,6 +135,9 @@ export default function MachineConsultation() {
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
                                     Injected Product
                                 </th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                                    Moule
+                                </th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right font-inter">Actions</th>
                             </tr>
                         </thead>
@@ -175,14 +181,20 @@ export default function MachineConsultation() {
                                         </td>
                                         <td className="px-6 py-4">
                                             {machine.injectingProduct ? (
-                                                <div className="flex items-center gap-2 p-2 ">
-
-                                                    <span className="text-xs font-bold text-emerald-700 font-inter">
-                                                        {machine.injectingProduct}
-                                                    </span>
-                                                </div>
+                                                <span className="text-xs font-bold text-emerald-700 font-inter">
+                                                    {machine.injectingProduct}
+                                                </span>
                                             ) : (
-                                                <span className="text-xs text-gray-400 italic font-inter font-medium tracking-tight">No product assigned</span>
+                                                <span className="text-xs text-gray-400 italic font-inter font-medium tracking-tight">No product</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {machine.currentMoule ? (
+                                                <span className="text-xs font-bold text-blue-700 font-inter">
+                                                    {machine.currentMoule}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-gray-400 italic font-inter font-medium tracking-tight">No mold</span>
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
@@ -230,25 +242,42 @@ export default function MachineConsultation() {
                 title={`Update Injected Product - ${selectedMachine?.name}`}
             >
                 <div className="space-y-6 p-1">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1 font-inter">
-                            Injected Product Name
-                        </label>
-                        <div className="relative">
-                            <Package className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Enter product name..."
-                                className="w-full pl-10 pr-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-inter font-medium"
-                                value={newProduct}
-                                onChange={(e) => setNewProduct(e.target.value)}
-                                autoFocus
-                            />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1 font-inter">
+                                Injected Product
+                            </label>
+                            <div className="relative">
+                                <Package className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Enter product..."
+                                    className="w-full pl-10 pr-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-inter font-medium"
+                                    value={newProduct}
+                                    onChange={(e) => setNewProduct(e.target.value)}
+                                />
+                            </div>
                         </div>
-                        <p className="mt-2 text-[11px] text-gray-400 ml-1 font-inter">
-                            This field identifies the product currently being produced on this machine.
-                        </p>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1 font-inter">
+                                Current Moule
+                            </label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Enter mold name..."
+                                    className="w-full pl-10 pr-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-inter font-medium"
+                                    value={newMoule}
+                                    onChange={(e) => setNewMoule(e.target.value)}
+                                />
+                            </div>
+                        </div>
                     </div>
+                    <p className="text-[11px] text-gray-400 ml-1 font-inter">
+                        Update the product and mold currently assigned to this machine.
+                    </p>
 
                     <div className="flex justify-end gap-3 pt-2">
                         <button
