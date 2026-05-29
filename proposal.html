@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thermo-GMAO — Smart CMMS Proposal</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #3b82f6;
+            --primary-soft: #eff6ff;
+            --secondary: #10b981;
+            --secondary-dark: #059669;
+            --secondary-soft: #ecfdf5;
+            --warning: #f59e0b;
+            --warning-soft: #fef3c7;
+            --danger: #f43f5e;
+            --danger-dark: #e11d48;
+            --danger-soft: #fff1f2;
+            --slate-950: #090d16;
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-500: #64748b;
+            --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
+            --slate-200: #e2e8f0;
+            --slate-100: #f1f5f9;
+            --slate-50: #f8fafc;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.7;
+            color: var(--slate-700);
+            background: var(--slate-100);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        .font-heading {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .page-wrapper {
+            max-width: 1040px;
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+
+        /* ─────────── COVER PAGE ─────────── */
+        .cover {
+            position: relative;
+            text-align: center;
+            padding: 90px 60px 80px;
+            background: linear-gradient(135deg, var(--slate-950) 0%, var(--slate-900) 40%, var(--primary-dark) 100%);
+            color: white;
+            border-radius: 24px;
+            margin-bottom: 32px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+        }
+
+        .cover::before {
+            content: '';
+            position: absolute;
+            top: -120px;
+            right: -120px;
+            width: 450px;
+            height: 450px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.15) 0%, transparent 70%);
+        }
+
+        .cover::after {
+            content: '';
+            position: absolute;
+            bottom: -100px;
+            left: -100px;
+            width: 350px;
+            height: 350px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
+        }
+
+        .cover-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 8px 24px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 32px;
+            backdrop-filter: blur(10px);
+        }
+
+        .cover h1 {
+            font-size: 60px;
+            font-weight: 900;
+            letter-spacing: -2px;
+            margin-bottom: 12px;
+            line-height: 1.1;
+            background: linear-gradient(135deg, #ffffff 60%, var(--primary-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .cover h2 {
+            font-size: 20px;
+            font-weight: 300;
+            opacity: 0.85;
+            margin-bottom: 48px;
+            letter-spacing: 1px;
+            color: var(--slate-300);
+        }
+
+        .cover-meta {
+            display: flex;
+            justify-content: center;
+            gap: 48px;
+            flex-wrap: wrap;
+            margin-bottom: 48px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .cover-meta-item {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 12px 24px;
+            border-radius: 12px;
+            min-width: 160px;
+        }
+
+        .cover-meta-item .label {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--slate-400);
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .cover-meta-item .value {
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .cover .confidential {
+            display: inline-block;
+            background: rgba(244, 63, 94, 0.15);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            color: #fda4af;
+            padding: 6px 20px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* ─────────── TABLE OF CONTENTS ─────────── */
+        .toc {
+            background: white;
+            border-radius: 20px;
+            padding: 40px 48px;
+            margin-bottom: 28px;
+            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.03);
+            border: 1px solid var(--slate-200);
+        }
+
+        .toc h2 {
+            font-size: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--slate-400);
+            margin-bottom: 24px;
+        }
+
+        .toc-list {
+            list-style: none;
+            counter-reset: toc;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0 32px;
+        }
+
+        @media (max-width: 768px) {
+            .toc-list {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .toc-list li {
+            counter-increment: toc;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--slate-100);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-weight: 600;
+            color: var(--slate-700);
+            font-size: 15px;
+        }
+
+        .toc-list li::before {
+            content: counter(toc, decimal-leading-zero);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            background: var(--primary-soft);
+            color: var(--primary);
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+
+        /* ─────────── SECTIONS ─────────── */
+        .section {
+            background: white;
+            padding: 48px;
+            margin-bottom: 28px;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.03);
+            border: 1px solid var(--slate-200);
+            position: relative;
+        }
+
+        .section-number {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            color: var(--primary-light);
+            margin-bottom: 8px;
+        }
+
+        .section h1 {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--slate-950);
+            letter-spacing: -1px;
+            margin-bottom: 6px;
+        }
+
+        .section-subtitle {
+            font-size: 15px;
+            color: var(--slate-400);
+            margin-bottom: 32px;
+            font-weight: 500;
+        }
+
+        .section h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--slate-900);
+            margin: 36px 0 18px 0;
+            padding-top: 28px;
+            border-top: 1px solid var(--slate-100);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section h2:first-of-type {
+            border-top: none;
+            padding-top: 0;
+            margin-top: 20px;
+        }
+
+        .section p {
+            margin-bottom: 18px;
+            font-size: 15px;
+            color: var(--slate-600);
+            line-height: 1.8;
+        }
+
+        .section p strong {
+            color: var(--slate-900);
+        }
+
+        /* ─────────── TABLES ─────────── */
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--slate-200);
+            font-size: 14px;
+        }
+
+        th {
+            background: var(--slate-900);
+            color: white;
+            padding: 16px 20px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--slate-100);
+            color: var(--slate-600);
+            vertical-align: top;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:nth-child(even) td {
+            background: var(--slate-50);
+        }
+
+        td:first-child {
+            font-weight: 600;
+            color: var(--slate-800);
+        }
+
+        /* ─────────── MODULE DIAGRAM ─────────── */
+        .module-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+            margin: 28px 0;
+        }
+
+        @media (max-width: 768px) {
+            .module-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .module-card {
+            background: var(--slate-50);
+            border: 1px solid var(--slate-200);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .module-card:hover {
+            border-color: var(--primary-light);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.08);
+        }
+
+        .module-card.primary {
+            grid-column: span 3;
+            background: linear-gradient(135deg, var(--primary-soft), #e0f2fe);
+            border-color: rgba(37, 99, 235, 0.2);
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .module-card.primary {
+                grid-column: span 1;
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+
+        .module-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .module-card.primary .module-icon {
+            margin: 0;
+            flex-shrink: 0;
+        }
+
+        .module-card h4 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--slate-800);
+            margin-bottom: 6px;
+        }
+
+        .module-card p {
+            font-size: 12px;
+            color: var(--slate-500);
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        /* ─────────── SCREENSHOT PLACEHOLDERS ─────────── */
+        .screenshot {
+            border: 2px dashed var(--slate-300);
+            border-radius: 16px;
+            padding: 56px 24px;
+            text-align: center;
+            margin: 24px 0;
+            background: var(--slate-50);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .screenshot:hover {
+            background: var(--primary-soft);
+            border-color: var(--primary-light);
+        }
+
+        .screenshot .icon {
+            font-size: 40px;
+            margin-bottom: 16px;
+            opacity: 0.6;
+        }
+
+        .screenshot .label {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--slate-800);
+        }
+
+        .screenshot .caption {
+            font-size: 12px;
+            color: var(--slate-400);
+            margin-top: 8px;
+        }
+
+        /* ─────────── FORMULA BOX ─────────── */
+        .formula-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin: 24px 0;
+        }
+
+        @media (max-width: 768px) {
+            .formula-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .formula-box {
+            background: linear-gradient(135deg, var(--slate-900), var(--slate-950));
+            color: white;
+            padding: 24px 28px;
+            border-radius: 16px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 15px rgba(15, 23, 42, 0.1);
+        }
+
+        .formula-box.wide {
+            grid-column: span 2;
+        }
+
+        @media (max-width: 768px) {
+            .formula-box.wide {
+                grid-column: span 1;
+            }
+        }
+
+        .formula-box .label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--slate-400);
+            margin-bottom: 12px;
+        }
+
+        .formula-box .formula {
+            font-size: 16px;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.5px;
+            line-height: 1.6;
+        }
+
+        .formula-box .formula span {
+            color: var(--primary-light);
+        }
+
+        .formula-box .formula span.sec {
+            color: var(--secondary);
+        }
+
+        /* ─────────── COLOR LEGEND ─────────── */
+        .color-legend {
+            display: flex;
+            gap: 24px;
+            margin: 20px 0 12px;
+            flex-wrap: wrap;
+            background: var(--slate-50);
+            padding: 16px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--slate-200);
+        }
+
+        .color-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--slate-700);
+        }
+
+        .color-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .color-dot.green {
+            background: var(--secondary);
+        }
+
+        .color-dot.blue {
+            background: var(--primary-light);
+        }
+
+        .color-dot.amber {
+            background: var(--warning);
+        }
+
+        .color-dot.red {
+            background: var(--danger);
+        }
+
+        /* ─────────── ROI IMPROVEMENT BARS ─────────── */
+        .roi-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+            margin: 28px 0;
+        }
+
+        .roi-card {
+            background: var(--slate-50);
+            border: 1px solid var(--slate-200);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            transition: border-color 0.2s;
+        }
+
+        .roi-card:hover {
+            border-color: var(--secondary);
+        }
+
+        @media (max-width: 600px) {
+            .roi-card {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 16px;
+            }
+        }
+
+        .roi-card .metric-label {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--slate-800);
+            min-width: 180px;
+        }
+
+        .roi-card .metric-change {
+            flex: 1;
+        }
+
+        .roi-card .bar-track {
+            height: 10px;
+            background: var(--slate-200);
+            border-radius: 100px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .roi-card .bar-fill {
+            height: 100%;
+            border-radius: 100px;
+            background: linear-gradient(90deg, var(--secondary), #34d399);
+        }
+
+        .roi-card .bar-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        .roi-card .bar-labels .before {
+            color: var(--slate-400);
+            font-weight: 500;
+        }
+
+        .roi-card .bar-labels .after {
+            color: var(--secondary-dark);
+            font-weight: 700;
+        }
+
+        .roi-badge {
+            background: var(--secondary-soft);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: var(--secondary-dark);
+            padding: 8px 18px;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 800;
+            white-space: nowrap;
+            text-align: center;
+        }
+
+        /* ─────────── STRATEGIC BENEFITS ─────────── */
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin: 24px 0;
+        }
+
+        @media (max-width: 768px) {
+            .benefits-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            background: var(--slate-50);
+            border: 1px solid var(--slate-200);
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--slate-700);
+            line-height: 1.6;
+        }
+
+        .benefit-check {
+            color: var(--secondary);
+            font-size: 18px;
+            flex-shrink: 0;
+            margin-top: 1px;
+            font-weight: bold;
+        }
+
+        /* ─────────── TIMELINE ─────────── */
+        .timeline {
+            position: relative;
+            margin: 36px 0 20px 24px;
+            padding-left: 36px;
+            border-left: 3px solid var(--slate-200);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-bottom: 36px;
+        }
+
+        .timeline-item:last-child {
+            padding-bottom: 0;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: -46px;
+            top: 2px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary-light);
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px var(--primary-light);
+        }
+
+        .timeline-item:last-child .timeline-dot {
+            background: var(--slate-400);
+            box-shadow: 0 0 0 2px var(--slate-400);
+        }
+
+        .timeline-phase {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+
+        .timeline-item:last-child .timeline-phase {
+            color: var(--slate-400);
+        }
+
+        .timeline-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--slate-900);
+            margin-bottom: 6px;
+        }
+
+        .timeline-desc {
+            font-size: 13.5px;
+            color: var(--slate-500);
+            line-height: 1.6;
+        }
+
+        .timeline-badge {
+            display: inline-block;
+            background: var(--primary-soft);
+            color: var(--primary-dark);
+            padding: 4px 14px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-top: 10px;
+        }
+
+        /* ─────────── NEXT STEPS ─────────── */
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin: 28px 0;
+        }
+
+        @media (max-width: 768px) {
+            .steps-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .step-card {
+            background: var(--slate-50);
+            border: 1px solid var(--slate-200);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .step-number {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: var(--primary);
+            color: white;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 800;
+            flex-shrink: 0;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.2);
+        }
+
+        .step-card h4 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--slate-900);
+            margin-bottom: 6px;
+        }
+
+        .step-card p {
+            font-size: 12.5px;
+            color: var(--slate-500);
+            margin: 0;
+            line-height: 1.6;
+        }
+
+        /* ─────────── FOOTER ─────────── */
+        .footer {
+            text-align: center;
+            padding: 48px 20px;
+            color: var(--slate-400);
+            font-size: 13px;
+        }
+
+        .footer .divider {
+            width: 80px;
+            height: 4px;
+            background: var(--slate-200);
+            border-radius: 100px;
+            margin: 0 auto 24px;
+        }
+
+        .footer strong {
+            color: var(--slate-600);
+        }
+
+        .footer .confidential-footer {
+            display: inline-block;
+            margin-top: 20px;
+            background: var(--danger-soft);
+            color: var(--danger-dark);
+            padding: 6px 20px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            border: 1px solid rgba(244, 63, 94, 0.1);
+        }
+
+        /* ─────────── QUOTE BLOCK ─────────── */
+        .quote-block {
+            background: linear-gradient(135deg, var(--primary-soft), #f0fdf4);
+            border-left: 4px solid var(--primary-light);
+            border-radius: 0 16px 16px 0;
+            padding: 24px 32px;
+            margin: 28px 0;
+            font-size: 15px;
+            font-weight: 500;
+            font-style: italic;
+            color: var(--slate-800);
+            line-height: 1.8;
+            border-right: 1px solid var(--slate-200);
+            border-top: 1px solid var(--slate-200);
+            border-bottom: 1px solid var(--slate-200);
+        }
+
+        /* ─────────── FEATURE BADGES ─────────── */
+        .feature-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .feature-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid;
+        }
+
+        .feature-badge.green {
+            background: var(--secondary-soft);
+            color: var(--secondary-dark);
+            border-color: rgba(16, 185, 129, 0.15);
+        }
+
+        .feature-badge.blue {
+            background: var(--primary-soft);
+            color: var(--primary-dark);
+            border-color: rgba(37, 99, 235, 0.15);
+        }
+
+        .feature-badge.amber {
+            background: var(--warning-soft);
+            color: #92400e;
+            border-color: rgba(245, 158, 11, 0.15);
+        }
+
+        /* ─────────── PRINT STYLES ─────────── */
+        @media print {
+            body {
+                background: white;
+            }
+
+            .page-wrapper {
+                padding: 0;
+                max-width: 100%;
+            }
+
+            .cover {
+                break-after: page;
+            }
+
+            .section {
+                box-shadow: none;
+                border: 1px solid var(--slate-200);
+                break-inside: avoid;
+            }
+
+            .module-card:hover {
+                border-color: var(--slate-200);
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page-wrapper">
+
+        <!-- ═══════════════ COVER PAGE ═══════════════ -->
+        <div class="cover">
+            <div class="cover-badge">Application Proposal</div>
+            <h1>THERMO-GMAO</h1>
+            <h2>Computerized Maintenance Management Platform</h2>
+            <div class="cover-meta">
+                <div class="cover-meta-item">
+                    <span class="label">Prepared By</span>
+                    <span class="value">Aymen Chebbi</span>
+                </div>
+                <div class="cover-meta-item">
+                    <span class="label">Departement</span>
+                    <span class="value">IT</span>
+                </div>
+                <div class="cover-meta-item">
+                    <span class="label">Date</span>
+                    <span class="value">May 25, 2026</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════ TABLE OF CONTENTS ═══════════════ -->
+        <div class="toc">
+            <h2>Table of Contents</h2>
+            <ol class="toc-list">
+                <li>Executive Summary</li>
+                <li>Current Challenges</li>
+                <li>Thermo-GMAO</li>
+                <li>Technical Capabilities</li>
+                <li>Database Architecture & Schema</li>
+                <li>Operational Benefits & Quantified ROI</li>
+                <li>Implementation & Rollout Timeline</li>
+
+            </ol>
+        </div>
+
+        <!-- ═══════════════ 1. EXECUTIVE SUMMARY ═══════════════ -->
+        <div class="section">
+            <div class="section-number">Section 01</div>
+            <h1>Executive Summary</h1>
+            <p class="section-subtitle">Real-time shop floor visibility, instant failure alerts, and automated stock
+                control</p>
+
+            <p>The <strong>Thermo-GMAO</strong> platform is a custom-engineered Computerized Maintenance Management
+                System (CMMS) designed explicitly to <strong>digitize, streamline, and optimize maintenance and
+                    operations</strong> on our injection molding factory floor.</p>
+
+            <p>By shifting from passive, fragmented paperwork to a proactive digital ecosystem, Thermo-GMAO connects
+                physical assets with operations staff. It bridges the gap between field technicians scanning
+                <strong>machine QR codes</strong> for rapid feedback and plant management navigating a **live 3D Digital
+                Twin** of the plant floor. The platform drives down the Mean Time to Repair (MTTR), optimizes spare
+                parts inventory levels automatically, and tracks machine efficiency metrics shift-by-shift.
+            </p>
+
+            <div class="quote-block">
+                "Thermo-GMAO transforms shop floor maintenance from a reactive emergency service into a structured,
+                predictive utility — guaranteeing maximum machine availability and transparent audit logs."
+            </div>
+        </div>
+
+        <!-- ═══════════════ 2. CURRENT SHOP FLOOR CHALLENGES ═══════════════ -->
+        <div class="section">
+            <div class="section-number">Section 02</div>
+            <h1>Current Shop Floor Challenges</h1>
+            <p class="section-subtitle">Critical bottlenecks and operational friction under manual tracking</p>
+
+            <p>Our current maintenance workflow relies on fragmented reporting, lack of immediate breakdown
+                notifications, and paper logs, directly affecting Overall Equipment Effectiveness (OEE).</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px">#</th>
+                        <th>Current Pain Point</th>
+                        <th>Business & Financial Impact</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>01</td>
+                        <td>Verbal breakdown notifications & delayed shift reporting</td>
+                        <td>Extended Mean Time to Repair (MTTR) as technicians wait for alerts</td>
+                    </tr>
+                    <tr>
+                        <td>02</td>
+                        <td>No centralized historical log of machine breakdowns</td>
+                        <td>Repeat machinery failures; inability to detect chronic equipment defects</td>
+                    </tr>
+                    <tr>
+                        <td>03</td>
+                        <td>Manual inventory counts for heaters, sensors & mold parts</td>
+                        <td>Frequent unexpected stockouts halting high-priority production lines</td>
+                    </tr>
+                    <tr>
+                        <td>04</td>
+                        <td>No digital record of technician time allocation</td>
+                        <td>Inability to assess labor efficiency; no clear operational audit trail</td>
+                    </tr>
+                    <tr>
+                        <td>05</td>
+                        <td>Manual, delayed calculation of shift-level machine Rendement</td>
+                        <td>Misalignment on production targets; delayed bottlenecks detection</td>
+                    </tr>
+                    <tr>
+                        <td>06</td>
+                        <td>Paper-based Purchase Requests ("Demande d'Achat")</td>
+                        <td>Slow procurement cycle for critical industrial supplies</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ═══════════════ 3. THERMO-GMAO ECOSYSTEM ═══════════════ -->
+        <div class="section">
+            <div class="section-number">Section 03</div>
+            <h1>Thermo-GMAO Ecosystem</h1>
+            <p class="section-subtitle">Six fully integrated modules forming a single industrial source of truth</p>
+
+            <div class="screenshot">
+                <div class="icon">🧱</div>
+                <div class="label">Insert Screenshot: 3D Factory Floor Layout</div>
+                <div class="caption">Figure 1 — Real-Time 3D Digital Twin Command Center</div>
+            </div>
+
+            <div class="module-grid">
+                <div class="module-card primary">
+                    <div class="module-icon">📊</div>
+                    <div>
+                        <h4>Command Center & Analytics</h4>
+                        <p>Live global KPIs including plant MTTR, active breakdown counters, historical trends, and
+                            technician work order completion lists at a glance.</p>
+                    </div>
+                </div>
+                <div class="module-card">
+                    <div class="module-icon">🧱</div>
+                    <h4>3D Factory Layout</h4>
+                    <p>Interactive spatial mapping displaying physical machine status using 3D glow colors.</p>
+                </div>
+                <div class="module-card">
+                    <div class="module-icon">📱</div>
+                    <h4>3-Sec QR Operations</h4>
+                    <p>Technicians scan machine QR codes to instantly report downtime or change product tags.</p>
+                </div>
+                <div class="module-card">
+                    <div class="module-icon">⚙️</div>
+                    <h4>Work Order Engine</h4>
+                    <p>Unified ticket creation for corrective & scheduled preventive maintenance plans.</p>
+                </div>
+                <div class="module-card">
+                    <div class="module-icon">📦</div>
+                    <h4>Inventory & Auto-Procure</h4>
+                    <p>Live spare parts ledger linked with one-click "Demande d'Achat" generation.</p>
+                </div>
+                <div class="module-card">
+                    <div class="module-icon">📈</div>
+                    <h4>TRS / Rendement Tracking</h4>
+                    <p>Automated shift performance calculations, target vs. actual quantities, and OEE indicators.</p>
+                </div>
+                <div class="module-card"
+                    style="grid-column: span 3; background: var(--slate-50); text-align: left; padding: 18px 24px;">
+                    <h4 style="margin-bottom: 4px; display: flex; align-items: center; gap: 8px;">🔐 Cryptographic
+                        Security & RBAC</h4>
+                    <p style="font-size: 12px; color: var(--slate-500);">A strict user authentication engine governs
+                        roles (Administrator, Manager, and Technician). Every state transition, QR scan, or stock
+                        adjustment is cryptographically recorded in the immutable <b>Audit Log</b> database.</p>
+                </div>
+            </div>
+
+            <div class="feature-badges">
+                <span class="feature-badge blue">🛡️ Role-Based Access Control</span>
+                <span class="feature-badge green">🔒 100% On-Premise (No Cloud Dependencies)</span>
+                <span class="feature-badge amber">📊 Interactive TRS / OEE Reports</span>
+            </div>
+        </div>
+
+        <!-- ═══════════════ 4. KEY MODULES & CAPABILITIES ═══════════════ -->
+        <div class="section">
+            <div class="section-number">Section 04</div>
+            <h1>Key Modules & Technical Capabilities</h1>
+            <p class="section-subtitle">A deep dive into the engineering behind our smart features</p>
+
+            <!-- 4.1 3D Layout -->
+            <h2>4.1 Live 3D Factory Digital Twin</h2>
+            <p>A WebGL-powered spatial digital twin of the factory floor allows managers to quickly locate failures.
+                Machines glow dynamically according to their real-time state:</p>
+
+            <div class="color-legend">
+                <div class="color-legend-item">
+                    <div class="color-dot green"></div> Operational — Healthy Machine running current product
+                </div>
+                <div class="color-legend-item">
+                    <div class="color-dot red"></div> Down — Unplanned breakdown requiring urgent technician scan
+                </div>
+                <div class="color-legend-item">
+                    <div class="color-dot amber"></div> Maintenance — Planned preventive task in-progress
+                </div>
+                <div class="color-legend-item">
+                    <div class="color-dot blue"></div> Retired / Standby — Asset offline or awaiting configuration
+                </div>
+            </div>
+
+            <!-- 4.2 QR and Mobile -->
+            <h2>4.2 The 3-Second Mobile QR Flow</h2>
+            <p>Eliminating system login overhead for field operators. When a machine breaks down or shifts to a new
+                product: </p>
+            <div class="screenshot">
+                <div class="icon">📱</div>
+                <div class="label">Insert Screenshot: Mobile QR Code Action Sheet</div>
+                <div class="caption">Figure 2 — Responsive mobile screen triggered by scanning physical Machine Tag
+                </div>
+            </div>
+
+            <div class="benefits-grid">
+                <div class="benefit-item"><span class="benefit-check">✓</span> <strong>Scan QR:</strong> Instant
+                    physical machine scanning automatically identifies matching machine assets</div>
+                <div class="benefit-item"><span class="benefit-check">✓</span> <strong>Instant Status Update:</strong>
+                    One-tap buttons switch state to 'Down' or 'In-Maintenance' immediately</div>
+                <div class="benefit-item"><span class="benefit-check">✓</span> <strong>Active Product Changing:</strong>
+                    Dynamically update the current 'Injecting Product' tag on the fly</div>
+                <div class="benefit-item"><span class="benefit-check">✓</span> <strong>Spare Part Scan:</strong> Adjust
+                    spare parts stock ledger directly from the shelf using item QR codes</div>
+            </div>
+
+            <!-- 4.3 Industrial Calculations -->
+            <h2>4.3 Industrial Maintenance Metrics & Formulas</h2>
+            <p>Our platform handles critical metrics reporting to keep the shop floor competitive. Automated computation
+                boxes calculate results continuously:</p>
+
+            <div class="formula-container">
+                <div class="formula-box">
+                    <div class="label">Mean Time to Repair (MTTR)</div>
+                    <div class="formula">
+                        MTTR = <span>Total DownTime</span> ÷ <span>Failure Count</span>
+                    </div>
+                </div>
+                <div class="formula-box">
+                    <div class="label">Mean Time Between Failures (MTBF)</div>
+                    <div class="formula">
+                        MTBF = <span>Total Operating Time</span> ÷ <span>Failure Count</span>
+                    </div>
+                </div>
+                <div class="formula-box wide">
+                    <div class="label">Taux de Rendement Synthétique (TRS / OEE)</div>
+                    <div class="formula">
+                        TRS (%) = (<span>Actual Qty</span> × <span>Actual Cycle Time</span>) ÷ (<span>Total Operating
+                            Time</span> × <span>Cavities Running</span>) × <span class="sec">100%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════ 5. DATABASE ARCHITECTURE & SCHEMA ═══════════════ -->
+        <div class="section">
+            <div class="section-number">Section 05</div>
+            <h1>Database Architecture & Specs</h1>
+            <p class="section-subtitle">Robust, local relational engine running SQLite for high reliability</p>
+
+            <p>Thermo-GMAO is powered by a high-efficiency database schema in <strong>SQLite
+                    (`better-sqlite3`)</strong>. It runs 100% locally on the industrial control PC or local intranet
+                server, guaranteeing data residency compliance and zero maintenance interruptions during external
+                internet outages.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 150px">Table Name</th>
+                        <th style="width: 250px">Primary Columns</th>
+                        <th>Functional Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>users</code></td>
+                        <td>uid, username, password, displayName, role</td>
+                        <td>Contains encrypted user profiles and active RBAC clearance roles.</td>
+                    </tr>
+                    <tr>
+                        <td><code>machines</code></td>
+                        <td>id, name, serialNumber, clampingForce, status, currentHours, injectingProduct, imageUrl</td>
+                        <td>Tracks technical injection molding machine specifications, state, and hours.</td>
+                    </tr>
+                    <tr>
+                        <td><code>work_orders</code></td>
+                        <td>id, machineId, type, priority, status, assignedTo, completedAt, reportNumber</td>
+                        <td>Core system logs for open corrective tickets and preventive intervention tasks.</td>
+                    </tr>
+                    <tr>
+                        <td><code>intervention_reports</code></td>
+                        <td>workOrderId, technicians, startTime, endTime, durationMinutes, failureCause, actions</td>
+                        <td>Detailed diagnosis log filed by technicians upon closing a work order.</td>
+                    </tr>
+                    <tr>
+                        <td><code>spare_parts</code></td>
+                        <td>id, name, sku, category, location, stock, minStock, unit</td>
+                        <td>Live inventory database mapping items, quantities, and storage coordinates.</td>
+                    </tr>
+                    <tr>
+                        <td><code>intervention_parts</code></td>
+                        <td>id, workOrderId, partId, quantity</td>
+                        <td>Junction ledger tracking precisely which spare parts were consumed where.</td>
+                    </tr>
+                    <tr>
+                        <td><code>audit_logs</code></td>
+                        <td>id, userId, username, action, entityType, entityId, details, createdAt</td>
+                        <td>Cryptographic logging system tracking all database writes, logins, and scans.</td>
+                    </tr>
+                    <tr>
+                        <td><code>machine_rendement</code></td>
+                        <td>id, date, machineNumber, item, targetQty, actualCavitiesRunning, trs, actualCycleTime</td>
+                        <td>Stores the raw production and injection efficiency figures shift by shift.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="quote-block"
+                style="background: var(--slate-900); color: white; border-color: var(--primary-light);">
+                <strong>🔒 Strict Data Residency Compliance:</strong> The database and server execute entirely inside
+                the factory local area network (LAN). No analytical statistics or asset configurations are ever
+                transmitted to external cloud systems, maintaining 100% security boundaries.
+            </div>
+        </div>
+
+        <!-- ═══════════════ 6. OPERATIONAL BENEFITS & QUANTIFIED ROI ═══════════════ -->
+        <div class="section">
+            <div class="section-number">Section 06</div>
+            <h1>Benefits & Return on Investment</h1>
+            <p class="section-subtitle">Quantified shop floor optimizations and strategic advantages</p>
+
+            <h2>Quantifiable Improvements</h2>
+
+            <div class="roi-grid">
+                <div class="roi-card">
+                    <div class="metric-label">Breakdown Alert Time</div>
+                    <div class="metric-change">
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width: 99.8%"></div>
+                        </div>
+                        <div class="bar-labels">
+                            <span class="before">Before: 15–30 mins verbal alert</span>
+                            <span class="after">After: ~3 seconds (QR alert)</span>
+                        </div>
+                    </div>
+                    <div class="roi-badge">99.8% Faster</div>
+                </div>
+                <div class="roi-card">
+                    <div class="metric-label">Spare Part Stockouts</div>
+                    <div class="metric-change">
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width: 95%"></div>
+                        </div>
+                        <div class="bar-labels">
+                            <span class="before">Before: Frequent unexpected halts</span>
+                            <span class="after">After: Auto-alert before safety stock hits</span>
+                        </div>
+                    </div>
+                    <div class="roi-badge">95% Reduction</div>
+                </div>
+                <div class="roi-card">
+                    <div class="metric-label">Intervention Logging</div>
+                    <div class="metric-change">
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width: 98%"></div>
+                        </div>
+                        <div class="bar-labels">
+                            <span class="before">Before: 20 mins of paper writing</span>
+                            <span class="after">After: ~10 seconds via mobile entry</span>
+                        </div>
+                    </div>
+                    <div class="roi-badge">98% Faster</div>
+                </div>
+                <div class="roi-card">
+                    <div class="metric-label">TRS / OEE Visibility</div>
+                    <div class="metric-change">
+                        <div class="bar-track">
+                            <div class="bar-fill" style="width: 100%"></div>
+                        </div>
+                        <div class="bar-labels">
+                            <span class="before">Before: Manual calculations at end of week</span>
+                            <span class="after">After: Real-time, instant shift feedback</span>
+                        </div>
+                    </div>
+                    <div class="roi-badge">Immediate</div>
+                </div>
+            </div>
+
+            <h2>Strategic Value</h2>
+            <div class="benefits-grid">
+                <div class="benefit-item"><span class="benefit-check">✓</span> <strong>Full Traceability:</strong>
+                    Historical log of every machine status update and spare part movement</div>
+                <div class="benefit-item"><span class="benefit-check">✓</span> <strong>Technician Empowerment:</strong>
+                    Zero frustration mobile tools to handle status reporting</div>
+                <div class="benefit-item"><span class="benefit-check">✓</span> <strong>Continuous Improvement:</strong>
+                    Actionable MTTR and MTBF analytics for machinery purchase reviews</div>
+                <div class="benefit-item"><span class="benefit-check">✓</span> <strong>Operational
+                        Accountability:</strong> Robust user verification and tamper-proof admin audit trail logs</div>
+            </div>
+        </div>
+
+        <!-- ═══════════════ 7. DEPLOYMENT PLAN ═══════════════ -->
+        <div class="section">
+            <div class="section-number">Section 07</div>
+            <h1>Deployment & Implementation Plan</h1>
+            <p class="section-subtitle">Phased shop floor deployment ensuring zero operational disruption</p>
+
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-phase">Phase 01</div>
+                    <div class="timeline-title">Audit, Tagging & Database Import</div>
+                    <div class="timeline-desc">Generate unique high-durability physical QR labels for all shop floor
+                        machinery and spare part bins. Import standard injection molding machine cadence rates, clamping
+                        force ratings, and core inventory lists into SQLite.</div>
+                    <div class="timeline-badge">Weeks 1–2</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-phase">Phase 02</div>
+                    <div class="timeline-title">Pilot Testing & 3D Calibration</div>
+                    <div class="timeline-desc">Deploy the local server. Configure user accounts and test the 3-second QR
+                        scan flow on 3 pilot machines. Align the live 3D factory layout nodes with actual factory
+                        coords.</div>
+                    <div class="timeline-badge">Weeks 3–4</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-phase">Phase 03</div>
+                    <div class="timeline-title">Technician Onboarding & Launch</div>
+                    <div class="timeline-desc">Conduct hands-on, thumb-friendly training sessions for technicians.
+                        Decommission paper breakdown logbooks. Begin using the purchase request generator for low-stock
+                        spare parts.</div>
+                    <div class="timeline-badge">Weeks 5–6</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-phase">Phase 04</div>
+                    <div class="timeline-title">Continuous Optimization & TRS Review</div>
+                    <div class="timeline-desc">Analyze compiled MTTR/MTBF metrics in weekly review meetings. Leverage
+                        automated machine rendement reports to adjust machine targets and scheduling.</div>
+                    <div class="timeline-badge">Ongoing</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════ 8. RECOMMENDED NEXT STEPS ═══════════════ -->
+        <div class="section">
+            <div class="section-number">Section 08</div>
+            <h1>Recommended Next Steps</h1>
+            <p class="section-subtitle">Concrete actions to begin the Thermo-GMAO transformation</p>
+
+            <div class="steps-grid">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <div>
+                        <h4>Interactive 3D Floor Demo</h4>
+                        <p>Conduct a live 20-minute visual walk-through of the interactive digital twin layout using
+                            pilot machinery.</p>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <div>
+                        <h4>Print & Mount QR Tags</h4>
+                        <p>Generate durable industrial-grade adhesive labels for the initial machinery test cell.</p>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <div>
+                        <h4>Calibrate Safety Thresholds</h4>
+                        <p>Configure critical min-stock variables inside the spare parts database to trigger accurate
+                            auto-purchase requests.</p>
+                    </div>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <div>
+                        <h4>Establish Initial Benchmarks</h4>
+                        <p>Log current approximate manual MTTR response times to compare against the automated metrics
+                            after 30 days of use.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════ FOOTER ═══════════════ -->
+        <div class="footer">
+            <div class="divider"></div>
+            <p><strong>Prepared by:</strong> Aymen Chebbi — Lead Systems Developer</p>
+            <p>Email: aymen.chebbi@company.com &nbsp;•&nbsp; Project Name: Thermo-GMAO CMMS Platform</p>
+            <p class="confidential-footer">⛔ Confidential — Internal Factory Floor Use Only &nbsp;•&nbsp; © 2026
+                Thermo-GMAO</p>
+        </div>
+
+    </div>
+</body>
+
+</html>
