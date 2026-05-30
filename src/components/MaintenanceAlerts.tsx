@@ -4,6 +4,7 @@ import { Bell, Calendar, AlertTriangle } from 'lucide-react';
 import { format, isBefore, addDays, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { formatHoursToDays } from '../lib/utils';
 
 export default function MaintenanceAlerts() {
   const [upcomingMaintenance, setUpcomingMaintenance] = useState<Machine[]>([]);
@@ -62,7 +63,7 @@ export default function MaintenanceAlerts() {
             const isHourBased = m.nextMaintenanceHours && (m.nextMaintenanceHours - m.currentHours) <= 10;
             toast.warning(`Maintenance Due Soon: ${m.name}`, {
               description: isHourBased
-                ? `Machine is at ${m.currentHours}h. Maintenance threshold: ${m.nextMaintenanceHours}h`
+                ? `Machine is at ${formatHoursToDays(m.currentHours, true)}. Maintenance threshold: ${formatHoursToDays(m.nextMaintenanceHours, true)}`
                 : `Scheduled for ${format(parseISO(m.nextMaintenance!), 'PPP')}`,
               duration: 10000,
             });
@@ -108,7 +109,7 @@ export default function MaintenanceAlerts() {
                 <p className="text-sm font-bold text-gray-900 truncate">{machine.name}</p>
                 <p className="text-xs text-amber-700 font-medium">
                   {machine.nextMaintenanceHours && (machine.nextMaintenanceHours - machine.currentHours) <= 50
-                    ? `Due at ${Math.round(machine.nextMaintenanceHours * 100) / 100}h (Current: ${Math.round(machine.currentHours * 100) / 100}h)`
+                    ? `Due at ${formatHoursToDays(machine.nextMaintenanceHours)} (Current: ${formatHoursToDays(machine.currentHours)})`
                     : machine.nextMaintenance ? format(parseISO(machine.nextMaintenance), 'MMM d, yyyy') : 'N/A'}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-1">

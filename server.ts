@@ -287,6 +287,31 @@ app.post('/api/purchase-requests', (req, res) => {
   }
 });
 
+app.put('/api/purchase-requests/:id', (req, res) => {
+  const { id } = req.params;
+  const { reference, date, requested_by, department, supplier, items_count, pdf_data } = req.body;
+  try {
+    db.prepare(`
+      UPDATE purchase_requests
+      SET reference = ?, date = ?, requested_by = ?, department = ?, supplier = ?, items_count = ?, pdf_data = ?
+      WHERE id = ?
+    `).run(reference, date, requested_by, department, supplier, items_count, pdf_data, id);
+    res.json({ message: 'Purchase request updated' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/purchase-requests/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    db.prepare('DELETE FROM purchase_requests WHERE id = ?').run(id);
+    res.json({ message: 'Purchase request deleted' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // Machines
 app.get('/api/machines', (req, res) => {
   try {

@@ -242,6 +242,18 @@ export const api = {
     });
     await handleResponse(res);
   },
+  updatePurchaseRequest: async (id: number | string, data: any): Promise<void> => {
+    const res = await fetch(`${API_BASE}/purchase-requests/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    await handleResponse(res);
+  },
+  deletePurchaseRequest: async (id: number | string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/purchase-requests/${id}`, { method: 'DELETE' });
+    await handleResponse(res);
+  },
 
   // Machine Rendement
   getRendement: async (date?: string): Promise<MachineRendement[]> => {

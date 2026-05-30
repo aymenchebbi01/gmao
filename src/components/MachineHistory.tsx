@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { WorkOrder, Machine, MachineConditionHistory, MachineProductionHistory } from '../types';
 import { format } from 'date-fns';
-import { toDate, cn, calculateMachineLiveHours } from '../lib/utils';
+import { toDate, cn, calculateMachineLiveHours, formatHoursToDays } from '../lib/utils';
 import { RECOMMENDED_TASKS } from '../constants/maintenanceTasks';
 import { api } from '../services/api';
 import {
@@ -227,7 +227,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
       ['Installation Date', machine.installationDate ? format(new Date(machine.installationDate), 'dd/MM/yyyy') : 'N/A'],
       ['Location', machine.location || 'N/A'],
       ['Current Status', machine.status.toUpperCase()],
-      ['Operating Hours', `${currentHours.toFixed(1)} hrs`]
+      ['Operating Days', formatHoursToDays(currentHours, true)]
     ];
 
     autoTable(doc, {
@@ -247,8 +247,8 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
     
     finalY += 3;
     const planningInfo = [
-      ['Next Maintenance', `${nextTask.hours} hrs`],
-      ['Hours Remaining', `${Math.max(0, nextTask.hours - currentHours).toFixed(1)} hrs`],
+      ['Next Maintenance', formatHoursToDays(nextTask.hours, true)],
+      ['Days Remaining', formatHoursToDays(Math.max(0, nextTask.hours - currentHours), true)],
       ['Cycle Frequency', nextTask.frequency]
     ];
 
@@ -504,12 +504,12 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
             </div>
             <div>
               <h3 className="text-sm font-bold text-gray-900">Recommended Maintenance</h3>
-              <p className="text-[10px] text-gray-500">Based on current operational hours: <span className="font-mono font-bold text-blue-600">{currentHours} hrs</span></p>
+              <p className="text-[10px] text-gray-500">Based on current operational time: <span className="font-mono font-bold text-blue-600">{formatHoursToDays(currentHours, true)}</span></p>
             </div>
           </div>
           <div className="flex flex-col items-end">
             <span className="text-[10px] font-bold text-gray-400 uppercase">Next Major Check</span>
-            <span className="text-xs font-bold text-blue-600">{nextTask.hours} hrs ({nextTask.frequency})</span>
+            <span className="text-xs font-bold text-blue-600">{formatHoursToDays(nextTask.hours, true)} ({nextTask.frequency})</span>
           </div>
         </div>
 
@@ -546,7 +546,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
               <h4 className="text-sm font-bold text-gray-900 mb-2">Next Maintenance Cycle</h4>
               <p className="text-xs text-gray-500 mb-4">The machine will reach the next maintenance threshold in approximately</p>
               <div className="text-2xl font-black text-blue-600">
-                {(nextTask.hours - currentHours).toFixed(1)} <span className="text-sm font-normal">hrs</span>
+                {formatHoursToDays(nextTask.hours - currentHours, true)}
               </div>
             </div>
           </div>

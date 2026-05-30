@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, addDays, isBefore, parseISO, isAfter } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, AlertTriangle, Bell, TrendingUp } from 'lucide-react';
 import { api } from '../services/api';
+import { formatHoursToDays } from '../lib/utils';
 import { Machine, WorkOrder, MachineRendement } from '../types';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -191,7 +192,7 @@ export default function MaintenanceCalendar() {
                     <div className="min-w-0">
                       <p className="text-xs font-bold truncate text-gray-900">{m.name}</p>
                       <p className="text-[10px] font-medium mt-0.5 text-amber-700">
-                        {m.nextMaintenance ? format(parseISO(m.nextMaintenance), 'MMM d') : `${Math.round(remainingHours || 0)}h remaining`}
+                        {m.nextMaintenance ? format(parseISO(m.nextMaintenance), 'MMM d') : `${formatHoursToDays(remainingHours || 0, true)} remaining`}
                       </p>
                     </div>
                   </div>

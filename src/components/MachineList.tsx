@@ -21,7 +21,7 @@ import {
   X
 } from 'lucide-react';
 import { Machine } from '../types';
-import { cn, toDate, calculateMachineLiveHours } from '../lib/utils';
+import { cn, toDate, calculateMachineLiveHours, formatHoursToDays } from '../lib/utils';
 import { RECOMMENDED_TASKS } from '../constants/maintenanceTasks';
 import Modal from './ui/Modal';
 import MachineHistory from './MachineHistory';
@@ -563,12 +563,12 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                         <div className="flex flex-col mt-1 gap-0.5">
                           {item.nextMaintenanceHours && (
                             <span className="text-[10px] text-blue-600 font-bold">
-                              Next: {(Math.round(item.nextMaintenanceHours * 100) / 100).toFixed(2)}h
+                              Next: {formatHoursToDays(item.nextMaintenanceHours)}
                             </span>
                           )}
                           <div className="flex items-center gap-1">
                             <span className="text-[10px] text-gray-500 font-medium">
-                              Current: {calculateLiveHours(item)}h
+                              Current: {formatHoursToDays(calculateLiveHours(item))}
                             </span>
                             <button
                               onClick={() => {
