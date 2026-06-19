@@ -6,11 +6,15 @@ import bcrypt from 'bcryptjs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = path.join(__dirname, 'gmao.db');
-const db = new Database(dbPath);
+export const DB_PATH = path.join(__dirname, 'gmao.db');
+
+// ─── Schema init (runs on every open) ─────────────────────────────────────────
+function initDb(): Database.Database {
+const db = new Database(DB_PATH);
+db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 
-// Initialize schema
+  // Initialize schema
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     uid TEXT PRIMARY KEY,
@@ -193,7 +197,7 @@ db.exec(`
   );
 `);
 
-// Safe migrations for missing columns
+  // Safe migrations for missing columns
 const migrations = [
   { table: 'machines', column: 'condition', type: 'TEXT' },
   { table: 'machines', column: 'preventivePlan', type: 'TEXT' },
@@ -222,24 +226,55 @@ const migrations = [
   { table: 'machine_rendement', column: 'priceMarket', type: 'TEXT DEFAULT \'TN\'' }
 ];
 
-for (const m of migrations) {
-  try {
-    db.exec(`ALTER TABLE ${m.table} ADD COLUMN ${m.column} ${m.type}`);
-  } catch (e) {
-    // Column might already exist
+  for (const m of migrations) {
+    try {
+      db.exec(`ALTER TABLE ${m.table} ADD COLUMN ${m.column} ${m.type}`);
+    } catch (e) {
+      // Column might already exist
+    }
   }
+
+  // Create default admin user if none exists
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
+  if (userCount.count === 0) {
+    const uid = 'admin-uid';
+    db.prepare(
+      'INSERT INTO users (uid, username, password, displayName, role) VALUES (?, ?, ?, ?, ?)'
+    ).run(uid, 'admin', 'admin', 'Administrator', 'admin');
+    console.log('Default admin user created: admin / admin');
+  }
+
+  return db;
 }
 
-// Create default admin user if none exists
-const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get() as any;
-if (userCount.count === 0) {
-  const uid = 'admin-uid';
+// ─── Live-reloadable DB instance ──────────────────────────────────────────────
+// We keep a mutable reference to the active Database instance.
+// The Proxy below always delegates to `_current`, so all existing
+// `db.prepare(...)`, `db.exec(...)`, etc. calls in server.ts work unchanged.
+// When a restore happens, `reloadDb()` swaps `_current` without any restart.
 
-  db.prepare(
-    'INSERT INTO users (uid, username, password, displayName, role) VALUES (?, ?, ?, ?, ?)'
-  ).run(uid, 'admin', 'admin', 'Administrator', 'admin');
+let _current: Database.Database = initDb();
 
-  console.log('Default admin user created: admin / admin');
+/**
+ * Hot-swap the database connection after a restore.
+ * Closes the old connection and opens a fresh one on the same DB_PATH.
+ */
+export function reloadDb(): void {
+  try { _current.close(); } catch (_) { /* already closed */ }
+  _current = initDb();
+  console.log('✅ [DB] Database connection reloaded — restore complete.');
 }
 
-export default db;
+// Proxy: every property access is forwarded to the current instance.
+const dbProxy = new Proxy({} as Database.Database, {
+  get(_target, prop: string) {
+    const val = (_current as any)[prop];
+    return typeof val === 'function' ? val.bind(_current) : val;
+  },
+  set(_target, prop: string, value) {
+    (_current as any)[prop] = value;
+    return true;
+  },
+});
+
+export default dbProxy;

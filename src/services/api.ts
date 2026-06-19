@@ -281,4 +281,30 @@ export const api = {
     const res = await fetch(`${API_BASE}/machine-rendement/${id}`, { method: 'DELETE' });
     await handleResponse(res);
   },
+
+  // Backups
+  getBackups: async (): Promise<{ filename: string; sizeBytes: number; createdAt: string }[]> => {
+    const res = await fetch(`${API_BASE}/backups`);
+    return handleResponse(res);
+  },
+  createBackup: async (): Promise<{ message: string; filename: string }> => {
+    const res = await fetch(`${API_BASE}/backups/create`, { method: 'POST' });
+    return handleResponse(res);
+  },
+  downloadLiveBackup: () => {
+    window.open(`${API_BASE}/backups/download`, '_blank');
+  },
+  downloadBackup: (filename: string) => {
+    window.open(`${API_BASE}/backups/download/${encodeURIComponent(filename)}`, '_blank');
+  },
+  restoreBackup: async (filename: string): Promise<{ message: string; safety: string }> => {
+    const res = await fetch(`${API_BASE}/backups/restore/${encodeURIComponent(filename)}`, { method: 'POST' });
+    return handleResponse(res);
+  },
+  restoreUploadedBackup: async (file: File): Promise<{ message: string; safety: string }> => {
+    const formData = new FormData();
+    formData.append('dbfile', file);
+    const res = await fetch(`${API_BASE}/backups/restore-upload`, { method: 'POST', body: formData });
+    return handleResponse(res);
+  },
 };

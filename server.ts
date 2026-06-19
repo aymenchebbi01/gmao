@@ -9,7 +9,7 @@ import jwt from 'jsonwebtoken';
 import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import fs from 'fs';
-import db from './db.js';
+import db, { DB_PATH, reloadDb } from './db.js';
 import os from 'os';
 
 
@@ -1007,7 +1007,196 @@ app.delete('/api/machine-rendement/:id', (req, res) => {
   }
 });
 
-// --- Vite Integration ---
+// ─── BACKUP SYSTEM ────────────────────────────────────────────────────────────────
+const BACKUPS_DIR = path.join(__dirname, 'backups');
+const MAX_BACKUPS = 30; // keep last 30 daily backups
+
+function ensureBackupsDir() {
+  if (!fs.existsSync(BACKUPS_DIR)) {
+    fs.mkdirSync(BACKUPS_DIR, { recursive: true });
+  }
+}
+
+function getBackupFilename(suffix = '') {
+  const now = new Date();
+  const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  const time = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS
+  return suffix
+    ? `backup-${date}_${time}-${suffix}.db`
+    : `backup-${date}.db`;
+}
+
+async function createBackup(filename?: string): Promise<string> {
+  ensureBackupsDir();
+  const name = filename || getBackupFilename();
+  const dest = path.join(BACKUPS_DIR, name);
+  // Use better-sqlite3 online backup — safe even while DB is being written to
+  await (db as any).backup(dest);
+  console.log(`✅ [Backup] Created: ${name}`);
+  return name;
+}
+
+function pruneOldBackups() {
+  ensureBackupsDir();
+  const files = fs.readdirSync(BACKUPS_DIR)
+    .filter(f => f.startsWith('backup-') && f.endsWith('.db') && !f.includes('-safety-'))
+    .sort(); // ascending — oldest first
+  if (files.length > MAX_BACKUPS) {
+    const toDelete = files.slice(0, files.length - MAX_BACKUPS);
+    toDelete.forEach(f => {
+      fs.unlinkSync(path.join(BACKUPS_DIR, f));
+      console.log(`🗑️  [Backup] Pruned old backup: ${f}`);
+    });
+  }
+}
+
+function scheduleAutoBackup() {
+  const now = new Date();
+  // Next midnight
+  const nextMidnight = new Date(now);
+  nextMidnight.setDate(nextMidnight.getDate() + 1);
+  nextMidnight.setHours(0, 0, 0, 0);
+  const msUntilMidnight = nextMidnight.getTime() - now.getTime();
+
+  console.log(`⏰ [Backup] Next auto-backup scheduled in ${Math.round(msUntilMidnight / 1000 / 60)} minutes`);
+
+  setTimeout(async () => {
+    await createBackup();
+    pruneOldBackups();
+    // Then repeat every 24h
+    setInterval(async () => {
+      await createBackup();
+      pruneOldBackups();
+    }, 24 * 60 * 60 * 1000);
+  }, msUntilMidnight);
+}
+
+// GET /api/backups — list all saved backups
+app.get('/api/backups', (_req, res) => {
+  try {
+    ensureBackupsDir();
+    const files = fs.readdirSync(BACKUPS_DIR)
+      .filter(f => f.endsWith('.db'))
+      .map(f => {
+        const stat = fs.statSync(path.join(BACKUPS_DIR, f));
+        return {
+          filename: f,
+          sizeBytes: stat.size,
+          createdAt: stat.mtime.toISOString(),
+        };
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()); // newest first
+    res.json(files);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/backups/create — manually trigger a backup now
+app.post('/api/backups/create', async (_req, res) => {
+  try {
+    const name = await createBackup(getBackupFilename('manual'));
+    pruneOldBackups();
+    res.json({ message: 'Backup created', filename: name });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// GET /api/backups/download — download a fresh live snapshot of the DB
+app.get('/api/backups/download', async (_req, res) => {
+  try {
+    const tmpName = getBackupFilename('snapshot');
+    const tmpPath = path.join(BACKUPS_DIR, tmpName);
+    ensureBackupsDir();
+    await (db as any).backup(tmpPath);
+    const date = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Disposition', `attachment; filename="gmao-backup-${date}.db"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    const stream = fs.createReadStream(tmpPath);
+    stream.pipe(res);
+    stream.on('close', () => {
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// GET /api/backups/download/:filename — download a specific saved backup
+app.get('/api/backups/download/:filename', (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename); // sanitize
+    const filePath = path.join(BACKUPS_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Backup not found' });
+    }
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    fs.createReadStream(filePath).pipe(res);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/backups/restore/:filename — restore from a saved backup
+app.post('/api/backups/restore/:filename', async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const srcPath = path.join(BACKUPS_DIR, filename);
+    if (!fs.existsSync(srcPath)) {
+      return res.status(404).json({ error: 'Backup not found' });
+    }
+    // 1. Safety backup of current state
+    const safetyName = getBackupFilename('safety-before-restore');
+    await (db as any).backup(path.join(BACKUPS_DIR, safetyName));
+    // 2. Close current connection, swap the file, delete stale WAL
+    (db as any).close();
+    fs.copyFileSync(srcPath, DB_PATH);
+    try { fs.unlinkSync(DB_PATH + '-wal'); } catch (_) {}
+    try { fs.unlinkSync(DB_PATH + '-shm'); } catch (_) {}
+    // 3. Hot-reload the DB connection — no process restart needed
+    reloadDb();
+    console.log(`✅ [Backup] Restored from ${filename}.`);
+    res.json({ message: `Restauration depuis "${filename}" effectuée avec succès.`, safety: safetyName });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/backups/restore-upload — restore from an uploaded .db file
+const backupUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => { ensureBackupsDir(); cb(null, BACKUPS_DIR); },
+    filename: (_req, _file, cb) => { cb(null, getBackupFilename('uploaded')); },
+  }),
+  fileFilter: (_req, file, cb) => {
+    cb(null, file.originalname.endsWith('.db'));
+  },
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB max
+});
+
+app.post('/api/backups/restore-upload', backupUpload.single('dbfile'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded or invalid file type (.db required)' });
+    const uploadedPath = req.file.path;
+    // Safety backup first
+    const safetyName = getBackupFilename('safety-before-upload-restore');
+    await (db as any).backup(path.join(BACKUPS_DIR, safetyName));
+    // Close, swap, clean WAL, hot-reload
+    (db as any).close();
+    fs.copyFileSync(uploadedPath, DB_PATH);
+    try { fs.unlinkSync(DB_PATH + '-wal'); } catch (_) {}
+    try { fs.unlinkSync(DB_PATH + '-shm'); } catch (_) {}
+    reloadDb();
+    console.log(`✅ [Backup] Restored from uploaded file.`);
+    res.json({ message: 'Restauration depuis le fichier uploadé effectuée avec succès.', safety: safetyName });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ─── Vite Integration ──────────────────────────────────────────────────────────────
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
@@ -1039,6 +1228,9 @@ async function startServer() {
     });
     console.log(`\nPress Ctrl+C to stop the server\n`);
   });
+
+  // Start the auto-backup scheduler after server is up
+  scheduleAutoBackup();
 }
 
 startServer();

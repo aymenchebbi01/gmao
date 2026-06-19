@@ -17,6 +17,7 @@ import MobileStatusUpdater from './components/MobileStatusUpdater';
 import MobileStockUpdater from './components/MobileStockUpdater';
 import PurchaseRequests from './components/PurchaseRequests';
 import MachineRendement from './components/MachineRendement';
+import BackupManager from './components/BackupManager';
 import { Toaster } from 'sonner';
 import { Machine } from './types';
 import { cn, calculateMachineLiveHours } from './lib/utils';
@@ -115,6 +116,7 @@ function AppContent() {
       case 'mobile-status': return <MobileStatusUpdater machineId={deepLinkId} />;
       case 'mobile-stock': return <MobileStockUpdater partId={deepLinkId} />;
       case 'rendement': return <MachineRendement />;
+      case 'backups': return isAdmin ? <BackupManager /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
       default: return <Dashboard setActiveTab={setActiveTab} />;
     }
   };

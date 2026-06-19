@@ -113,7 +113,8 @@ export default function Sidebar({
       subItems: [
         { id: 'analytics', label: 'Analytics' },
         { id: 'audit-logs', label: 'Audit Logs' },
-        { id: 'users', label: 'Users' }
+        { id: 'users', label: 'Users' },
+        { id: 'backups', label: 'Sauvegardes DB' },
       ]
     },
   ];
