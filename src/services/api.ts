@@ -12,7 +12,8 @@ import {
   MtbfTrend,
   MachineConditionHistory,
   ProductionProduct,
-  MachineRendement
+  MachineRendement,
+  CalendarEvent
 } from '../types';
 
 const API_BASE = '/api';
@@ -63,9 +64,33 @@ export const api = {
     const res = await fetch(`${API_BASE}/machines/${id}/condition-history`);
     return handleResponse(res);
   },
+  updateMachineConditionHistory: async (id: number, data: { previousCondition: string; newCondition: string; timestamp: string }): Promise<void> => {
+    const res = await fetch(`${API_BASE}/machine-condition-history/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    await handleResponse(res);
+  },
+  deleteMachineConditionHistory: async (id: number): Promise<void> => {
+    const res = await fetch(`${API_BASE}/machine-condition-history/${id}`, { method: 'DELETE' });
+    await handleResponse(res);
+  },
   getMachineProductionHistory: async (id: string): Promise<any[]> => {
     const res = await fetch(`${API_BASE}/machines/${id}/production-history`);
     return handleResponse(res);
+  },
+  updateMachineProductionHistory: async (id: number, data: { productName: string; mouleName: string; startDate: string; endDate: string | null }): Promise<void> => {
+    const res = await fetch(`${API_BASE}/machine-production-history/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    await handleResponse(res);
+  },
+  deleteMachineProductionHistory: async (id: number): Promise<void> => {
+    const res = await fetch(`${API_BASE}/machine-production-history/${id}`, { method: 'DELETE' });
+    await handleResponse(res);
   },
 
   // Work Orders
@@ -279,6 +304,33 @@ export const api = {
   },
   deleteRendement: async (id: number): Promise<void> => {
     const res = await fetch(`${API_BASE}/machine-rendement/${id}`, { method: 'DELETE' });
+    await handleResponse(res);
+  },
+
+  // Calendar Events
+  getCalendarEvents: async (month?: string): Promise<CalendarEvent[]> => {
+    const url = month ? `${API_BASE}/calendar-events?month=${month}` : `${API_BASE}/calendar-events`;
+    const res = await fetch(url);
+    return handleResponse(res);
+  },
+  createCalendarEvent: async (event: Partial<CalendarEvent>): Promise<CalendarEvent> => {
+    const res = await fetch(`${API_BASE}/calendar-events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event)
+    });
+    return handleResponse(res);
+  },
+  updateCalendarEvent: async (id: string, event: Partial<CalendarEvent>): Promise<void> => {
+    const res = await fetch(`${API_BASE}/calendar-events/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event)
+    });
+    await handleResponse(res);
+  },
+  deleteCalendarEvent: async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/calendar-events/${id}`, { method: 'DELETE' });
     await handleResponse(res);
   },
 

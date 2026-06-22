@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -77,6 +77,11 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
   const [machines, setMachines] = useState<Machine[]>([]);
   const [statusData, setStatusData] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [showAllAlertsDropdown, setShowAllAlertsDropdown] = useState(false);
+
+  const alertMachines = useMemo(() => {
+    return machines.filter(m => m.status === 'down' || m.status === 'maintenance');
+  }, [machines]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -200,69 +205,111 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
         <StatCard title="MTTR (Avg)" value={stats.mttr} icon={TrendingUp} color="bg-emerald-500" />
       </div>
 
-      {/* Maintenance Alerts */}
-      <MaintenanceAlerts />
-
-      {/* Critical & Maintenance Alerts Section */}
-      {(stats.downMachines > 0 || stats.maintenanceMachines > 0) && (
-        <div className={cn(
-          "p-6 rounded-2xl flex flex-col gap-4 border",
-          stats.downMachines > 0 ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"
-        )}>
-          <div className="flex items-start gap-4">
-            <div className={cn(
-              "p-2 rounded-lg animate-pulse",
-              stats.downMachines > 0 ? "bg-red-500" : "bg-amber-500"
-            )}>
-              <AlertTriangle className="w-5 h-5 text-white" />
+      {/* Redesigned Compact Critical & Maintenance Alert Bar */}
+      {alertMachines.length > 0 && (
+        <div className="relative h-12 bg-[#fff5f5] border-l-4 border-red-500 rounded-r-2xl shadow-sm px-4 flex items-center justify-between border border-y-red-100 border-r-red-100 text-xs transition-all z-20">
+          <div className="flex items-center gap-3 overflow-hidden mr-2">
+            <div className="flex items-center gap-1.5 font-bold text-red-700 flex-shrink-0">
+              <AlertTriangle size={14} className="animate-pulse" />
+              <span>
+                {stats.downMachines} Down · {stats.maintenanceMachines} In Maintenance
+              </span>
             </div>
-            <div>
-              <h4 className={cn(
-                "text-sm font-bold",
-                stats.downMachines > 0 ? "text-red-900" : "text-amber-900"
-              )}>
-                {stats.downMachines > 0 ? `Critical Alert: ${stats.downMachines} Machine(s) Currently Down` : `Maintenance Alert: ${stats.maintenanceMachines} Machine(s) in Maintenance`}
-              </h4>
-              {stats.downMachines > 0 && stats.maintenanceMachines > 0 && (
-                <p className="text-xs text-red-700 mt-1">Also {stats.maintenanceMachines} machine(s) in maintenance.</p>
+            
+            <span className="text-gray-300">|</span>
+            
+            {/* Inline Badges/Chips */}
+            <div className="flex items-center gap-2 overflow-hidden">
+              {alertMachines.slice(0, 2).map(machine => (
+                <div
+                  key={machine.id}
+                  onClick={() => setActiveTab('machines')}
+                  className={cn(
+                    "relative group flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer select-none transition-all hover:scale-[1.02]",
+                    machine.status === 'down' 
+                      ? "bg-red-100 text-red-805 border-red-200" 
+                      : "bg-amber-100 text-amber-805 border-amber-200"
+                  )}
+                >
+                  <span className={cn(
+                    "w-1.5 h-1.5 rounded-full animate-ping",
+                    machine.status === 'down' ? "bg-red-500" : "bg-amber-500"
+                  )}></span>
+                  <span className="truncate max-w-[120px] sm:max-w-[180px]">{machine.name}</span>
+                  <span className="text-[9px] uppercase opacity-75 font-extrabold">({machine.status})</span>
+
+                  {/* Tooltip on Hover */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-900 text-white text-[10px] rounded-lg p-2 whitespace-nowrap shadow-lg z-30 font-bold leading-normal text-left">
+                    <div className="text-blue-400">ID: {machine.id}</div>
+                    <div>SN: {machine.serialNumber}</div>
+                    {machine.location && <div>Loc: {machine.location}</div>}
+                    {machine.statusReason && <div className="italic text-gray-300 mt-1">"{machine.statusReason}"</div>}
+                  </div>
+                </div>
+              ))}
+
+              {/* Overflow Badge */}
+              {alertMachines.length > 2 && (
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowAllAlertsDropdown(prev => !prev);
+                    }}
+                    className="bg-red-200 hover:bg-red-300 text-red-800 px-2 py-0.5 rounded-full text-[10px] font-extrabold transition-all border border-red-300 cursor-pointer flex items-center gap-1"
+                  >
+                    +{alertMachines.length - 2} more
+                  </button>
+
+                  {/* Dropdown Overlay List */}
+                  {showAllAlertsDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-20" onClick={() => setShowAllAlertsDropdown(false)}></div>
+                      <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-150 rounded-xl shadow-xl z-30 p-2 divide-y divide-gray-50 max-h-48 overflow-y-auto">
+                        {alertMachines.slice(2).map(machine => (
+                          <div
+                            key={machine.id}
+                            onClick={() => {
+                              setActiveTab('machines');
+                              setShowAllAlertsDropdown(false);
+                            }}
+                            className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors text-[11px] font-bold"
+                          >
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className={cn(
+                                "w-1.5 h-1.5 rounded-full",
+                                machine.status === 'down' ? "bg-red-500" : "bg-amber-500"
+                              )}></span>
+                              <span className="truncate text-gray-800">{machine.name}</span>
+                            </div>
+                            <span className={cn(
+                              "text-[8px] uppercase font-extrabold px-1.5 py-0.5 rounded-md",
+                              machine.status === 'down' ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                            )}>
+                              {machine.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-            {machines.filter(m => m.status === 'down' || m.status === 'maintenance').map(machine => (
-              <div
-                key={machine.id}
-                onClick={() => setActiveTab('machines')}
-                className={cn(
-                  "flex items-center p-3 bg-white border rounded-xl shadow-sm cursor-pointer transition-colors",
-                  machine.status === 'down' ? "border-red-200 hover:bg-red-50" : "border-amber-200 hover:bg-amber-50"
-                )}
-              >
-                <div className={cn(
-                  "w-2 h-2 rounded-full mr-3 animate-ping",
-                  machine.status === 'down' ? "bg-red-500" : "bg-amber-500"
-                )}></div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-bold text-gray-900">{machine.name}</p>
-                    <span className={cn(
-                      "text-[8px] px-1.5 py-0.5 rounded uppercase font-bold",
-                      machine.status === 'down' ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
-                    )}>
-                      {machine.status}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-gray-500 font-mono">{machine.serialNumber}</p>
-                  {machine.statusReason && (
-                    <p className="text-[9px] text-gray-400 italic mt-1 truncate">"{machine.statusReason}"</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          {/* View All link */}
+          <button
+            onClick={() => setActiveTab('machines')}
+            className="text-[11px] font-bold text-red-700 hover:text-red-900 hover:underline flex-shrink-0 cursor-pointer"
+          >
+            View All
+          </button>
         </div>
       )}
+
+      {/* Maintenance Alerts */}
+      <MaintenanceAlerts />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* Main Chart */}

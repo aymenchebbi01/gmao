@@ -10,6 +10,7 @@ import {
     X,
     RefreshCw,
     Download,
+    FileDown,
     DollarSign,
     Clock,
     Hash
@@ -107,6 +108,58 @@ export default function ProductManagement() {
         setIsModalOpen(true);
     };
 
+    // ── Download Import Template ──────────────────────────────────────────────
+    const downloadTemplate = () => {
+        const headers = [
+            'Item',
+            'Description',
+            'Color',
+            'Cycle time/s',
+            'qty produced',
+            'TN price',
+            'Malta price'
+        ];
+
+        const sampleRows = [
+            {
+                Item: 'SAMPLE-001',
+                Description: 'Example product description',
+                Color: 'Black',
+                'Cycle time/s': 28.5,
+                'qty produced': 1000,
+                'TN price': 1.250,
+                'Malta price': 1.500
+            },
+            {
+                Item: 'SAMPLE-002',
+                Description: 'Another example product',
+                Color: 'White',
+                'Cycle time/s': 32.0,
+                'qty produced': 2500,
+                'TN price': 0.980,
+                'Malta price': 1.200
+            }
+        ];
+
+        const ws = XLSX.utils.json_to_sheet(sampleRows, { header: headers });
+
+        // Style the header row width hints
+        ws['!cols'] = [
+            { wch: 18 }, // Item
+            { wch: 32 }, // Description
+            { wch: 14 }, // Color
+            { wch: 14 }, // Cycle time/s
+            { wch: 14 }, // qty produced
+            { wch: 12 }, // TN price
+            { wch: 14 }, // Malta price
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Items Template');
+        XLSX.writeFile(wb, 'items_import_template.xlsx');
+        toast.success('Template downloaded — fill it in and use "Import Excel" to upload');
+    };
+
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -176,6 +229,14 @@ export default function ProductManagement() {
                         accept=".xlsx, .xls"
                         onChange={handleFileUpload}
                     />
+                    <button
+                        onClick={downloadTemplate}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-violet-600 bg-violet-50 border border-violet-100 rounded-xl hover:bg-violet-100 transition-all font-inter"
+                        title="Download an Excel template with the correct column headers"
+                    >
+                        <FileDown size={18} />
+                        Download Template
+                    </button>
                     <button
                         onClick={() => fileInputRef.current?.click()}
                         className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-all font-inter"

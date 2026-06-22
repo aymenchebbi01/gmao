@@ -136,6 +136,31 @@ function logAction(userId: string | undefined, username: string | undefined, act
   }
 }
 
+/**
+ * Reads the JWT cookie from a request and returns the caller's identity.
+ * Falls back to { userId: undefined, userName: 'System', isAdmin: false }
+ * when the cookie is absent or invalid — so legacy anonymous callers are
+ * still labelled "System" while every authenticated action carries the
+ * real user's name.
+ */
+function getCallerIdentity(req: any): { userId: string | undefined; userName: string; isAdmin: boolean } {
+  const token = req.cookies?.token;
+  if (!token) return { userId: undefined, userName: 'System', isAdmin: false };
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    if (decoded && decoded.uid) {
+      return {
+        userId: decoded.uid,
+        userName: decoded.displayName || decoded.username || 'Unknown',
+        isAdmin: decoded.role === 'admin',
+      };
+    }
+  } catch {
+    // invalid / expired token — treat as anonymous
+  }
+  return { userId: undefined, userName: 'System', isAdmin: false };
+}
+
 function getChangesString(entityType: string, entityName: string, oldObj: any, newObj: any): string {
   const changes: string[] = [];
   const ignoredKeys = [
@@ -339,7 +364,8 @@ app.post('/api/machines', (req, res) => {
 
     db.prepare(`INSERT INTO machines (${columns}) VALUES (${placeholders})`).run(...values);
 
-    logAction(undefined, 'System', 'Create', 'Machine', machine.id, `Created Machine "${machine.name || machine.serialNumber}"`);
+    const { userId: cUserId, userName: cUserName } = getCallerIdentity(req);
+    logAction(cUserId, cUserName, 'Create', 'Machine', machine.id, `Created Machine "${machine.name || machine.serialNumber}"`);
 
     // Log initial condition
     if (machine.condition) {
@@ -444,11 +470,209 @@ app.get('/api/machines/:id/condition-history', (req, res) => {
   }
 });
 
+app.put('/api/machine-condition-history/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { previousCondition, newCondition, timestamp } = req.body;
+
+    let isAdmin = false;
+    let userId = 'System';
+    let userName = 'System';
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        if (decoded && decoded.uid) {
+          userId = decoded.uid;
+          userName = decoded.username || decoded.displayName || decoded.name || 'User';
+          isAdmin = decoded.role === 'admin';
+        }
+      } catch (e) {
+        console.error("Token verification failed", e);
+      }
+    }
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    const oldEntry = db.prepare('SELECT * FROM machine_condition_history WHERE id = ?').get(id) as any;
+    if (!oldEntry) {
+      return res.status(404).json({ error: 'Condition history entry not found' });
+    }
+
+    db.prepare(`
+      UPDATE machine_condition_history
+      SET previousCondition = ?, newCondition = ?, timestamp = ?
+      WHERE id = ?
+    `).run(previousCondition, newCondition, timestamp, id);
+
+    logAction(
+      userId === 'System' ? undefined : userId,
+      userName,
+      'Update',
+      'MachineConditionHistory',
+      id,
+      `Updated Condition History for machine ${oldEntry.machineId} (New Condition: "${newCondition}")`
+    );
+
+    res.json({ message: 'Condition history entry updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/machine-condition-history/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+
+    let isAdmin = false;
+    let userId = 'System';
+    let userName = 'System';
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        if (decoded && decoded.uid) {
+          userId = decoded.uid;
+          userName = decoded.username || decoded.displayName || decoded.name || 'User';
+          isAdmin = decoded.role === 'admin';
+        }
+      } catch (e) {
+        console.error("Token verification failed", e);
+      }
+    }
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    const oldEntry = db.prepare('SELECT * FROM machine_condition_history WHERE id = ?').get(id) as any;
+    if (!oldEntry) {
+      return res.status(404).json({ error: 'Condition history entry not found' });
+    }
+
+    db.prepare('DELETE FROM machine_condition_history WHERE id = ?').run(id);
+
+    logAction(
+      userId === 'System' ? undefined : userId,
+      userName,
+      'Delete',
+      'MachineConditionHistory',
+      id,
+      `Deleted Condition History entry (ID: ${id}) for machine ${oldEntry.machineId}`
+    );
+
+    res.json({ message: 'Condition history entry deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 app.get('/api/machines/:id/production-history', (req, res) => {
   try {
     const { id } = req.params;
     const rows = db.prepare('SELECT * FROM machine_production_history WHERE machineId = ? ORDER BY startDate DESC').all(id);
     res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.put('/api/machine-production-history/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { productName, mouleName, startDate, endDate } = req.body;
+
+    let isAdmin = false;
+    let userId = 'System';
+    let userName = 'System';
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        if (decoded && decoded.uid) {
+          userId = decoded.uid;
+          userName = decoded.username || decoded.displayName || decoded.name || 'User';
+          isAdmin = decoded.role === 'admin';
+        }
+      } catch (e) {
+        console.error("Token verification failed", e);
+      }
+    }
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    const oldEntry = db.prepare('SELECT * FROM machine_production_history WHERE id = ?').get(id) as any;
+    if (!oldEntry) {
+      return res.status(404).json({ error: 'Production history entry not found' });
+    }
+
+    db.prepare(`
+      UPDATE machine_production_history
+      SET productName = ?, mouleName = ?, startDate = ?, endDate = ?
+      WHERE id = ?
+    `).run(productName, mouleName, startDate, endDate, id);
+
+    logAction(
+      userId === 'System' ? undefined : userId,
+      userName,
+      'Update',
+      'MachineProductionHistory',
+      id,
+      `Updated Production History for machine ${oldEntry.machineId} (Product: "${productName}", Mold: "${mouleName}")`
+    );
+
+    res.json({ message: 'Production history entry updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/machine-production-history/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+
+    let isAdmin = false;
+    let userId = 'System';
+    let userName = 'System';
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        if (decoded && decoded.uid) {
+          userId = decoded.uid;
+          userName = decoded.username || decoded.displayName || decoded.name || 'User';
+          isAdmin = decoded.role === 'admin';
+        }
+      } catch (e) {
+        console.error("Token verification failed", e);
+      }
+    }
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+
+    const oldEntry = db.prepare('SELECT * FROM machine_production_history WHERE id = ?').get(id) as any;
+    if (!oldEntry) {
+      return res.status(404).json({ error: 'Production history entry not found' });
+    }
+
+    db.prepare('DELETE FROM machine_production_history WHERE id = ?').run(id);
+
+    logAction(
+      userId === 'System' ? undefined : userId,
+      userName,
+      'Delete',
+      'MachineProductionHistory',
+      id,
+      `Deleted Production History entry (ID: ${id}) for machine ${oldEntry.machineId}`
+    );
+
+    res.json({ message: 'Production history entry deleted successfully' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -460,7 +684,8 @@ app.delete('/api/machines/:id', (req, res) => {
     const oldMachine = db.prepare('SELECT * FROM machines WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM machines WHERE id = ?').run(id);
     const entityName = oldMachine ? (oldMachine.name || oldMachine.serialNumber) : id;
-    logAction(undefined, 'System', 'Delete', 'Machine', id, `Deleted Machine "${entityName}"`);
+    const { userId: dMUserId, userName: dMUserName } = getCallerIdentity(req);
+    logAction(dMUserId, dMUserName, 'Delete', 'Machine', id, `Deleted Machine "${entityName}"`);
     res.json({ message: 'Machine deleted' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -496,7 +721,8 @@ app.post('/api/work-orders', (req, res) => {
     const values = Object.values(workOrder);
 
     db.prepare(`INSERT INTO work_orders (${columns}) VALUES (${placeholders})`).run(...values);
-    logAction(undefined, 'System', 'Create', 'WorkOrder', workOrder.id, `Created Work Order "${workOrder.title}"`);
+    const { userId: cWoUserId, userName: cWoUserName } = getCallerIdentity(req);
+    logAction(cWoUserId, cWoUserName, 'Create', 'WorkOrder', workOrder.id, `Created Work Order "${workOrder.title}"`);
     res.status(201).json({ message: 'Work order created' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -571,7 +797,8 @@ app.put('/api/work-orders/:id', (req, res) => {
     const entityName = oldWorkOrder ? oldWorkOrder.title : id;
     const detailsMsg = getChangesString('Work Order', entityName, oldWorkOrder, workOrder);
     if (detailsMsg) {
-      logAction(undefined, 'System', 'Update', 'WorkOrder', id, detailsMsg);
+      const { userId: uWoUserId, userName: uWoUserName } = getCallerIdentity(req);
+      logAction(uWoUserId, uWoUserName, 'Update', 'WorkOrder', id, detailsMsg);
     }
     res.json({ message: 'Work order updated' });
   } catch (error) {
@@ -585,7 +812,8 @@ app.delete('/api/work-orders/:id', (req, res) => {
     const oldWorkOrder = db.prepare('SELECT * FROM work_orders WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM work_orders WHERE id = ?').run(id);
     const entityName = oldWorkOrder ? oldWorkOrder.title : id;
-    logAction(undefined, 'System', 'Delete', 'WorkOrder', id, `Deleted Work Order "${entityName}"`);
+    const { userId: dWoUserId, userName: dWoUserName } = getCallerIdentity(req);
+    logAction(dWoUserId, dWoUserName, 'Delete', 'WorkOrder', id, `Deleted Work Order "${entityName}"`);
     res.json({ message: 'Work order deleted' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -677,7 +905,8 @@ app.post('/api/spare-parts', (req, res) => {
     const values = Object.values(part);
 
     db.prepare(`INSERT INTO spare_parts (${columns}) VALUES (${placeholders})`).run(...values);
-    logAction(undefined, 'System', 'Create', 'SparePart', part.id, `Created Spare Part "${part.name}"`);
+    const { userId: cSpUserId, userName: cSpUserName } = getCallerIdentity(req);
+    logAction(cSpUserId, cSpUserName, 'Create', 'SparePart', part.id, `Created Spare Part "${part.name}"`);
     res.status(201).json({ message: 'Spare part created' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -699,7 +928,8 @@ app.put('/api/spare-parts/:id', (req, res) => {
     const entityName = oldPart ? oldPart.name : id;
     const detailsMsg = getChangesString('Spare Part', entityName, oldPart, part);
     if (detailsMsg) {
-      logAction(undefined, 'System', 'Update', 'SparePart', id, detailsMsg);
+      const { userId: uSpUserId, userName: uSpUserName } = getCallerIdentity(req);
+      logAction(uSpUserId, uSpUserName, 'Update', 'SparePart', id, detailsMsg);
     }
     res.json({ message: 'Spare part updated' });
   } catch (error) {
@@ -713,7 +943,8 @@ app.delete('/api/spare-parts/:id', (req, res) => {
     const oldPart = db.prepare('SELECT * FROM spare_parts WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM spare_parts WHERE id = ?').run(id);
     const entityName = oldPart ? oldPart.name : id;
-    logAction(undefined, 'System', 'Delete', 'SparePart', id, `Deleted Spare Part "${entityName}"`);
+    const { userId: dSpUserId, userName: dSpUserName } = getCallerIdentity(req);
+    logAction(dSpUserId, dSpUserName, 'Delete', 'SparePart', id, `Deleted Spare Part "${entityName}"`);
     res.json({ message: 'Spare part deleted' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -745,7 +976,8 @@ app.put('/api/users/:uid', (req, res) => {
     const entityName = oldUser ? (oldUser.displayName || oldUser.username) : uid;
     const detailsMsg = getChangesString('User', entityName, oldUser, user);
     if (detailsMsg) {
-      logAction(undefined, 'System', 'Update', 'User', uid, detailsMsg);
+      const { userId: uUUserId, userName: uUUserName } = getCallerIdentity(req);
+      logAction(uUUserId, uUUserName, 'Update', 'User', uid, detailsMsg);
     }
     res.json({ message: 'User updated' });
   } catch (error) {
@@ -759,7 +991,8 @@ app.delete('/api/users/:uid', (req, res) => {
     const oldUser = db.prepare('SELECT * FROM users WHERE uid = ?').get(uid) as any;
     db.prepare('DELETE FROM users WHERE uid = ?').run(uid);
     const entityName = oldUser ? (oldUser.displayName || oldUser.username) : uid;
-    logAction(undefined, 'System', 'Delete', 'User', uid, `Deleted User "${entityName}"`);
+    const { userId: dUUserId, userName: dUUserName } = getCallerIdentity(req);
+    logAction(dUUserId, dUUserName, 'Delete', 'User', uid, `Deleted User "${entityName}"`);
     res.json({ message: 'User deleted' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -1191,6 +1424,118 @@ app.post('/api/backups/restore-upload', backupUpload.single('dbfile'), async (re
     reloadDb();
     console.log(`✅ [Backup] Restored from uploaded file.`);
     res.json({ message: 'Restauration depuis le fichier uploadé effectuée avec succès.', safety: safetyName });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// --- Calendar Events ---
+app.get('/api/calendar-events', (req, res) => {
+  try {
+    const { month } = req.query;
+    let rows;
+    if (month && typeof month === 'string') {
+      rows = db.prepare('SELECT * FROM calendar_events WHERE startDate LIKE ? OR endDate LIKE ?').all(`${month}%`, `${month}%`);
+    } else {
+      rows = db.prepare('SELECT * FROM calendar_events').all();
+    }
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/calendar-events', (req, res) => {
+  try {
+    const event = { ...req.body };
+    if (!event.id) {
+      event.id = 'evt_' + Math.random().toString(36).substring(2, 15);
+    }
+    event.createdAt = new Date().toISOString();
+    event.updatedAt = new Date().toISOString();
+
+    const columns = Object.keys(event).join(', ');
+    const placeholders = Object.keys(event).map(() => '?').join(', ');
+    const values = Object.values(event);
+
+    db.prepare(`INSERT INTO calendar_events (${columns}) VALUES (${placeholders})`).run(...values);
+
+    let userId: string | undefined;
+    let userName = 'System';
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        if (decoded?.uid) {
+          userId = decoded.uid;
+          userName = decoded.displayName || decoded.username || 'User';
+        }
+      } catch (e) {}
+    }
+    logAction(userId, userName, 'Create', 'CalendarEvent', event.id, `Created Calendar Event "${event.title}"`);
+    res.status(201).json(event);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.put('/api/calendar-events/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = { ...req.body };
+    delete updates.id;
+    updates.updatedAt = new Date().toISOString();
+
+    const oldEvent = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id) as any;
+    if (!oldEvent) {
+      return res.status(404).json({ error: 'Calendar event not found' });
+    }
+
+    const sets = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+    const values = Object.values(updates);
+
+    db.prepare(`UPDATE calendar_events SET ${sets} WHERE id = ?`).run(...values, id);
+
+    let userId: string | undefined;
+    let userName = 'System';
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        if (decoded?.uid) {
+          userId = decoded.uid;
+          userName = decoded.displayName || decoded.username || 'User';
+        }
+      } catch (e) {}
+    }
+    logAction(userId, userName, 'Update', 'CalendarEvent', id, `Updated Calendar Event "${updates.title || oldEvent.title}"`);
+    res.json({ message: 'Calendar event updated' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/calendar-events/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const oldEvent = db.prepare('SELECT * FROM calendar_events WHERE id = ?').get(id) as any;
+    db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id);
+
+    let userId: string | undefined;
+    let userName = 'System';
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        if (decoded?.uid) {
+          userId = decoded.uid;
+          userName = decoded.displayName || decoded.username || 'User';
+        }
+      } catch (e) {}
+    }
+    const entityName = oldEvent ? oldEvent.title : id;
+    logAction(userId, userName, 'Delete', 'CalendarEvent', id, `Deleted Calendar Event "${entityName}"`);
+    res.json({ message: 'Calendar event deleted' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

@@ -224,3 +224,32 @@ export interface MachineRendement {
   priceMarket?: 'TN' | 'Malta';
   createdAt?: string;
 }
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  eventType: 'preventive' | 'corrective' | 'inspection' | 'downtime';
+  equipmentId?: string;
+  equipmentName?: string;
+  location?: string;
+  technicians?: string;
+  estimatedDuration?: number;
+  priority?: 'critical' | 'high' | 'medium' | 'low';
+  status?: 'planned' | 'in-progress' | 'done' | 'overdue';
+  workOrderNumber?: string;
+  notes?: string;
+  startDate: string;
+  endDate: string;
+  recurrence?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually' | 'none';
+  createdAt?: string;
+  updatedAt?: string;
+  isReadOnly?: boolean;
+  isPrediction?: boolean;
+  isRecurringInstance?: boolean;
+  originalEventId?: string;
+  source?: string;
+  lastMaintenanceDate?: string;
+  nextDueDate?: string;
+  daysRemainingOrOverdue?: number;
+}
+

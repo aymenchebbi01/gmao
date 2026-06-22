@@ -195,6 +195,26 @@ db.exec(`
     comment TEXT DEFAULT '',
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS calendar_events (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    eventType TEXT NOT NULL DEFAULT 'preventive',
+    equipmentId TEXT,
+    equipmentName TEXT DEFAULT '',
+    location TEXT DEFAULT '',
+    technicians TEXT DEFAULT '',
+    estimatedDuration INTEGER DEFAULT 60,
+    priority TEXT DEFAULT 'medium',
+    status TEXT DEFAULT 'planned',
+    workOrderNumber TEXT,
+    notes TEXT DEFAULT '',
+    startDate TEXT NOT NULL,
+    endDate TEXT NOT NULL,
+    recurrence TEXT,
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
   // Safe migrations for missing columns

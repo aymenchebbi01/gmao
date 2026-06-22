@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { toDate, cn, calculateMachineLiveHours, formatHoursToDays } from '../lib/utils';
 import { RECOMMENDED_TASKS } from '../constants/maintenanceTasks';
 import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 import {
   History,
   Calendar,
@@ -20,7 +21,12 @@ import {
   TrendingUp,
   AlertTriangle,
   Download,
-  Package
+  Package,
+  Edit2,
+  Trash2,
+  X,
+  Save,
+  AlertCircle
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -32,13 +38,315 @@ interface MachineHistoryProps {
   machineName: string;
 }
 
+// ─── Edit / Delete state helpers ────────────────────────────────────────────
+interface EditProductionForm {
+  id: number;
+  productName: string;
+  mouleName: string;
+  startDate: string;
+  endDate: string;
+}
+
+interface EditConditionForm {
+  id: number;
+  previousCondition: string;
+  newCondition: string;
+  timestamp: string;
+}
+
+// ─── Shared Modal backdrop ────────────────────────────────────────────────────
+function ModalBackdrop({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── Confirm Delete Dialog ────────────────────────────────────────────────────
+function ConfirmDeleteDialog({
+  title,
+  description,
+  onConfirm,
+  onCancel,
+  loading
+}: {
+  title: string;
+  description: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}) {
+  return (
+    <ModalBackdrop onClose={onCancel}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-in slide-in-from-bottom-4 fade-in p-6">
+        <div className="flex items-start gap-4 mb-5">
+          <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+            <AlertCircle className="text-red-600" size={24} />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-gray-900">{title}</h3>
+            <p className="text-sm text-gray-500 mt-1">{description}</p>
+          </div>
+        </div>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all shadow-lg shadow-red-200 disabled:opacity-60"
+          >
+            {loading ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Trash2 size={14} />
+            )}
+            Delete
+          </button>
+        </div>
+      </div>
+    </ModalBackdrop>
+  );
+}
+
+// ─── Edit Production Modal ────────────────────────────────────────────────────
+function EditProductionModal({
+  form,
+  onChange,
+  onSave,
+  onClose,
+  loading
+}: {
+  form: EditProductionForm;
+  onChange: (f: EditProductionForm) => void;
+  onSave: () => void;
+  onClose: () => void;
+  loading: boolean;
+}) {
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 animate-in slide-in-from-bottom-4 fade-in">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
+              <Package className="text-blue-600" size={18} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">Edit Production Entry</h3>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider">Admin Action</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400 transition-all">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Product Name</label>
+              <input
+                type="text"
+                value={form.productName}
+                onChange={e => onChange({ ...form, productName: e.target.value })}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 hover:bg-white transition-all"
+                placeholder="Product name"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Mold (Moule)</label>
+              <input
+                type="text"
+                value={form.mouleName}
+                onChange={e => onChange({ ...form, mouleName: e.target.value })}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 hover:bg-white transition-all"
+                placeholder="Mold name"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Start Date</label>
+              <input
+                type="datetime-local"
+                value={form.startDate ? form.startDate.slice(0, 16) : ''}
+                onChange={e => onChange({ ...form, startDate: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 hover:bg-white transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">End Date <span className="text-gray-300 normal-case font-normal">(optional)</span></label>
+              <input
+                type="datetime-local"
+                value={form.endDate ? form.endDate.slice(0, 16) : ''}
+                onChange={e => onChange({ ...form, endDate: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 hover:bg-white transition-all"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end bg-gray-50/50 rounded-b-2xl">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSave}
+            disabled={loading}
+            className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-lg shadow-blue-200 disabled:opacity-60"
+          >
+            {loading ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Save size={14} />
+            )}
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </ModalBackdrop>
+  );
+}
+
+// ─── Edit Condition Modal ─────────────────────────────────────────────────────
+const CONDITION_OPTIONS = ['Excellent', 'Good', 'Fair', 'Poor', 'Critical'];
+
+function EditConditionModal({
+  form,
+  onChange,
+  onSave,
+  onClose,
+  loading
+}: {
+  form: EditConditionForm;
+  onChange: (f: EditConditionForm) => void;
+  onSave: () => void;
+  onClose: () => void;
+  loading: boolean;
+}) {
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-in slide-in-from-bottom-4 fade-in">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
+              <Activity className="text-emerald-600" size={18} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">Edit Condition Entry</h3>
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider">Admin Action</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400 transition-all">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Previous Condition</label>
+            <select
+              value={form.previousCondition}
+              onChange={e => onChange({ ...form, previousCondition: e.target.value })}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 hover:bg-white transition-all"
+            >
+              <option value="">— N/A —</option>
+              {CONDITION_OPTIONS.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">New Condition</label>
+            <select
+              value={form.newCondition}
+              onChange={e => onChange({ ...form, newCondition: e.target.value })}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 hover:bg-white transition-all"
+            >
+              <option value="">— Select —</option>
+              {CONDITION_OPTIONS.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Timestamp</label>
+            <input
+              type="datetime-local"
+              value={form.timestamp ? form.timestamp.slice(0, 16) : ''}
+              onChange={e => onChange({ ...form, timestamp: e.target.value ? new Date(e.target.value).toISOString() : '' })}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-gray-50 hover:bg-white transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end bg-gray-50/50 rounded-b-2xl">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onSave}
+            disabled={loading}
+            className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-lg shadow-emerald-200 disabled:opacity-60"
+          >
+            {loading ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Save size={14} />
+            )}
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </ModalBackdrop>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function MachineHistory({ machineId, machineName }: MachineHistoryProps) {
+  const { isAdmin } = useAuth();
+
   const [history, setHistory] = useState<WorkOrder[]>([]);
   const [conditionHistory, setConditionHistory] = useState<MachineConditionHistory[]>([]);
   const [machine, setMachine] = useState<Machine | null>(null);
   const [productionHistory, setProductionHistory] = useState<MachineProductionHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeMetric, setActiveMetric] = useState<'mttr' | 'mtbf' | 'availability' | null>(null);
+
+  // ── Edit / Delete state – production ──
+  const [editingProduction, setEditingProduction] = useState<EditProductionForm | null>(null);
+  const [deletingProductionId, setDeletingProductionId] = useState<number | null>(null);
+  const [productionSaving, setProductionSaving] = useState(false);
+  const [productionDeleting, setProductionDeleting] = useState(false);
+
+  // ── Edit / Delete state – condition ──
+  const [editingCondition, setEditingCondition] = useState<EditConditionForm | null>(null);
+  const [deletingConditionId, setDeletingConditionId] = useState<number | null>(null);
+  const [conditionSaving, setConditionSaving] = useState(false);
+  const [conditionDeleting, setConditionDeleting] = useState(false);
 
   useEffect(() => {
     if (!machineId) return;
@@ -85,17 +393,13 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
     );
   }
 
-  // Calculate Metrics
+  // ── Metrics ──────────────────────────────────────────────────────────────────
   const currentHours = machine ? calculateMachineLiveHours(machine) : 0;
 
-  // Calculate live operating time and live downtime
-  let liveOperatingTime = machine?.totalOperatingTime || 0; // in minutes
-  let liveDownTime = machine?.totalDownTime || 0; // in minutes
+  let liveOperatingTime = machine?.totalOperatingTime || 0;
+  let liveDownTime = machine?.totalDownTime || 0;
 
-  // Refine total downtime using completed work orders for more accuracy if needed
   const totalInterventionTime = history.reduce((acc, order) => acc + (order.intervention?.durationMinutes || 0), 0);
-  // Use the larger of the two to be conservative, or just use machine.totalDownTime if it's already being updated correctly
-  // For this refinement, we'll use the machine's recorded downtime but ensure it's at least the sum of interventions
   liveDownTime = Math.max(liveDownTime, totalInterventionTime);
 
   if (machine) {
@@ -115,34 +419,30 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
   const mtbfVal = failureCount > 0 ? (liveOperatingTime / failureCount / 60) : 0;
   const mttrVal = failureCount > 0 ? (liveDownTime / failureCount) : 0;
 
-  const mtbf = failureCount > 0 ? mtbfVal.toFixed(1) : 'N/A'; // in hours
-  const mttr = failureCount > 0 ? mttrVal.toFixed(0) : 'N/A'; // in minutes
+  const mtbf = failureCount > 0 ? mtbfVal.toFixed(1) : 'N/A';
+  const mttr = failureCount > 0 ? mttrVal.toFixed(0) : 'N/A';
   const availabilityVal = (liveOperatingTime + liveDownTime) > 0
     ? (liveOperatingTime / (liveOperatingTime + liveDownTime)) * 100
     : 100;
   const availability = availabilityVal.toFixed(1);
 
-  // Benchmarks & Color Coding
   const getMtbfColor = (val: number) => {
     if (val === 0) return "text-gray-400";
     if (val >= 500) return "text-emerald-600";
     if (val >= 200) return "text-amber-600";
     return "text-red-600";
   };
-
   const getMttrColor = (val: number) => {
     if (val === 0) return "text-gray-400";
     if (val <= 60) return "text-emerald-600";
     if (val <= 180) return "text-amber-600";
     return "text-red-600";
   };
-
   const getAvailabilityColor = (val: number) => {
     if (val >= 95) return "text-emerald-600";
     if (val >= 85) return "text-amber-600";
     return "text-red-600";
   };
-
   const getMtbfBg = (val: number, active: boolean) => {
     if (active) return "bg-blue-600 border-blue-600 shadow-lg shadow-blue-200";
     if (val === 0) return "bg-white border-gray-100";
@@ -150,7 +450,6 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
     if (val >= 200) return "bg-white border-amber-100 hover:border-amber-200 hover:shadow-amber-50 shadow-sm";
     return "bg-white border-red-100 hover:border-red-200 hover:shadow-red-50 shadow-sm";
   };
-
   const getMttrBg = (val: number, active: boolean) => {
     if (active) return "bg-amber-600 border-amber-600 shadow-lg shadow-amber-200";
     if (val === 0) return "bg-white border-gray-100";
@@ -159,14 +458,12 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
     return "bg-white border-red-100 hover:border-red-200 hover:shadow-red-50 shadow-sm";
   };
 
-  // Cycle-based maintenance logic synced with DB values
+  // ── Maintenance cycle ─────────────────────────────────────────────────────
   const cycleSize = 20000;
   const cycleIndex = Math.floor(currentHours / cycleSize);
   const cycleStart = cycleIndex * cycleSize;
   const hoursInCycle = currentHours - cycleStart;
 
-  // Use machine.nextMaintenanceHours as the authoritative next threshold
-  // If not present or in the past, fallback to next milestone in the cycle
   const nextTargetHours = (machine?.nextMaintenanceHours && machine.nextMaintenanceHours > currentHours)
     ? machine.nextMaintenanceHours
     : (() => {
@@ -179,24 +476,21 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
     hours: nextTargetHours
   };
 
-  // Find the last passed threshold to calculate progress interval
   const lastThresholdBase = RECOMMENDED_TASKS.slice().reverse().find(t => t.hours <= hoursInCycle);
   const lastThresholdHours = lastThresholdBase ? (cycleStart + lastThresholdBase.hours) : cycleStart;
-
   const currentThreshold = lastThresholdBase || RECOMMENDED_TASKS[0];
 
-  // Calculate progress within the current milestone interval
   const intervalTotal = Math.max(nextTargetHours - lastThresholdHours, 1);
   const intervalCurrent = currentHours - lastThresholdHours;
   const progressPercent = Math.min(Math.max((intervalCurrent / intervalTotal) * 100, 0), 100);
 
+  // ── PDF report ───────────────────────────────────────────────────────────────
   const generateHistoryReport = () => {
     if (!machine) return;
 
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const today = new Date();
 
-    // ---- Header & Logo ----
     try {
       doc.addImage(THERMOPLASTICS_LOGO_BASE64, 'PNG', 14, 10, 35, 15);
     } catch (e) {
@@ -208,16 +502,15 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
     doc.text('MACHINE MAINTENANCE REPORT', 105, 40, { align: 'center' });
-    
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(`Generated on: ${format(today, 'dd/MM/yyyy HH:mm')}`, 105, 47, { align: 'center' });
 
-    // ---- 1. Machine Information ----
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('1. Machine Information', 14, 60);
-    
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     const machineInfo = [
@@ -240,11 +533,10 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
 
     let finalY = (doc as any).lastAutoTable.finalY + 12;
 
-    // ---- 2. Preventive Maintenance Planning ----
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('2. Preventive Maintenance Schedule', 14, finalY);
-    
+
     finalY += 3;
     const planningInfo = [
       ['Next Maintenance', formatHoursToDays(nextTask.hours, true)],
@@ -263,11 +555,10 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
 
     finalY = (doc as any).lastAutoTable.finalY + 12;
 
-    // ---- 3. Maintenance Recommendations ----
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('3. Maintenance Recommendations', 14, finalY);
-    
+
     finalY += 3;
     const recTasks = (currentHours < RECOMMENDED_TASKS[0].hours ? RECOMMENDED_TASKS[0] : currentThreshold).tasks.map(t => [t]);
 
@@ -282,7 +573,6 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
 
     finalY = (doc as any).lastAutoTable.finalY + 12;
 
-    // ---- 4. Completed Interventions History ----
     if (finalY > 240) {
       doc.addPage();
       finalY = 20;
@@ -291,7 +581,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('4. Completed Interventions History', 14, finalY);
-    
+
     finalY += 3;
     const historyData = history.map(order => [
       order.completedAt ? format(new Date(order.completedAt), 'dd/MM/yyyy') : 'N/A',
@@ -314,7 +604,6 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
       }
     });
 
-    // Footer
     const pageCount = (doc as any).internal.getNumberOfPages();
     doc.setFontSize(8);
     for (let i = 1; i <= pageCount; i++) {
@@ -327,8 +616,147 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
     toast.success('PDF Report generated successfully');
   };
 
+  // ── Production CRUD handlers ─────────────────────────────────────────────────
+  const openEditProduction = (entry: MachineProductionHistory) => {
+    setEditingProduction({
+      id: entry.id,
+      productName: entry.productName || '',
+      mouleName: entry.mouleName || '',
+      startDate: entry.startDate || '',
+      endDate: entry.endDate || ''
+    });
+  };
+
+  const saveProduction = async () => {
+    if (!editingProduction) return;
+    setProductionSaving(true);
+    try {
+      await api.updateMachineProductionHistory(editingProduction.id, {
+        productName: editingProduction.productName,
+        mouleName: editingProduction.mouleName,
+        startDate: editingProduction.startDate,
+        endDate: editingProduction.endDate || null
+      });
+      setProductionHistory(prev =>
+        prev.map(e => e.id === editingProduction.id
+          ? { ...e, productName: editingProduction.productName, mouleName: editingProduction.mouleName, startDate: editingProduction.startDate, endDate: editingProduction.endDate || undefined }
+          : e
+        )
+      );
+      toast.success('Production entry updated');
+      setEditingProduction(null);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update entry');
+    } finally {
+      setProductionSaving(false);
+    }
+  };
+
+  const confirmDeleteProduction = async () => {
+    if (deletingProductionId === null) return;
+    setProductionDeleting(true);
+    try {
+      await api.deleteMachineProductionHistory(deletingProductionId);
+      setProductionHistory(prev => prev.filter(e => e.id !== deletingProductionId));
+      toast.success('Production entry deleted');
+      setDeletingProductionId(null);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete entry');
+    } finally {
+      setProductionDeleting(false);
+    }
+  };
+
+  // ── Condition CRUD handlers ───────────────────────────────────────────────────
+  const openEditCondition = (log: MachineConditionHistory) => {
+    setEditingCondition({
+      id: log.id,
+      previousCondition: log.previousCondition || '',
+      newCondition: log.newCondition || '',
+      timestamp: log.timestamp || ''
+    });
+  };
+
+  const saveCondition = async () => {
+    if (!editingCondition) return;
+    setConditionSaving(true);
+    try {
+      await api.updateMachineConditionHistory(editingCondition.id, {
+        previousCondition: editingCondition.previousCondition,
+        newCondition: editingCondition.newCondition,
+        timestamp: editingCondition.timestamp
+      });
+      setConditionHistory(prev =>
+        prev.map(e => e.id === editingCondition.id
+          ? { ...e, previousCondition: editingCondition.previousCondition, newCondition: editingCondition.newCondition, timestamp: editingCondition.timestamp }
+          : e
+        )
+      );
+      toast.success('Condition entry updated');
+      setEditingCondition(null);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update entry');
+    } finally {
+      setConditionSaving(false);
+    }
+  };
+
+  const confirmDeleteCondition = async () => {
+    if (deletingConditionId === null) return;
+    setConditionDeleting(true);
+    try {
+      await api.deleteMachineConditionHistory(deletingConditionId);
+      setConditionHistory(prev => prev.filter(e => e.id !== deletingConditionId));
+      toast.success('Condition entry deleted');
+      setDeletingConditionId(null);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete entry');
+    } finally {
+      setConditionDeleting(false);
+    }
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-8">
+      {/* Modals */}
+      {editingProduction && (
+        <EditProductionModal
+          form={editingProduction}
+          onChange={setEditingProduction}
+          onSave={saveProduction}
+          onClose={() => setEditingProduction(null)}
+          loading={productionSaving}
+        />
+      )}
+      {deletingProductionId !== null && (
+        <ConfirmDeleteDialog
+          title="Delete Production Entry"
+          description="This action cannot be undone. The production/mold history record will be permanently removed from the database."
+          onConfirm={confirmDeleteProduction}
+          onCancel={() => setDeletingProductionId(null)}
+          loading={productionDeleting}
+        />
+      )}
+      {editingCondition && (
+        <EditConditionModal
+          form={editingCondition}
+          onChange={setEditingCondition}
+          onSave={saveCondition}
+          onClose={() => setEditingCondition(null)}
+          loading={conditionSaving}
+        />
+      )}
+      {deletingConditionId !== null && (
+        <ConfirmDeleteDialog
+          title="Delete Condition Entry"
+          description="This action cannot be undone. The condition evolution record will be permanently removed from the database."
+          onConfirm={confirmDeleteCondition}
+          onCancel={() => setDeletingConditionId(null)}
+          loading={conditionDeleting}
+        />
+      )}
+
       {/* Mini Dashboard */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <button
@@ -443,7 +871,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
         </button>
       </div>
 
-      {/* Metric Details / Interface */}
+      {/* Metric Details */}
       {activeMetric && (
         <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center gap-3 mb-4">
@@ -495,7 +923,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
         </div>
       )}
 
-      {/* Recommended Tasks Section */}
+      {/* Recommended Tasks */}
       <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
         <div className="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -553,18 +981,25 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
         </div>
       </div>
 
+      {/* ── Condition Evolution ──────────────────────────────────────────────────── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-bold text-gray-900 flex items-center">
             <Activity className="w-4 h-4 mr-2 text-emerald-600" />
             Condition Evolution ({conditionHistory.length})
           </h3>
+          {isAdmin && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-[10px] font-bold text-amber-700 uppercase tracking-wide">
+              <ShieldCheck size={10} />
+              Admin Mode
+            </span>
+          )}
         </div>
 
         {conditionHistory.length > 0 ? (
           <div className="grid grid-cols-1 gap-3">
             {conditionHistory.map((log) => (
-              <div key={log.id} className="bg-white border border-gray-100 rounded-xl p-4 flex items-center justify-between shadow-sm">
+              <div key={log.id} className="bg-white border border-gray-100 rounded-xl p-4 flex items-center justify-between shadow-sm group hover:border-gray-200 transition-all">
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col">
                     <span className="text-[10px] text-gray-400 uppercase font-bold">Previous</span>
@@ -576,11 +1011,32 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
                     <span className="text-sm font-bold text-gray-900">{log.newCondition}</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="flex items-center justify-end text-[10px] text-gray-400 font-medium">
-                    <Clock size={10} className="mr-1" />
-                    {format(toDate(log.timestamp), 'MMM d, yyyy HH:mm')}
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className="flex items-center justify-end text-[10px] text-gray-400 font-medium">
+                      <Clock size={10} className="mr-1" />
+                      {format(toDate(log.timestamp), 'MMM d, yyyy HH:mm')}
+                    </div>
                   </div>
+                  {/* Admin actions */}
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => openEditCondition(log)}
+                        title="Edit entry"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-all"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                      <button
+                        onClick={() => setDeletingConditionId(log.id)}
+                        title="Delete entry"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-all"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -592,12 +1048,19 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
         )}
       </div>
 
+      {/* ── Production & Mold History ─────────────────────────────────────────── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-bold text-gray-900 flex items-center">
             <Package className="w-4 h-4 mr-2 text-blue-600" />
             Production & Mold History ({productionHistory.length})
           </h3>
+          {isAdmin && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200 rounded-lg text-[10px] font-bold text-amber-700 uppercase tracking-wide">
+              <ShieldCheck size={10} />
+              Admin Mode
+            </span>
+          )}
         </div>
 
         {productionHistory.length > 0 ? (
@@ -609,11 +1072,14 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
                   <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Mold (Moule)</th>
                   <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Start Date</th>
                   <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">End Date</th>
+                  {isAdmin && (
+                    <th className="px-6 py-3 text-[10px] font-bold text-amber-500 uppercase tracking-wider text-right">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {productionHistory.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-blue-50/30 transition-colors">
+                  <tr key={entry.id} className="hover:bg-blue-50/30 transition-colors group">
                     <td className="px-6 py-4">
                       <span className="text-xs font-bold text-emerald-700">{entry.productName || 'N/A'}</span>
                     </td>
@@ -628,6 +1094,26 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
                         <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold uppercase">Current</span>
                       )}
                     </td>
+                    {isAdmin && (
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => openEditProduction(entry)}
+                            title="Edit entry"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-all"
+                          >
+                            <Edit2 size={12} />
+                          </button>
+                          <button
+                            onClick={() => setDeletingProductionId(entry.id)}
+                            title="Delete entry"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-all"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -640,6 +1126,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
         )}
       </div>
 
+      {/* ── Completed Interventions ────────────────────────────────────────────── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-bold text-gray-900 flex items-center">
@@ -656,13 +1143,11 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
         </div>
 
         <div className="relative">
-          {/* Timeline Line */}
           <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-100 ml-[1px]"></div>
 
           <div className="space-y-6">
             {history.map((order, index) => (
               <div key={order.id} className="relative pl-10 group">
-                {/* Timeline Dot */}
                 <div className="absolute left-0 top-1 w-9 h-9 flex items-center justify-center">
                   <div className="w-2.5 h-2.5 rounded-full bg-blue-600 ring-4 ring-blue-50 z-10"></div>
                 </div>
@@ -713,7 +1198,6 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
                     </div>
                   </div>
 
-                  {/* Intervention Details (Expandable or just summary) */}
                   {order.intervention && (
                     <div className="mt-3 p-3 bg-gray-50 rounded-xl border border-gray-100/50">
                       <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-1">Actions Taken</p>
