@@ -279,6 +279,12 @@ export const api = {
     const res = await fetch(`${API_BASE}/purchase-requests/${id}`, { method: 'DELETE' });
     await handleResponse(res);
   },
+  sendPurchaseRequestEmail: async (id: number | string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/purchase-requests/${id}/send`, {
+      method: 'POST'
+    });
+    await handleResponse(res);
+  },
 
   // Machine Rendement
   getRendement: async (date?: string): Promise<MachineRendement[]> => {

@@ -12,7 +12,8 @@ import {
     CheckCircle2,
     Edit2,
     Search,
-    X
+    X,
+    Send
 } from 'lucide-react';
 import { SparePart } from '../types';
 import { api } from '../services/api';
@@ -68,6 +69,7 @@ export default function PurchaseRequests() {
     const [activeView, setActiveTab] = useState<'generator' | 'history'>('generator');
     const [history, setHistory] = useState<any[]>([]);
     const [lastRef, setLastRef] = useState<string | null>(null);
+    const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
 
     // History search and edit states
     const [historySearch, setHistorySearch] = useState('');
@@ -109,6 +111,18 @@ export default function PurchaseRequests() {
             fetchHistory();
         } catch (err) {
             toast.error('Échec de la suppression');
+        }
+    };
+
+    const handleSendEmail = async (id: number) => {
+        setSendingEmailId(id);
+        try {
+            await api.sendPurchaseRequestEmail(id);
+            toast.success('Demande d\'achat envoyée à la comptabilité ✓');
+        } catch (err: any) {
+            toast.error(err.message || 'Échec de l\'envoi de l\'email');
+        } finally {
+            setSendingEmailId(null);
         }
     };
 
@@ -674,6 +688,19 @@ export default function PurchaseRequests() {
                                                             <Download size={13} />
                                                             PDF
                                                         </button>
+                                                        <button
+                                                             onClick={() => handleSendEmail(req.id)}
+                                                             disabled={sendingEmailId === req.id}
+                                                             className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                                             title="Envoyer par email"
+                                                         >
+                                                             {sendingEmailId === req.id ? (
+                                                                 <RefreshCw size={13} className="animate-spin" />
+                                                             ) : (
+                                                                 <Send size={13} />
+                                                             )}
+                                                             Envoyer
+                                                         </button>
                                                         {isAdmin && (
                                                             <>
                                                                 <button

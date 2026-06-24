@@ -11,6 +11,7 @@ import multer from 'multer';
 import fs from 'fs';
 import db, { DB_PATH, reloadDb } from './db.js';
 import os from 'os';
+import { sendPurchaseRequestNotification } from './email.js';
 
 
 dotenv.config();
@@ -306,7 +307,32 @@ app.post('/api/purchase-requests', (req, res) => {
       INSERT INTO purchase_requests (reference, date, requested_by, department, supplier, items_count, pdf_data)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(reference, date, requested_by, department, supplier, items_count, pdf_data);
+
     res.json({ id: info.lastInsertRowid });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/purchase-requests/:id/send', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const request = db.prepare('SELECT * FROM purchase_requests WHERE id = ?').get(id) as any;
+    if (!request) {
+      return res.status(404).json({ error: 'Purchase request not found' });
+    }
+
+    await sendPurchaseRequestNotification({
+      reference: request.reference,
+      date: request.date,
+      requestedBy: request.requested_by,
+      department: request.department,
+      itemsCount: request.items_count,
+      supplier: request.supplier,
+      pdfData: request.pdf_data || null
+    });
+
+    res.json({ message: 'Email sent successfully to accounting department' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
