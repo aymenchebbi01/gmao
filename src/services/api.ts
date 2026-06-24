@@ -60,6 +60,10 @@ export const api = {
     const res = await fetch(`${API_BASE}/machines/${id}`, { method: 'DELETE' });
     await handleResponse(res);
   },
+  clearAllMachines: async (): Promise<void> => {
+    const res = await fetch(`${API_BASE}/machines`, { method: 'DELETE' });
+    await handleResponse(res);
+  },
   getMachineConditionHistory: async (id: string): Promise<MachineConditionHistory[]> => {
     const res = await fetch(`${API_BASE}/machines/${id}/condition-history`);
     return handleResponse(res);

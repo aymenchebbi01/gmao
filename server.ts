@@ -704,6 +704,18 @@ app.delete('/api/machine-production-history/:id', (req, res) => {
   }
 });
 
+app.delete('/api/machines', (req, res) => {
+  try {
+    db.prepare('DELETE FROM machines').run();
+    db.prepare('DELETE FROM machine_production_history').run();
+    const { userId: dMUserId, userName: dMUserName } = getCallerIdentity(req);
+    logAction(dMUserId, dMUserName, 'Delete', 'Machine', 'all', 'Cleared all machines');
+    res.json({ message: 'All machines deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 app.delete('/api/machines/:id', (req, res) => {
   try {
     const { id } = req.params;

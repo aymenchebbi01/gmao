@@ -278,7 +278,9 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
         }
 
         await api.createMachine(finalNewData);
+        toast.success('Machine registered successfully');
       }
+      fetchMachines();
       setIsModalOpen(false);
       setIsEditMode(false);
       setFormData({
@@ -301,6 +303,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
       });
     } catch (error) {
       console.error("Error saving machine:", error);
+      toast.error('Failed to save machine');
     } finally {
       setLoading(false);
     }
@@ -331,12 +334,33 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
   };
 
   const handleDeleteMachine = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this machine? This action cannot be undone.')) {
+      return;
+    }
     try {
       await api.deleteMachine(id);
       toast.success('Machine deleted successfully');
+      fetchMachines();
     } catch (error) {
       console.error("Error deleting machine:", error);
       toast.error('Failed to delete machine');
+    }
+  };
+
+  const handleClearAllMachines = async () => {
+    if (!window.confirm('WARNING: Are you sure you want to delete ALL machines? This will clear all machine records and their product/mold change histories. This action is IRREVERSIBLE!')) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await api.clearAllMachines();
+      toast.success('All machines cleared successfully');
+      fetchMachines();
+    } catch (error) {
+      console.error("Error clearing machines:", error);
+      toast.error('Failed to clear machines');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -415,6 +439,15 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
             >
               <RotateCw size={18} />
             </button>
+            {machines.length > 0 && (
+              <button
+                onClick={handleClearAllMachines}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-all"
+              >
+                <Trash2 size={18} />
+                Clear All
+              </button>
+            )}
             <button
               onClick={() => {
                 setIsEditMode(false);
