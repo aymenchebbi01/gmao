@@ -24,6 +24,10 @@ import { api } from '../services/api';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { THERMOPLASTICS_LOGO_BASE64 } from '../constants/logo';
+import { format } from 'date-fns';
 import {
     LineChart,
     Line,
@@ -412,6 +416,145 @@ export default function MachineRendement() {
         toast.success('Exported to Excel');
     };
 
+    const handleExportPDF = () => {
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const today = new Date();
+
+        try {
+            doc.addImage(THERMOPLASTICS_LOGO_BASE64, 'PNG', 14, 10, 35, 15);
+        } catch (e) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.text('THERMOPLASTICS', 14, 20);
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.text('MACHINE RENDEMENT REPORT', 148, 22, { align: 'center' });
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Generated on: ${format(today, 'dd/MM/yyyy HH:mm')}`, 148, 27, { align: 'center' });
+
+        // Add Active Search Filters context if any are set
+        let filtersY = 32;
+        const activeFilters: string[] = [];
+        if (filterDate) activeFilters.push(`Date: ${filterDate}`);
+        if (filterMachine) activeFilters.push(`Machine N°: #${filterMachine}`);
+        if (filterItem) activeFilters.push(`Item: ${filterItem}`);
+        if (filterMarket) activeFilters.push(`Market: ${filterMarket}`);
+
+        if (activeFilters.length > 0) {
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`Active Filters: ${activeFilters.join('  |  ')}`, 14, filtersY);
+            filtersY += 6;
+        }
+
+        // Summary Info Cards table
+        const summaryData = [
+            ['Total Records', filtered.length.toString(), 'Total Qty Produced', totalQty.toLocaleString()],
+            ['Avg Efficiency', `${avgEff.toFixed(1)}%`, 'TRS Total', (totals.qty1 + totals.qty2 + totals.qty3).toLocaleString()],
+            ['Price Target Total', `${totals.priceTarget.toFixed(2)} EUR`, 'Price Actual Total', `${totals.priceActual.toFixed(2)} EUR`]
+        ];
+
+        autoTable(doc, {
+            startY: filtersY,
+            body: summaryData,
+            theme: 'plain',
+            styles: { fontSize: 8, cellPadding: 1.5 },
+            columnStyles: {
+                0: { fontStyle: 'bold', cellWidth: 35 },
+                1: { cellWidth: 40 },
+                2: { fontStyle: 'bold', cellWidth: 40 },
+                3: { cellWidth: 40 }
+            }
+        });
+
+        let finalY = (doc as any).lastAutoTable.finalY + 8;
+
+        const tableBody = filtered.map(r => {
+            const prod = products.find(p => p.item === r.item);
+            const price = r.priceMarket === 'Malta' ? (prod?.priceMalta || 0) : (prod?.priceTN || 0);
+            const total = r.qtyShift1 + r.qtyShift2 + r.qtyShift3;
+            const priceTarget = (r.targetQty / 1000) * price;
+            const priceActual = (total / 1000) * price;
+            return [
+                r.date,
+                `#${String(r.machineNumber || '').trim() || '---'}`,
+                r.item,
+                r.priceMarket || 'TN',
+                r.targetQty.toLocaleString(),
+                r.qtyShift1.toLocaleString(),
+                `${r.efficiencyShift1.toFixed(1)}%`,
+                r.qtyShift2.toLocaleString(),
+                `${r.efficiencyShift2.toFixed(1)}%`,
+                r.qtyShift3.toLocaleString(),
+                `${r.efficiencyShift3.toFixed(1)}%`,
+                (r.trs || 0).toLocaleString(),
+                priceTarget.toFixed(2),
+                priceActual.toFixed(2),
+                r.comment || ''
+            ];
+        });
+
+        autoTable(doc, {
+            startY: finalY,
+            head: [['Date', 'Mch N°', 'Item', 'Market', 'Target Qty', 'Shift 1', 'Eff. S1', 'Shift 2', 'Eff. S2', 'Shift 3', 'Eff. S3', 'TRS', 'Target Price', 'Actual Price', 'Comment']],
+            body: tableBody,
+            foot: [[
+                'Totals',
+                '',
+                '',
+                '',
+                totals.targetQty.toLocaleString(),
+                totals.qty1.toLocaleString(),
+                '',
+                totals.qty2.toLocaleString(),
+                '',
+                totals.qty3.toLocaleString(),
+                '',
+                '',
+                totals.priceTarget.toFixed(2),
+                totals.priceActual.toFixed(2),
+                ''
+            ]],
+            theme: 'grid',
+            headStyles: { fillColor: [37, 99, 235], fontSize: 7, cellPadding: 1.5, halign: 'center' }, // blue-600
+            footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 7, cellPadding: 1.5, halign: 'center' },
+            bodyStyles: { fontSize: 7, cellPadding: 1.5 },
+            styles: { fontSize: 7 },
+            columnStyles: {
+                0: { cellWidth: 16 },
+                1: { cellWidth: 14 },
+                2: { cellWidth: 20 },
+                3: { cellWidth: 12 },
+                4: { cellWidth: 18, halign: 'right' },
+                5: { cellWidth: 15, halign: 'right' },
+                6: { cellWidth: 13, halign: 'center' },
+                7: { cellWidth: 15, halign: 'right' },
+                8: { cellWidth: 13, halign: 'center' },
+                9: { cellWidth: 15, halign: 'right' },
+                10: { cellWidth: 13, halign: 'center' },
+                11: { cellWidth: 14, halign: 'center' },
+                12: { cellWidth: 18, halign: 'right' },
+                13: { cellWidth: 18, halign: 'right' },
+                14: { cellWidth: 30 } // comment
+            }
+        });
+
+        const pageCount = (doc as any).internal.getNumberOfPages();
+        doc.setFontSize(8);
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.text(`Page ${i} of ${pageCount}`, 283, 202, { align: 'right' });
+            doc.text('MAINTENANCE & PRODUCTION SYSTEM (CMMS)', 14, 202);
+        }
+
+        doc.save(`Machine_Rendement_Report_${format(today, 'yyyyMMdd')}.pdf`);
+        toast.success('PDF report exported successfully');
+    };
+
     // ── summary cards ─────────────────────────────────────────────────────────
 
     const avgEff = useMemo(() => {
@@ -455,467 +598,474 @@ export default function MachineRendement() {
     // ── render ────────────────────────────────────────────────────────────────
 
     return (
-        <div className="space-y-6">
-            {/* ── Header ── */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        Rendement Machines
-                    </h1>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                    <button
-                        onClick={handleExport}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-all"
-                    >
-                        <Download size={16} />
-                        Export Excel
-                    </button>
-                    <button
-                        onClick={openCreate}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-                    >
-                        <Plus size={16} />
-                        Add Rendement
-                    </button>
-                    <button
-                        onClick={fetchAll}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
-                        title="Refresh"
-                    >
-                        <RefreshCw size={18} className={cn(loading && 'animate-spin')} />
-                    </button>
-                </div>
-            </div>
-
-            {/* ── Summary Cards ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <SummaryCard
-                    icon={<Activity size={20} className="text-blue-600" />}
-                    label="Total Records"
-                    value={filtered.length.toString()}
-                    bg="bg-blue-50"
-                />
-                <SummaryCard
-                    icon={<Target size={20} className="text-purple-600" />}
-                    label="Total Qty Produced"
-                    value={totalQty.toLocaleString()}
-                    bg="bg-purple-50"
-                />
-                <SummaryCard
-                    icon={<TrendingUp size={20} className={avgEff >= 80 ? 'text-emerald-600' : 'text-amber-600'} />}
-                    label="Avg Efficiency"
-                    value={`${avgEff.toFixed(1)}%`}
-                    bg={avgEff >= 80 ? 'bg-emerald-50' : 'bg-amber-50'}
-                />
-            </div>
-
-            {/* ── Chart Section ── */}
-            {filtered.length > 0 && (
-                <div className="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="flex items-center justify-between mb-6">
-                        <div>
-                            <h3 className="text-sm font-bold text-gray-900">Production by Item</h3>
-                            <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold mt-1">Quantity Produced (Total Shifts)</p>
-                        </div>
-                        <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-lg">
-                            <TrendingUp size={14} className="text-blue-600" />
-                            <span className="text-xs font-bold text-blue-700">Live Production Data</span>
-                        </div>
+        <div className="space-y-6 relative min-h-[800px]">
+            {/* List View */}
+            <div className={cn(
+                "transition-all duration-500 ease-in-out",
+                isModalOpen ? "blur-xl opacity-20 scale-95 pointer-events-none" : "blur-0 opacity-100 scale-100"
+            )}>
+                {/* ── Header ── */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                            Rendement Machines
+                        </h1>
                     </div>
-                    <div className="h-[250px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="colorQty" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
-                                        <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis
-                                    dataKey="name"
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 10, fontWeight: 600, fill: '#94a3b8' }}
-                                    dy={10}
-                                />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 10, fontWeight: 600, fill: '#94a3b8' }}
-                                />
-                                <Tooltip
-                                    contentStyle={{
-                                        borderRadius: '12px',
-                                        border: 'none',
-                                        boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
-                                        fontSize: '12px',
-                                        fontWeight: '700'
-                                    }}
-                                />
-                                <Area
-                                    type="monotone"
-                                    dataKey="qty"
-                                    stroke="#2563eb"
-                                    strokeWidth={3}
-                                    fillOpacity={1}
-                                    fill="url(#colorQty)"
-                                    animationDuration={1500}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            )}
-
-            {/* ── Filters ── */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white border border-gray-100 shadow-sm rounded-2xl">
-                <div className="flex items-center gap-4">
-                    <Calendar size={18} className="text-gray-400 flex-shrink-0" />
-                    <div className="flex items-center gap-2 flex-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Date</label>
-                        <input
-                            type="date"
-                            value={filterDate}
-                            onChange={e => setFilterDate(e.target.value)}
-                            className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
-                        />
-                        {filterDate && (
-                            <button
-                                onClick={() => setFilterDate('')}
-                                className="p-1 text-gray-400 hover:text-red-500 transition-colors"
-                            >
-                                <X size={14} />
-                            </button>
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <Monitor size={18} className="text-gray-400 flex-shrink-0" />
-                    <div className="flex items-center gap-2 flex-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Machine N°</label>
-                        <div className="relative w-full">
-                            <input
-                                type="text"
-                                placeholder="Machine No..."
-                                value={filterMachine}
-                                onChange={e => setFilterMachine(e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
-                            />
-                            {filterMachine && (
-                                <button
-                                    onClick={() => setFilterMachine('')}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-500 transition-colors"
-                                >
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                    <Search size={18} className="text-gray-400 flex-shrink-0" />
-                    <div className="flex items-center gap-2 flex-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Item</label>
-                        <div className="relative w-full">
-                            <input
-                                type="text"
-                                placeholder="Search items..."
-                                value={filterItem}
-                                onChange={e => setFilterItem(e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
-                            />
-                            {filterItem && (
-                                <button
-                                    onClick={() => setFilterItem('')}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-500 transition-colors"
-                                >
-                                    <X size={14} />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-                <div className="flex items-center gap-4">
-                    <Target size={18} className="text-gray-400 flex-shrink-0" />
-                    <div className="flex items-center gap-2 flex-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Market</label>
-                        <select
-                            value={filterMarket}
-                            onChange={e => setFilterMarket(e.target.value as any)}
-                            className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium"
+                    <div className="flex gap-2 flex-wrap">
+                        <button
+                            onClick={handleExport}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-all font-inter"
                         >
-                            <option value="">All Markets</option>
-                            <option value="TN">TN Price</option>
-                            <option value="Malta">Malta Price</option>
-                        </select>
+                            <Download size={16} />
+                            Export Excel
+                        </button>
+                        <button
+                            onClick={handleExportPDF}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-700 bg-red-50 border border-red-100 rounded-xl hover:bg-red-100 transition-all font-inter"
+                        >
+                            <Download size={16} />
+                            Export PDF
+                        </button>
+                        <button
+                            onClick={openCreate}
+                            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                        >
+                            <Plus size={16} />
+                            Add Rendement
+                        </button>
+                        <button
+                            onClick={fetchAll}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                            title="Refresh"
+                        >
+                            <RefreshCw size={18} className={cn(loading && 'animate-spin')} />
+                        </button>
                     </div>
                 </div>
-            </div>
 
-            {/* ── Table ── */}
-            <div className="bg-white border border-gray-100 shadow-xl shadow-gray-200/50 rounded-2xl overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[1000px]">
-                        <thead>
-                            <tr className="bg-gray-50/50 border-b border-gray-100">
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Date</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Mch N°</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Item</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Market</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Target Qty</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Shift 1 Qty</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Eff. S1</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Shift 2 Qty</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Eff. S2</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Shift 3 Qty</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Eff. S3</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">TRS</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Price Target</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Price Actual</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Comment</th>
-                                <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {loading ? (
-                                Array.from({ length: 5 }).map((_, i) => (
-                                    <tr key={i} className="animate-pulse">
-                                        <td colSpan={16} className="px-5 py-5">
-                                            <div className="h-4 bg-gray-100 rounded w-full" />
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : filtered.length === 0 ? (
-                                <tr>
-                                    <td colSpan={16} className="px-5 py-16 text-center">
-                                        <div className="inline-flex flex-col items-center">
-                                            <div className="p-4 bg-gray-50 rounded-full mb-3">
-                                                <Activity size={28} className="text-gray-300" />
-                                            </div>
-                                            <p className="text-sm font-bold text-gray-900">No records found</p>
-                                            <p className="text-xs text-gray-400 mt-1">Click "Add Record" to get started.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                paginatedRecords.map(rec => (
-                                    <tr key={rec.id} className="hover:bg-blue-50/20 transition-colors group">
-                                        <td className="px-5 py-4 text-sm font-semibold text-gray-700">{rec.date}</td>
-                                        <td className="px-5 py-4">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-blue-50 text-black-700 text-xs font-bold">
-                                                #{String(rec.machineNumber || '').trim() || '---'}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <span className="text-sm font-bold text-gray-900">{rec.item}</span>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <span className={cn(
-                                                "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                                                rec.priceMarket === 'Malta' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
-                                            )}>
-                                                {rec.priceMarket || 'TN'}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-4 text-center">
-                                            <span className="text-sm font-bold text-gray-700 tabular-nums">
-                                                {rec.targetQty.toLocaleString()}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-4 text-center text-sm font-bold text-gray-700 tabular-nums">
-                                            {rec.qtyShift1.toLocaleString()}
-                                        </td>
-                                        <td className="px-5 py-4 text-center">{effBadge(rec.efficiencyShift1)}</td>
-                                        <td className="px-5 py-4 text-center text-sm font-bold text-gray-700 tabular-nums">
-                                            {rec.qtyShift2.toLocaleString()}
-                                        </td>
-                                        <td className="px-5 py-4 text-center">{effBadge(rec.efficiencyShift2)}</td>
-                                        <td className="px-5 py-4 text-center text-sm font-bold text-gray-700 tabular-nums">
-                                            {rec.qtyShift3.toLocaleString()}
-                                        </td>
-                                        <td className="px-5 py-4 text-center">{effBadge(rec.efficiencyShift3)}</td>
-                                        <td className="px-5 py-4 text-center">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold tabular-nums">
-                                                {(rec.trs || 0).toLocaleString()}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-4 text-center">
-                                            <span className="text-sm font-bold text-emerald-600 tabular-nums">
-                                                {(() => {
-                                                    const prod = products.find(p => p.item === rec.item);
-                                                    if (!prod) return '0.00';
-                                                    const price = rec.priceMarket === 'Malta' ? prod.priceMalta : prod.priceTN;
-                                                    return ((rec.targetQty / 1000) * price).toFixed(2);
-                                                })()}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-4 text-center">
-                                            <span className="text-sm font-bold text-blue-600 tabular-nums">
-                                                {(() => {
-                                                    const prod = products.find(p => p.item === rec.item);
-                                                    if (!prod) return '0.00';
-                                                    const price = rec.priceMarket === 'Malta' ? prod.priceMalta : prod.priceTN;
-                                                    const totalQty = rec.qtyShift1 + rec.qtyShift2 + rec.qtyShift3;
-                                                    return ((totalQty / 1000) * price).toFixed(2);
-                                                })()}
-                                            </span>
-                                        </td>
-                                        <td className="px-5 py-4">
-                                            <p className="text-xs text-gray-500 max-w-[200px] truncate" title={rec.comment}>
-                                                {rec.comment || '---'}
-                                            </p>
-                                        </td>
-                                        <td className="px-5 py-4 text-right">
-                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button
-                                                    onClick={() => openEdit(rec)}
-                                                    className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                                >
-                                                    <Edit2 size={15} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(rec.id!)}
-                                                    className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                                                >
-                                                    <Trash2 size={15} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
+                {/* ── Summary Cards ── */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+                    <SummaryCard
+                        icon={<Activity size={20} className="text-blue-600" />}
+                        label="Total Records"
+                        value={filtered.length.toString()}
+                        bg="bg-blue-50"
+                    />
+                    <SummaryCard
+                        icon={<Target size={20} className="text-purple-600" />}
+                        label="Total Qty Produced"
+                        value={totalQty.toLocaleString()}
+                        bg="bg-purple-50"
+                    />
+                    <SummaryCard
+                        icon={<TrendingUp size={20} className={avgEff >= 80 ? 'text-emerald-600' : 'text-amber-600'} />}
+                        label="Avg Efficiency"
+                        value={`${avgEff.toFixed(1)}%`}
+                        bg={avgEff >= 80 ? 'bg-emerald-50' : 'bg-amber-50'}
+                    />
+                </div>
+
+                {/* ── Chart Section ── */}
+                {filtered.length > 0 && (
+                    <div className="p-6 bg-white border border-gray-100 shadow-sm rounded-2xl animate-in fade-in slide-in-from-bottom-4 duration-500 mt-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-sm font-bold text-gray-900">Production by Item</h3>
+                                <p className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold mt-1">Quantity Produced (Total Shifts)</p>
+                            </div>
+                            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-lg">
+                                <TrendingUp size={14} className="text-blue-600" />
+                                <span className="text-xs font-bold text-blue-700">Live Production Data</span>
+                            </div>
+                        </div>
+                        <div className="h-[250px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorQty" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1} />
+                                            <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                    <XAxis
+                                        dataKey="name"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fontSize: 10, fontWeight: 600, fill: '#94a3b8' }}
+                                        dy={10}
+                                    />
+                                    <YAxis
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fontSize: 10, fontWeight: 600, fill: '#94a3b8' }}
+                                    />
+                                    <Tooltip
+                                        contentStyle={{
+                                            borderRadius: '12px',
+                                            border: 'none',
+                                            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                                            fontSize: '12px',
+                                            fontWeight: '700'
+                                        }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="qty"
+                                        stroke="#2563eb"
+                                        strokeWidth={3}
+                                        fillOpacity={1}
+                                        fill="url(#colorQty)"
+                                        animationDuration={1500}
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Filters ── */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white border border-gray-100 shadow-sm rounded-2xl mt-6">
+                    <div className="flex items-center gap-4">
+                        <Calendar size={18} className="text-gray-400 flex-shrink-0" />
+                        <div className="flex items-center gap-2 flex-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Date</label>
+                            <input
+                                type="date"
+                                value={filterDate}
+                                onChange={e => setFilterDate(e.target.value)}
+                                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                            />
+                            {filterDate && (
+                                <button
+                                    onClick={() => setFilterDate('')}
+                                    className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                >
+                                    <X size={14} />
+                                </button>
                             )}
-                        </tbody>
-                        {filtered.length > 0 && (
-                            <tfoot className="sticky bottom-0 z-20 bg-white border-t-4 border-gray-100 font-bold shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
-                                <tr className="divide-x divide-gray-50">
-                                    <td colSpan={4} className="px-5 py-4 text-xs font-black text-gray-500 uppercase tracking-wider bg-gray-50/95 backdrop-blur-sm">Totals</td>
-                                    <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
-                                        {totals.targetQty.toLocaleString()}
-                                    </td>
-                                    <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
-                                        {totals.qty1.toLocaleString()}
-                                    </td>
-                                    <td className="px-5 py-4 text-center bg-gray-50/95 backdrop-blur-sm">
-                                        {effBadge(calcEfficiency(totals.qty1, totals.targetQty))}
-                                    </td>
-                                    <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
-                                        {totals.qty2.toLocaleString()}
-                                    </td>
-                                    <td className="px-5 py-4 text-center bg-gray-50/95 backdrop-blur-sm">
-                                        {effBadge(calcEfficiency(totals.qty2, totals.targetQty))}
-                                    </td>
-                                    <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
-                                        {totals.qty3.toLocaleString()}
-                                    </td>
-                                    <td className="px-5 py-4 text-center bg-gray-50/95 backdrop-blur-sm">
-                                        {effBadge(calcEfficiency(totals.qty3, totals.targetQty))}
-                                    </td>
-                                    <td className="px-5 py-4 text-center bg-gray-50/95 backdrop-blur-sm">
-                                        {/* TRS Total/Avg */}
-                                    </td>
-                                    <td className="px-5 py-4 text-center text-sm text-emerald-700 tabular-nums bg-emerald-50/50 backdrop-blur-sm">
-                                        {totals.priceTarget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td className="px-5 py-4 text-center text-sm text-blue-700 tabular-nums bg-blue-50/50 backdrop-blur-sm">
-                                        {totals.priceActual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </td>
-                                    <td colSpan={2} className="bg-gray-50/95 backdrop-blur-sm"></td>
-                                </tr>
-                            </tfoot>
-                        )}
-                    </table>
-                </div>
-
-                {/* ── Pagination Footer ── */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-8">
-                        <div className="flex flex-col">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Items</span>
-                            <span className="text-sm font-bold text-gray-700">{totalItems}</span>
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Selected Items</span>
-                            <span className="text-sm font-bold text-gray-700">0</span>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-3">
-                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Page Size:</span>
+                    <div className="flex items-center gap-4">
+                        <Monitor size={18} className="text-gray-400 flex-shrink-0" />
+                        <div className="flex items-center gap-2 flex-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Machine N°</label>
+                            <div className="relative w-full">
+                                <input
+                                    type="text"
+                                    placeholder="Machine No..."
+                                    value={filterMachine}
+                                    onChange={e => setFilterMachine(e.target.value)}
+                                    className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                                />
+                                {filterMachine && (
+                                    <button
+                                        onClick={() => setFilterMachine('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <Search size={18} className="text-gray-400 flex-shrink-0" />
+                        <div className="flex items-center gap-2 flex-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Item</label>
+                            <div className="relative w-full">
+                                <input
+                                    type="text"
+                                    placeholder="Search items..."
+                                    value={filterItem}
+                                    onChange={e => setFilterItem(e.target.value)}
+                                    className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                                />
+                                {filterItem && (
+                                    <button
+                                        onClick={() => setFilterItem('')}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-500 transition-colors"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <Target size={18} className="text-gray-400 flex-shrink-0" />
+                        <div className="flex items-center gap-2 flex-1">
+                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider whitespace-nowrap">Market</label>
                             <select
-                                value={pageSize}
-                                onChange={(e) => setPageSize(Number(e.target.value))}
-                                className="bg-white border border-gray-200 rounded-lg text-xs font-bold px-2 py-1.5 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                                value={filterMarket}
+                                onChange={e => setFilterMarket(e.target.value as any)}
+                                className="w-full px-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium"
                             >
-                                {[10, 25, 50, 100].map(sz => (
-                                    <option key={sz} value={sz}>{sz}</option>
-                                ))}
+                                <option value="">All Markets</option>
+                                <option value="TN">TN Price</option>
+                                <option value="Malta">Malta Price</option>
                             </select>
                         </div>
+                    </div>
+                </div>
 
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => setCurrentPage(1)}
-                                disabled={currentPage === 1}
-                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
-                            >
-                                <ChevronsLeft size={16} />
-                            </button>
-                            <button
-                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                                disabled={currentPage === 1}
-                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
+                {/* ── Table ── */}
+                <div className="bg-white border border-gray-100 shadow-xl shadow-gray-200/50 rounded-2xl overflow-hidden mt-6">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse min-w-[1000px]">
+                            <thead>
+                                <tr className="bg-gray-50/50 border-b border-gray-100">
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Date</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Mch N°</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Item</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Market</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Target Qty</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Shift 1 Qty</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Eff. S1</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Shift 2 Qty</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Eff. S2</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Shift 3 Qty</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Eff. S3</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">TRS</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Price Target</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Price Actual</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Comment</th>
+                                    <th className="px-5 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {loading ? (
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <tr key={i} className="animate-pulse">
+                                            <td colSpan={16} className="px-5 py-5">
+                                                <div className="h-4 bg-gray-100 rounded w-full" />
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : filtered.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={16} className="px-5 py-16 text-center">
+                                            <div className="inline-flex flex-col items-center">
+                                                <div className="p-4 bg-gray-50 rounded-full mb-3">
+                                                    <Activity size={28} className="text-gray-300" />
+                                                </div>
+                                                <p className="text-sm font-bold text-gray-900">No records found</p>
+                                                <p className="text-xs text-gray-400 mt-1">Click "Add Record" to get started.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    paginatedRecords.map(rec => (
+                                        <tr key={rec.id} className="hover:bg-blue-50/20 transition-colors group">
+                                            <td className="px-5 py-4 text-sm font-semibold text-gray-700">{rec.date}</td>
+                                            <td className="px-5 py-4">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-blue-50 text-black-700 text-xs font-bold">
+                                                    #{String(rec.machineNumber || '').trim() || '---'}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-4">
+                                                <span className="text-sm font-bold text-gray-900">{rec.item}</span>
+                                            </td>
+                                            <td className="px-5 py-4">
+                                                <span className={cn(
+                                                    "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                                                    rec.priceMarket === 'Malta' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                                                )}>
+                                                    {rec.priceMarket || 'TN'}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-4 text-center">
+                                                <span className="text-sm font-bold text-gray-700 tabular-nums">
+                                                    {rec.targetQty.toLocaleString()}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-4 text-center text-sm font-bold text-gray-700 tabular-nums">
+                                                {rec.qtyShift1.toLocaleString()}
+                                            </td>
+                                            <td className="px-5 py-4 text-center">{effBadge(rec.efficiencyShift1)}</td>
+                                            <td className="px-5 py-4 text-center text-sm font-bold text-gray-700 tabular-nums">
+                                                {rec.qtyShift2.toLocaleString()}
+                                            </td>
+                                            <td className="px-5 py-4 text-center">{effBadge(rec.efficiencyShift2)}</td>
+                                            <td className="px-5 py-4 text-center text-sm font-bold text-gray-700 tabular-nums">
+                                                {rec.qtyShift3.toLocaleString()}
+                                            </td>
+                                            <td className="px-5 py-4 text-center">{effBadge(rec.efficiencyShift3)}</td>
+                                            <td className="px-5 py-4 text-center">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold tabular-nums">
+                                                    {(rec.trs || 0).toLocaleString()}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-4 text-center">
+                                                <span className="text-sm font-bold text-emerald-600 tabular-nums">
+                                                    {(() => {
+                                                        const prod = products.find(p => p.item === rec.item);
+                                                        if (!prod) return '0.00';
+                                                        const price = rec.priceMarket === 'Malta' ? prod.priceMalta : prod.priceTN;
+                                                        return ((rec.targetQty / 1000) * price).toFixed(2);
+                                                    })()}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-4 text-center">
+                                                <span className="text-sm font-bold text-blue-600 tabular-nums">
+                                                    {(() => {
+                                                        const prod = products.find(p => p.item === rec.item);
+                                                        if (!prod) return '0.00';
+                                                        const price = rec.priceMarket === 'Malta' ? prod.priceMalta : prod.priceTN;
+                                                        const totalQty = rec.qtyShift1 + rec.qtyShift2 + rec.qtyShift3;
+                                                        return ((totalQty / 1000) * price).toFixed(2);
+                                                    })()}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-4">
+                                                <p className="text-xs text-gray-500 max-w-[200px] truncate" title={rec.comment}>
+                                                    {rec.comment || '---'}
+                                                </p>
+                                            </td>
+                                            <td className="px-5 py-4 text-right">
+                                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={() => openEdit(rec)}
+                                                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                                    >
+                                                        <Edit2 size={15} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(rec.id!)}
+                                                        className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                            {filtered.length > 0 && (
+                                <tfoot className="sticky bottom-0 z-20 bg-white border-t-4 border-gray-100 font-bold shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
+                                    <tr className="divide-x divide-gray-50">
+                                        <td colSpan={4} className="px-5 py-4 text-xs font-black text-gray-500 uppercase tracking-wider bg-gray-50/95 backdrop-blur-sm">Totals</td>
+                                        <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
+                                            {totals.targetQty.toLocaleString()}
+                                        </td>
+                                        <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
+                                            {totals.qty1.toLocaleString()}
+                                        </td>
+                                        <td className="px-5 py-4 bg-gray-50/95 backdrop-blur-sm" />
+                                        <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
+                                            {totals.qty2.toLocaleString()}
+                                        </td>
+                                        <td className="px-5 py-4 bg-gray-50/95 backdrop-blur-sm" />
+                                        <td className="px-5 py-4 text-center text-sm text-gray-900 tabular-nums bg-gray-50/95 backdrop-blur-sm">
+                                            {totals.qty3.toLocaleString()}
+                                        </td>
+                                        <td className="px-5 py-4 bg-gray-50/95 backdrop-blur-sm" />
+                                        <td className="px-5 py-4 bg-gray-50/95 backdrop-blur-sm" />
+                                        <td className="px-5 py-4 text-center text-sm text-emerald-600 tabular-nums bg-gray-50/95 backdrop-blur-sm">
+                                            {totals.priceTarget.toFixed(2)}
+                                        </td>
+                                        <td className="px-5 py-4 text-center text-sm text-blue-600 tabular-nums bg-gray-50/95 backdrop-blur-sm">
+                                            {totals.priceActual.toFixed(2)}
+                                        </td>
+                                        <td colSpan={2} className="px-5 py-4 bg-gray-50/95 backdrop-blur-sm" />
+                                    </tr>
+                                </tfoot>
+                            )}
+                        </table>
+                    </div>
 
-                            <div className="flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-lg">
-                                <span className="text-xs font-bold text-blue-600">{currentPage}</span>
-                                <span className="mx-2 text-gray-300 text-xs">/</span>
-                                <span className="text-xs font-bold text-gray-400">{totalPages || 1}</span>
+                    {/* ── Pagination Footer ── */}
+                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-8">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Items</span>
+                                <span className="text-sm font-bold text-gray-700">{totalItems}</span>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Selected Items</span>
+                                <span className="text-sm font-bold text-gray-700">0</span>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Page Size:</span>
+                                <select
+                                    value={pageSize}
+                                    onChange={(e) => setPageSize(Number(e.target.value))}
+                                    className="bg-white border border-gray-200 rounded-lg text-xs font-bold px-2 py-1.5 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                                >
+                                    {[10, 25, 50, 100].map(sz => (
+                                        <option key={sz} value={sz}>{sz}</option>
+                                    ))}
+                                </select>
                             </div>
 
-                            <button
-                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                                disabled={currentPage === totalPages || totalPages === 0}
-                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
-                            >
-                                <ChevronRight size={16} />
-                            </button>
-                            <button
-                                onClick={() => setCurrentPage(totalPages)}
-                                disabled={currentPage === totalPages || totalPages === 0}
-                                className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
-                            >
-                                <ChevronsRight size={16} />
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setCurrentPage(1)}
+                                    disabled={currentPage === 1}
+                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                                >
+                                    <ChevronsLeft size={16} />
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+
+                                <div className="flex items-center px-3 py-1.5 bg-white border border-gray-200 rounded-lg">
+                                    <span className="text-xs font-bold text-blue-600">{currentPage}</span>
+                                    <span className="mx-2 text-gray-300 text-xs">/</span>
+                                    <span className="text-xs font-bold text-gray-400">{totalPages || 1}</span>
+                                </div>
+
+                                <button
+                                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                                <button
+                                    onClick={() => setCurrentPage(totalPages)}
+                                    disabled={currentPage === totalPages || totalPages === 0}
+                                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-white rounded-lg transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                                >
+                                    <ChevronsRight size={16} />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* ── Modal ── */}
+            {/* ── Form View Overlay ── */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-in fade-in slide-in-from-bottom-4 duration-200">
-                        {/* Modal Header */}
-                        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
-                            <h2 className="text-lg font-bold text-gray-900">
-                                {editingRecord ? 'Edit Record' : 'New Rendement Record'}
-                            </h2>
-                            <button
-                                onClick={() => setIsModalOpen(false)}
-                                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                            >
-                                <X size={18} />
-                            </button>
+                <div className="absolute inset-x-0 top-0 z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">
+                                {editingRecord ? 'Edit Rendement Record' : 'New Rendement Record'}
+                            </h1>
+                            <p className="text-gray-500">Fill in the details below to save the rendement record.</p>
                         </div>
+                        <button
+                            onClick={() => setIsModalOpen(false)}
+                            className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-inter"
+                        >
+                            Back to List
+                        </button>
+                    </div>
 
-                        <form onSubmit={handleSave} className="px-6 py-5 space-y-5 overflow-y-auto max-h-[80vh]">
+                    <div className="bg-white/90 backdrop-blur-2xl border border-white/20 shadow-2xl rounded-2xl p-8">
+                        <form onSubmit={handleSave} className="space-y-5">
                             {/* Date + Machine */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -1083,7 +1233,7 @@ export default function MachineRendement() {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all"
+                                    className="flex items-center gap-2 px-6 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
                                 >
                                     <Save size={15} />
                                     {editingRecord ? 'Update' : 'Save'}
