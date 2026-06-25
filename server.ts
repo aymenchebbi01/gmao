@@ -20,7 +20,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 5033;
 const JWT_SECRET = process.env.JWT_SECRET || 'gmao-pro-secret-key-2026';
 
 // Ensure uploads directory exists
@@ -437,11 +437,11 @@ app.put('/api/machines/:id', (req, res) => {
     if (machine.injectingProduct !== undefined || machine.currentMoule !== undefined) {
       const newProduct = machine.injectingProduct !== undefined ? machine.injectingProduct : (oldMachine ? oldMachine.injectingProduct : undefined);
       const newMoule = machine.currentMoule !== undefined ? machine.currentMoule : (oldMachine ? oldMachine.currentMoule : undefined);
-      
+
       if (oldMachine && (oldMachine.injectingProduct !== newProduct || oldMachine.currentMoule !== newMoule)) {
         // End the previous history entry
         db.prepare('UPDATE machine_production_history SET endDate = ? WHERE machineId = ? AND endDate IS NULL').run(new Date().toISOString(), id);
-        
+
         // Start a new history entry
         db.prepare(`
           INSERT INTO machine_production_history (machineId, productName, mouleName, startDate)
@@ -706,6 +706,10 @@ app.delete('/api/machine-production-history/:id', (req, res) => {
 
 app.delete('/api/machines', (req, res) => {
   try {
+    const { isAdmin } = getCallerIdentity(req);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
     db.prepare('DELETE FROM machines').run();
     db.prepare('DELETE FROM machine_production_history').run();
     const { userId: dMUserId, userName: dMUserName } = getCallerIdentity(req);
@@ -718,6 +722,10 @@ app.delete('/api/machines', (req, res) => {
 
 app.delete('/api/machines/:id', (req, res) => {
   try {
+    const { isAdmin } = getCallerIdentity(req);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
     const { id } = req.params;
     const oldMachine = db.prepare('SELECT * FROM machines WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM machines WHERE id = ?').run(id);
@@ -725,6 +733,44 @@ app.delete('/api/machines/:id', (req, res) => {
     const { userId: dMUserId, userName: dMUserName } = getCallerIdentity(req);
     logAction(dMUserId, dMUserName, 'Delete', 'Machine', id, `Deleted Machine "${entityName}"`);
     res.json({ message: 'Machine deleted' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Interventions
+app.get('/api/interventions', (req, res) => {
+  const { from, to } = req.query;
+  try {
+    if (!from || !to) {
+      return res.status(400).json({ error: "Missing 'from' or 'to' parameters" });
+    }
+    const rows = db.prepare(`
+      SELECT 
+        w.id,
+        w.type,
+        w.machineId,
+        m.name AS machineName,
+        w.assignedTo AS technicianId,
+        u.displayName AS technicianName,
+        COALESCE(w.date, w.createdAt) AS scheduledAt,
+        w.completedAt,
+        w.status,
+        w.id AS woId
+      FROM work_orders w
+      LEFT JOIN machines m ON w.machineId = m.id
+      LEFT JOIN users u ON w.assignedTo = u.uid
+    `).all() as any[];
+
+    const filtered = rows.filter(row => {
+      const sched = row.scheduledAt ? row.scheduledAt.substring(0, 10) : '';
+      const compl = row.completedAt ? row.completedAt.substring(0, 10) : '';
+      const isSchedInRange = sched && sched >= from && sched <= to;
+      const isComplInRange = compl && compl >= from && compl <= to;
+      return isSchedInRange || isComplInRange;
+    });
+
+    res.json(filtered);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -846,6 +892,10 @@ app.put('/api/work-orders/:id', (req, res) => {
 
 app.delete('/api/work-orders/:id', (req, res) => {
   try {
+    const { isAdmin } = getCallerIdentity(req);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
     const { id } = req.params;
     const oldWorkOrder = db.prepare('SELECT * FROM work_orders WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM work_orders WHERE id = ?').run(id);
@@ -977,6 +1027,10 @@ app.put('/api/spare-parts/:id', (req, res) => {
 
 app.delete('/api/spare-parts/:id', (req, res) => {
   try {
+    const { isAdmin } = getCallerIdentity(req);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
     const { id } = req.params;
     const oldPart = db.prepare('SELECT * FROM spare_parts WHERE id = ?').get(id) as any;
     db.prepare('DELETE FROM spare_parts WHERE id = ?').run(id);
@@ -1025,6 +1079,10 @@ app.put('/api/users/:uid', (req, res) => {
 
 app.delete('/api/users/:uid', (req, res) => {
   try {
+    const { isAdmin } = getCallerIdentity(req);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
     const { uid } = req.params;
     const oldUser = db.prepare('SELECT * FROM users WHERE uid = ?').get(uid) as any;
     db.prepare('DELETE FROM users WHERE uid = ?').run(uid);
@@ -1387,7 +1445,7 @@ app.get('/api/backups/download', async (_req, res) => {
     const stream = fs.createReadStream(tmpPath);
     stream.pipe(res);
     stream.on('close', () => {
-      try { fs.unlinkSync(tmpPath); } catch (_) {}
+      try { fs.unlinkSync(tmpPath); } catch (_) { }
     });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -1424,8 +1482,8 @@ app.post('/api/backups/restore/:filename', async (req, res) => {
     // 2. Close current connection, swap the file, delete stale WAL
     (db as any).close();
     fs.copyFileSync(srcPath, DB_PATH);
-    try { fs.unlinkSync(DB_PATH + '-wal'); } catch (_) {}
-    try { fs.unlinkSync(DB_PATH + '-shm'); } catch (_) {}
+    try { fs.unlinkSync(DB_PATH + '-wal'); } catch (_) { }
+    try { fs.unlinkSync(DB_PATH + '-shm'); } catch (_) { }
     // 3. Hot-reload the DB connection — no process restart needed
     reloadDb();
     console.log(`✅ [Backup] Restored from ${filename}.`);
@@ -1457,8 +1515,8 @@ app.post('/api/backups/restore-upload', backupUpload.single('dbfile'), async (re
     // Close, swap, clean WAL, hot-reload
     (db as any).close();
     fs.copyFileSync(uploadedPath, DB_PATH);
-    try { fs.unlinkSync(DB_PATH + '-wal'); } catch (_) {}
-    try { fs.unlinkSync(DB_PATH + '-shm'); } catch (_) {}
+    try { fs.unlinkSync(DB_PATH + '-wal'); } catch (_) { }
+    try { fs.unlinkSync(DB_PATH + '-shm'); } catch (_) { }
     reloadDb();
     console.log(`✅ [Backup] Restored from uploaded file.`);
     res.json({ message: 'Restauration depuis le fichier uploadé effectuée avec succès.', safety: safetyName });
@@ -1508,7 +1566,7 @@ app.post('/api/calendar-events', (req, res) => {
           userId = decoded.uid;
           userName = decoded.displayName || decoded.username || 'User';
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     logAction(userId, userName, 'Create', 'CalendarEvent', event.id, `Created Calendar Event "${event.title}"`);
     res.status(201).json(event);
@@ -1544,7 +1602,7 @@ app.put('/api/calendar-events/:id', (req, res) => {
           userId = decoded.uid;
           userName = decoded.displayName || decoded.username || 'User';
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     logAction(userId, userName, 'Update', 'CalendarEvent', id, `Updated Calendar Event "${updates.title || oldEvent.title}"`);
     res.json({ message: 'Calendar event updated' });
@@ -1569,7 +1627,7 @@ app.delete('/api/calendar-events/:id', (req, res) => {
           userId = decoded.uid;
           userName = decoded.displayName || decoded.username || 'User';
         }
-      } catch (e) {}
+      } catch (e) { }
     }
     const entityName = oldEvent ? oldEvent.title : id;
     logAction(userId, userName, 'Delete', 'CalendarEvent', id, `Deleted Calendar Event "${entityName}"`);

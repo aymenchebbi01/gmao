@@ -109,7 +109,7 @@ function AppContent() {
       case 'intervention-reports': return <WorkOrderList view="reports" />;
       case 'inventory': return <Inventory />;
       case 'purchase-requests': return isManager ? <PurchaseRequests /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
-      case 'calendar': return <MaintenanceCalendar />;
+      case 'calendar': return <MaintenanceCalendar setActiveTab={setActiveTab} />;
       case 'audit-logs': return isAdmin ? <AuditLogList /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
       case 'analytics': return <AdvancedAnalytics />;
       case 'users': return isManager ? <UserManagement /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;

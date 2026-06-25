@@ -102,6 +102,10 @@ export const api = {
     const res = await fetch(`${API_BASE}/work-orders`);
     return handleResponse(res);
   },
+  getInterventions: async (from: string, to: string): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/interventions?from=${from}&to=${to}`);
+    return handleResponse(res);
+  },
   createWorkOrder: async (workOrder: WorkOrder): Promise<void> => {
     const res = await fetch(`${API_BASE}/work-orders`, {
       method: 'POST',

@@ -32,6 +32,8 @@ import { api } from '../services/api';
 import { exportToCSV } from '../lib/exportUtils';
 import { format } from 'date-fns';
 import TableFooter from './ui/TableFooter';
+import { useGmaoStore } from '../store/gmaoStore';
+import { useAuth } from '../contexts/AuthContext';
 
 interface MachineListProps {
   historyMachineId?: string | null;
@@ -39,6 +41,7 @@ interface MachineListProps {
 }
 
 export default function MachineList({ historyMachineId, onHistoryClose }: MachineListProps = {}) {
+  const { isAdmin } = useAuth();
   const [machines, setMachines] = useState<Machine[]>([]);
   const prevStatuses = useRef<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -115,6 +118,8 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
     description: ''
   });
 
+  const { setMachineStatuses, setMachineHours: setMachineHoursStore, updateMachineHour } = useGmaoStore.getState();
+
   const fetchMachines = async (showToast = false) => {
     if (showToast) setRefreshing(true);
     try {
@@ -139,6 +144,9 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
       });
 
       setMachines(items);
+      // Propagate to global store so Dashboard updates reactively
+      setMachineStatuses(items);
+      setMachineHoursStore(items);
       if (showToast) toast.success('Machine list refreshed');
     } catch (error) {
       console.error("Error fetching machines:", error);
@@ -181,8 +189,11 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
       }
 
       await api.updateMachine(selectedMachine.id, updateData);
+      // Update store immediately so Dashboard PM panel reacts without waiting for poll
+      updateMachineHour(selectedMachine.id, newHours);
       toast.success('Operational hours updated');
       setIsHoursModalOpen(false);
+      fetchMachines();
     } catch (error) {
       console.error("Error updating hours:", error);
       toast.error('Failed to update hours');
@@ -234,12 +245,16 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
               finalUpdateData.failureCount = (oldMachine.failureCount || 0) + 1;
             }
           } else if (oldMachine.status === 'operational' && formData.status === 'operational') {
-            // Staying operational - update base hours to current live hours and reset start time
+            // Staying operational - use whichever is greater: auto live hours or user-entered value
             const liveHours = calculateLiveHours(oldMachine);
-            finalUpdateData.currentHours = liveHours;
+            // BUG FIX: if user manually entered a higher value in the form, honour it
+            const resolvedHours = formData.currentHours > liveHours ? formData.currentHours : liveHours;
+            finalUpdateData.currentHours = resolvedHours;
             finalUpdateData.operationalStartTime = new Date().toISOString();
-            finalUpdateData.totalOperatingTime = (oldMachine.totalOperatingTime || 0) + (liveHours - oldMachine.currentHours) * 60;
+            finalUpdateData.totalOperatingTime = (oldMachine.totalOperatingTime || 0) + (resolvedHours - oldMachine.currentHours) * 60;
             finalUpdateData.lastHoursUpdate = new Date().toISOString();
+            // Propagate to store immediately
+            updateMachineHour(id, resolvedHours);
           } else if (oldMachine.status === 'down' && formData.status !== 'down') {
             // Leaving down state
             if (oldMachine.lastHoursUpdate) {
@@ -439,7 +454,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
             >
               <RotateCw size={18} />
             </button>
-            {machines.length > 0 && (
+            {machines.length > 0 && isAdmin && (
               <button
                 onClick={handleClearAllMachines}
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-all"
@@ -660,13 +675,15 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                         >
                           <Edit2 size={18} />
                         </button>
-                        <button
-                          onClick={() => handleDeleteMachine(item.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                          title="Delete"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeleteMachine(item.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

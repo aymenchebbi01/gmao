@@ -320,13 +320,15 @@ export default function UserManagement() {
                       >
                         <Edit2 size={18} />
                       </button>
-                      <button
-                        onClick={() => handleDeleteUser(u.uid)}
-                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDeleteUser(u.uid)}
+                          className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

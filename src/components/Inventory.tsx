@@ -25,8 +25,10 @@ import { api } from '../services/api';
 import { exportToCSV } from '../lib/exportUtils';
 import { format } from 'date-fns';
 import TableFooter from './ui/TableFooter';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Inventory() {
+  const { isAdmin } = useAuth();
   const [parts, setParts] = useState<SparePart[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -296,13 +298,15 @@ export default function Inventory() {
                         >
                           <Edit2 size={18} />
                         </button>
-                        <button
-                          onClick={() => handleDeletePart(part.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDeletePart(part.id)}
+                            className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

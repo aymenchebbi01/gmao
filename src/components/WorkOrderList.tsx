@@ -36,7 +36,7 @@ interface WorkOrderListProps {
 }
 
 export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [faultTypes, setFaultTypes] = useState<FaultType[]>([]);
@@ -1039,13 +1039,15 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                             >
                               <Edit2 size={18} />
                             </button>
-                            <button
-                              onClick={() => handleDeleteWorkOrder(order.id)}
-                              className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                              title="Delete Report"
-                            >
-                              <Trash2 size={18} />
-                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => handleDeleteWorkOrder(order.id)}
+                                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                title="Delete Report"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            )}
                           </>
                         ) : (
                           <>
@@ -1090,13 +1092,15 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                             >
                               <Edit2 size={18} />
                             </button>
-                            <button
-                              onClick={() => handleDeleteWorkOrder(order.id)}
-                              className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 size={18} />
-                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => handleDeleteWorkOrder(order.id)}
+                                className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            )}
                           </>
                         )}
                       </div>

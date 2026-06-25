@@ -1,2 +1,28 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
+
+:root {
+  --color-background-primary: #ffffff;
+  --color-background-secondary: #f8f9fb;
+  --color-background-tertiary: #f1f3f6;
+  --color-border-primary: #d1d5db;
+  --color-border-secondary: #e5e7eb;
+  --color-border-tertiary: #e9eaec;
+  --color-text-primary: #111827;
+  --color-text-secondary: #6b7280;
+  --color-text-muted: #9ca3af;
+  --accent-blue: #378ADD;
+  --accent-teal: #1D9E75;
+  --accent-red: #E24B4A;
+  --accent-amber: #EF9F27;
+  --accent-gray: #9ca3af;
+}
+
+/* Dashboard-specific keyframes */
+@keyframes dash-highlight {
+  0%   { background-color: #fefce8; }
+  100% { background-color: transparent; }
+}
+.dash-new-item {
+  animation: dash-highlight 2.5s ease-out forwards;
+}
