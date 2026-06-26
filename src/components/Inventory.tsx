@@ -159,7 +159,7 @@ export default function Inventory() {
       )}>
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Stock Management</h1>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -198,7 +198,7 @@ export default function Inventory() {
               className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Part
+              Add New Part
             </button>
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function Inventory() {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 mt-6">
           <div className="p-6 bg-white border border-gray-100 rounded-2xl shadow-sm">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-500">Total Items</p>
+              <p className="text-sm font-medium text-gray-500">Total Components</p>
               <Package className="text-blue-500" size={20} />
             </div>
             <p className="text-2xl font-bold text-gray-900">{parts.length}</p>
@@ -331,7 +331,6 @@ export default function Inventory() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{isEditMode ? "Edit Spare Part" : "Add New Spare Part"}</h1>
-              <p className="text-gray-500">Fill in the details below to {isEditMode ? "update" : "register"} the part.</p>
             </div>
             <button
               onClick={() => {
@@ -359,13 +358,13 @@ export default function Inventory() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Référence / Part Number</label>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Référence</label>
                   <div className="relative">
                     <Tag className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                     <input
                       type="text"
                       required
-                      placeholder="SKU-12345"
+                      placeholder="Ref-12345"
                       className="w-full pl-10 pr-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                       value={formData.sku}
                       onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
@@ -448,7 +447,7 @@ export default function Inventory() {
                   disabled={loading}
                   className="flex-1 px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-lg shadow-blue-500/20"
                 >
-                  {loading ? (isEditMode ? 'Saving...' : 'Adding...') : (isEditMode ? 'Save Changes' : 'Add Part')}
+                  {loading ? (isEditMode ? 'Saving...' : 'Adding...') : (isEditMode ? 'Save Changes' : 'Save')}
                 </button>
               </div>
             </form>

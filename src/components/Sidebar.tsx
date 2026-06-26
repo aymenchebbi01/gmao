@@ -100,7 +100,7 @@ export default function Sidebar({
       icon: Package,
       roles: ['admin', 'manager'],
       subItems: [
-        { id: 'inventory', label: 'Inventory' },
+        { id: 'inventory', label: 'Stock' },
         { id: 'purchase-requests', label: 'Demande d\'Achat' },
         { id: 'products', label: 'Items Data' }
       ]

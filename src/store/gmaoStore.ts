@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -9,7 +9,9 @@ export type NotificationType =
   | 'machine_maintenance'
   | 'pm_warning'
   | 'wo_completed'
-  | 'hours_updated';
+  | 'hours_updated'
+  | 'wo_created'
+  | 'inventory_alert';
 
 export interface DashboardNotification {
   id: string;

@@ -14,11 +14,11 @@ import { useGmaoStore } from '../store/gmaoStore';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
-  blue:  '#378ADD',
-  teal:  '#1D9E75',
-  red:   '#E24B4A',
+  blue: '#378ADD',
+  teal: '#1D9E75',
+  red: '#E24B4A',
   amber: '#EF9F27',
-  gray:  '#9ca3af',
+  gray: '#9ca3af',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ function last7DaysBuckets() {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
-    return { name: DAYS_SHORT[d.getDay()], date: d.toISOString().split('T')[0], corrective: 0, preventive: 0, emergency: 0 };
+    return { name: DAYS_SHORT[d.getDay()], date: d.toISOString().split('T')[0], corrective: 0, preventive: 0 };
   });
 }
 
@@ -36,7 +36,7 @@ function last30DaysBuckets() {
   return Array.from({ length: 30 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (29 - i));
-    return { name: d.toLocaleDateString('en', { month: 'short', day: 'numeric' }), date: d.toISOString().split('T')[0], corrective: 0, preventive: 0, emergency: 0 };
+    return { name: d.toLocaleDateString('en', { month: 'short', day: 'numeric' }), date: d.toISOString().split('T')[0], corrective: 0, preventive: 0 };
   });
 }
 
@@ -47,7 +47,6 @@ function bucketOrders(orders: WorkOrder[], buckets: ReturnType<typeof last7DaysB
     const date = new Date(o.createdAt).toISOString().split('T')[0];
     const slot = b.find(d => d.date === date);
     if (!slot) return;
-    if (o.priority === 'critical') slot.emergency++;
     else if (o.type === 'preventive') slot.preventive++;
     else slot.corrective++;
   });
@@ -201,59 +200,79 @@ function ChartTooltip({ active, payload, label }: any) {
 // ─── Audit log → human-readable notification helper ─────────────────────────
 function parseAuditLog(
   log: AuditLog,
-  machineMap: Record<string, string> // id → name
-): { type: string; title: string; message: string } {
+  machineMap: Record<string, string>, // id → name
+  sparePartsMap: Map<string, any>
+): { type: string; title: string; message: string } | null {
+  const entityType = (log.entityType || '').toLowerCase();
   const action = (log.action || '').toLowerCase();
   const details = (log.details || '');
-  const entityName = machineMap[log.entityId] || log.entityId;
 
-  // Detect type from action verb and details content
-  const isDown = action.includes('down') || /status[^:]*:\s*down/i.test(details) || /["']?status["']?\s*changed.+down/i.test(details);
-  const isMaint = action.includes('maintenance') || /status[^:]*:\s*maintenance/i.test(details);
-  const isCompleted = action.includes('complet');
-  const isHours = action.includes('hour') || /nextMaintenanceHours|currentHours/i.test(details);
-  const isStatusChange = /status.*changed|changed.*status/i.test(details) || action.includes('status');
-
-  let type = 'hours_updated';
-  if (isDown) type = 'machine_down';
-  else if (isMaint) type = 'machine_maintenance';
-  else if (isCompleted) type = 'wo_completed';
-  else if (isHours) type = 'hours_updated';
-
-  // Build human-readable message
-  let message = '';
-
-  // Try to parse "field changed from 'X' to 'Y'" patterns
-  const hoursMatch = details.match(/nextMaintenanceHours.*from\s*['"]?([\d.]+)['"]?\s*to\s*['"]?([\d.]+)['"]?/i);
-  const statusMatch = details.match(/status.*from\s*['"]?(\w+)['"]?\s*to\s*['"]?(\w+)['"]?/i);
-  const currentHrsMatch = details.match(/currentHours.*from\s*['"]?([\d.]+)['"]?\s*to\s*['"]?([\d.]+)['"]?/i);
-
-  if (hoursMatch) {
-    message = `Next PM updated to ${Math.round(parseFloat(hoursMatch[2]))}h`;
-    type = 'hours_updated';
-  } else if (currentHrsMatch) {
-    message = `Operational hours set to ${Math.round(parseFloat(currentHrsMatch[2]))}h`;
-    type = 'hours_updated';
-  } else if (statusMatch) {
-    const toStatus = statusMatch[2];
-    if (toStatus === 'down') { type = 'machine_down'; message = 'Machine went down'; }
-    else if (toStatus === 'maintenance') { type = 'machine_maintenance'; message = 'Placed in maintenance'; }
-    else if (toStatus === 'operational') { type = 'wo_completed'; message = 'Returned to operational'; }
-    else message = `Status changed to ${toStatus}`;
-  } else if (isCompleted) {
-    message = 'Work order completed';
-    type = 'wo_completed';
-  } else {
-    // Fallback: strip raw ID-like tokens, truncate to 60 chars
-    message = details
-      .replace(/MACH-\d+/g, entityName)
-      .replace(/from\s*['"][^'"]{20,}['"]/g, '') // drop long raw values
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 72) || log.action;
+  // 1. Work Order Creation
+  if (entityType === 'workorder' && action === 'create') {
+    const title = 'Work Order';
+    let message = details;
+    const woMatch = details.match(/(WO-\d{4}-\d+)/);
+    if (woMatch) {
+      message = `Work order created: ${woMatch[1]}`;
+    }
+    return { type: 'wo_created', title, message };
   }
 
-  return { type, title: entityName, message };
+  // 2. Inventory alerts (low stock)
+  if (entityType === 'sparepart' || entityType === 'spare-part') {
+    if (action !== 'delete') {
+      const part = sparePartsMap.get(log.entityId);
+      if (part && part.stock <= part.minStock) {
+        return {
+          type: 'inventory_alert',
+          title: part.name,
+          message: `Low stock alert: ${part.stock} ${part.unit || 'units'} left (min: ${part.minStock})`
+        };
+      }
+    }
+  }
+
+  // 3. Machine status changes
+  if (entityType === 'machine') {
+    const isStatusChange = action.includes('status') || details.includes("'status'") || details.includes('status changed') || action === 'change_status';
+    if (isStatusChange) {
+      const entityName = machineMap[log.entityId] || log.entityId;
+      const statusMatch = details.match(/status.*from\s*['"]?(\w+)['"]?\s*to\s*['"]?(\w+)['"]?/i);
+      
+      let type = 'hours_updated';
+      let message = details;
+
+      if (statusMatch) {
+        const toStatus = statusMatch[2];
+        if (toStatus === 'down') {
+          type = 'machine_down';
+          message = 'Machine went down';
+        } else if (toStatus === 'maintenance') {
+          type = 'machine_maintenance';
+          message = 'Placed in maintenance';
+        } else if (toStatus === 'operational') {
+          type = 'wo_completed';
+          message = 'Returned to operational';
+        } else {
+          message = `Status changed to ${toStatus}`;
+        }
+      } else {
+        if (details.toLowerCase().includes('down')) {
+          type = 'machine_down';
+          message = 'Machine went down';
+        } else if (details.toLowerCase().includes('maintenance')) {
+          type = 'machine_maintenance';
+          message = 'Placed in maintenance';
+        } else if (details.toLowerCase().includes('operational')) {
+          type = 'wo_completed';
+          message = 'Returned to operational';
+        }
+      }
+      return { type, title: entityName, message };
+    }
+  }
+
+  return null;
 }
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
@@ -326,28 +345,54 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
   // Poll audit log → derive human-readable notifications
   const pollAuditLog = useCallback(async () => {
     try {
-      const logs: AuditLog[] = await api.getAuditLogs();
+      const [logs, spareParts] = await Promise.all([
+        api.getAuditLogs(),
+        api.getSpareParts()
+      ]);
       if (!logs.length) return;
 
-      const newOnes = lastAuditIdRef.current
-        ? logs.filter(l => l.id > lastAuditIdRef.current!)
-        : logs.slice(0, 10);
+      const nameMap = machineNameMapRef.current;
+      const sparePartsMap = new Map(spareParts.map(p => [p.id, p]));
 
-      lastAuditIdRef.current = logs[0]?.id ?? null;
+      // Parse and filter the logs
+      const parsedLogs = logs
+        .map(log => {
+          const parsed = parseAuditLog(log, nameMap, sparePartsMap);
+          if (!parsed) return null;
+          return {
+            logId: log.id,
+            notif: {
+              type: parsed.type as any,
+              machineId: log.entityId,
+              machineName: parsed.title,
+              message: parsed.message,
+              timestamp: log.createdAt,
+            }
+          };
+        })
+        .filter((n): n is Exclude<typeof n, null> => n !== null);
+
+      const newOnes = lastAuditIdRef.current
+        ? parsedLogs.filter(l => Number(l.logId) > Number(lastAuditIdRef.current!))
+        : parsedLogs.slice(0, 10);
+
+      lastAuditIdRef.current = String(logs[0]?.id ?? '');
 
       if (newOnes.length > 0) {
-        const nameMap = machineNameMapRef.current;
-        const mapped = newOnes.map(log => {
-          const { type, title, message } = parseAuditLog(log, nameMap);
-          return {
-            type: type as any,
-            machineId: log.entityId,
-            machineName: title,
-            message,
-            timestamp: log.createdAt,
-          };
-        });
-        prependNotifications(mapped);
+        // Filter out any notifications that already exist in store (by machineName/message/timestamp)
+        const existing = useGmaoStore.getState().notifications;
+        const filteredNewOnes = newOnes
+          .map(o => o.notif)
+          .filter(n => {
+            return !existing.some(ext => 
+              ext.machineName === n.machineName && 
+              ext.message === n.message && 
+              ext.timestamp === n.timestamp
+            );
+          });
+        if (filteredNewOnes.length > 0) {
+          prependNotifications(filteredNewOnes);
+        }
       }
     } catch (e) { /* silent */ }
   }, [prependNotifications]);
@@ -512,7 +557,6 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--color-background-tertiary)' }} />
                 <Bar dataKey="corrective" fill={C.blue} radius={[3, 3, 0, 0]} maxBarSize={16} />
                 <Bar dataKey="preventive" fill={C.teal} radius={[3, 3, 0, 0]} maxBarSize={16} />
-                <Bar dataKey="emergency" fill={C.red} radius={[3, 3, 0, 0]} maxBarSize={16} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -521,7 +565,6 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
             {[
               { label: 'Corrective', color: C.blue },
               { label: 'Preventive', color: C.teal },
-              { label: 'Emergency', color: C.red },
             ].map(l => (
               <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color: 'var(--color-text-secondary)' }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: l.color }} />
@@ -693,7 +736,13 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
               <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 12, color: 'var(--color-text-muted)' }}>No notifications</div>
             )}
             {notifications.slice(0, 10).map(n => (
-              <NotifItem key={n.id} n={n} onCreateWO={() => setActiveTab('work-orders-list')} onSchedulePM={() => setActiveTab('calendar')} />
+              <NotifItem
+                key={n.id}
+                n={n}
+                onCreateWO={() => setActiveTab('work-orders-list')}
+                onSchedulePM={() => setActiveTab('calendar')}
+                onGoToPurchaseRequests={() => setActiveTab('purchase-requests')}
+              />
             ))}
           </div>
         </div>
@@ -751,12 +800,12 @@ function AlertBanner({ severity, machines, onDismiss, onNavigate }: {
           </button>
         ))}
       </div>
-      <button
+      {/*<button
         onClick={onNavigate}
         style={{ fontSize: 11, fontWeight: 500, color: textColor, background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}
       >
         View all
-      </button>
+      </button>*/}
       <button onClick={onDismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: accentColor, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
         <X size={14} />
       </button>
@@ -777,10 +826,10 @@ function WoBadge({ label, color }: { label: string; color: string }) {
 
 function PriorityPill({ priority }: { priority: string }) {
   const cfg: Record<string, { bg: string; color: string }> = {
-    high:     { bg: '#FAD5D5', color: '#9B2020' },
+    high: { bg: '#FAD5D5', color: '#9B2020' },
     critical: { bg: '#FAD5D5', color: '#9B2020' },
-    medium:   { bg: '#FAEEDA', color: '#8B5A00' },
-    low:      { bg: '#D5F5E3', color: '#1A7A40' },
+    medium: { bg: '#FAEEDA', color: '#8B5A00' },
+    low: { bg: '#D5F5E3', color: '#1A7A40' },
   };
   const c = cfg[priority] || { bg: '#f3f4f6', color: '#6b7280' };
   return (
@@ -801,21 +850,28 @@ function StatusDot({ status }: { status: string }) {
 }
 
 // ─── Notification item ────────────────────────────────────────────────────────
-function NotifItem({ n, onCreateWO, onSchedulePM }: { n: any; onCreateWO: () => void; onSchedulePM: () => void }) {
+function NotifItem({ n, onCreateWO, onSchedulePM, onGoToPurchaseRequests }: {
+  n: any;
+  onCreateWO: () => void;
+  onSchedulePM: () => void;
+  onGoToPurchaseRequests: () => void;
+}) {
   const isUnread = !n.read;
   const isCritical = n.type === 'machine_down';
-  const isWarning = n.type === 'machine_maintenance' || n.type === 'pm_warning';
+  const isWarning = n.type === 'machine_maintenance' || n.type === 'pm_warning' || n.type === 'inventory_alert';
 
   let borderColor = 'transparent';
   if (isUnread && isCritical) borderColor = C.red;
   if (isUnread && isWarning) borderColor = C.amber;
 
   const iconCfg: Record<string, { bg: string; color: string; icon: React.ReactNode }> = {
-    machine_down:        { bg: C.red + '20',   color: C.red,   icon: <AlertCircle size={13} /> },
+    machine_down: { bg: C.red + '20', color: C.red, icon: <AlertCircle size={13} /> },
     machine_maintenance: { bg: C.amber + '20', color: C.amber, icon: <Clock size={13} /> },
-    pm_warning:          { bg: C.amber + '20', color: C.amber, icon: <Clock size={13} /> },
-    wo_completed:        { bg: C.teal + '20',  color: C.teal,  icon: <CheckCircle2 size={13} /> },
-    hours_updated:       { bg: C.blue + '20',  color: C.blue,  icon: <Edit2 size={13} /> },
+    pm_warning: { bg: C.amber + '20', color: C.amber, icon: <Clock size={13} /> },
+    wo_completed: { bg: C.teal + '20', color: C.teal, icon: <CheckCircle2 size={13} /> },
+    hours_updated: { bg: C.blue + '20', color: C.blue, icon: <Edit2 size={13} /> },
+    wo_created: { bg: C.blue + '20', color: C.blue, icon: <Clipboard size={13} /> },
+    inventory_alert: { bg: C.amber + '20', color: C.amber, icon: <AlertTriangle size={13} /> },
   };
   const ic = iconCfg[n.type] || iconCfg.hours_updated;
 
@@ -844,9 +900,14 @@ function NotifItem({ n, onCreateWO, onSchedulePM }: { n: any; onCreateWO: () => 
               + Create work order
             </button>
           )}
-          {isUnread && isWarning && (
+          {isUnread && n.type === 'pm_warning' && (
             <button onClick={onSchedulePM} style={{ marginTop: 4, fontSize: 10, color: C.amber, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: 0 }}>
               + Schedule PM
+            </button>
+          )}
+          {isUnread && n.type === 'inventory_alert' && (
+            <button onClick={onGoToPurchaseRequests} style={{ marginTop: 4, fontSize: 10, color: C.amber, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500, padding: 0 }}>
+              + Create purchase request
             </button>
           )}
         </div>
@@ -854,3 +915,4 @@ function NotifItem({ n, onCreateWO, onSchedulePM }: { n: any; onCreateWO: () => 
     </div>
   );
 }
+

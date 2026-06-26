@@ -454,7 +454,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
             >
               <RotateCw size={18} />
             </button>
-            {machines.length > 0 && isAdmin && (
+            {/*machines.length > 0 && isAdmin && (
               <button
                 onClick={handleClearAllMachines}
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-all"
@@ -462,7 +462,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                 <Trash2 size={18} />
                 Clear All
               </button>
-            )}
+            )*/}
             <button
               onClick={() => {
                 setIsEditMode(false);
@@ -857,7 +857,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Installation Date (Start Running)</label>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Installation Date in Tunisia</label>
                   <input
                     type="date"
                     className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
@@ -1019,7 +1019,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                   disabled={loading}
                   className="flex-1 px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-lg shadow-blue-500/20"
                 >
-                  {loading ? (isEditMode ? 'Updating...' : 'Adding...') : (isEditMode ? 'Update Machine' : 'Add Machine')}
+                  {loading ? (isEditMode ? 'Updating...' : 'Adding...') : (isEditMode ? 'Save' : 'Save')}
                 </button>
               </div>
             </form>

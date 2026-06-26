@@ -1052,9 +1052,8 @@ export default function MachineRendement() {
                     <div className="flex items-center justify-between mb-6">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">
-                                {editingRecord ? 'Edit Rendement Record' : 'New Rendement Record'}
+                                {editingRecord ? 'Edit Rendement' : 'New Rendement'}
                             </h1>
-                            <p className="text-gray-500">Fill in the details below to save the rendement record.</p>
                         </div>
                         <button
                             onClick={() => setIsModalOpen(false)}
