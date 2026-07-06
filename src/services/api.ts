@@ -293,6 +293,14 @@ export const api = {
     });
     await handleResponse(res);
   },
+  updatePurchaseRequestStatus: async (id: number | string, status: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/purchase-requests/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    await handleResponse(res);
+  },
 
   // Machine Rendement
   getRendement: async (date?: string): Promise<MachineRendement[]> => {

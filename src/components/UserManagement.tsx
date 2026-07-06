@@ -230,6 +230,7 @@ export default function UserManagement() {
               >
                 <option value="technician">Technician</option>
                 <option value="manager">Manager</option>
+                <option value="accounting">Accounting</option>
                 <option value="admin">Administrator</option>
               </select>
             </div>

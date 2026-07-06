@@ -168,5 +168,6 @@ CREATE TABLE IF NOT EXISTS purchase_requests (
     supplier TEXT,
     items_count INTEGER,
     pdf_data TEXT, -- Base64 encoded PDF
+    status TEXT DEFAULT 'Waiting for validation',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

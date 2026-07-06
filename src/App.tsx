@@ -48,7 +48,17 @@ function LoginRoute() {
 function RequireRole({ children, allowed }: { children: React.ReactNode, allowed: string | string[] }) {
   const { user } = useAuth();
   const allowedRoles = Array.isArray(allowed) ? allowed : [allowed];
-  if (!user || !allowedRoles.includes(user.role)) {
+  
+  const effectiveRoles = [...allowedRoles];
+  if (effectiveRoles.includes('technician')) {
+    if (!effectiveRoles.includes('manager')) effectiveRoles.push('manager');
+    if (!effectiveRoles.includes('admin')) effectiveRoles.push('admin');
+  }
+  if (effectiveRoles.includes('manager')) {
+    if (!effectiveRoles.includes('admin')) effectiveRoles.push('admin');
+  }
+
+  if (!user || !effectiveRoles.includes(user.role)) {
     return <div className="p-8 text-center text-gray-500">Access Denied</div>;
   }
   return <>{children}</>;

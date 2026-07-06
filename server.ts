@@ -99,9 +99,16 @@ try {
       supplier TEXT,
       items_count INTEGER,
       pdf_data TEXT,
+      status TEXT DEFAULT 'Waiting for validation',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `).run();
+
+  try {
+    db.prepare(`ALTER TABLE purchase_requests ADD COLUMN status TEXT DEFAULT 'Waiting for validation'`).run();
+  } catch (e) {
+    // Column already exists, ignore
+  }
 
 } catch (error) {
   console.error("Migration error:", error);
@@ -302,12 +309,13 @@ app.get('/api/purchase-requests/last-ref', (req, res) => {
 });
 
 app.post('/api/purchase-requests', (req, res) => {
-  const { reference, date, requested_by, department, supplier, items_count, pdf_data } = req.body;
+  const { reference, date, requested_by, department, supplier, items_count, pdf_data, status } = req.body;
+  const finalStatus = status || 'Waiting for validation';
   try {
     const info = db.prepare(`
-      INSERT INTO purchase_requests (reference, date, requested_by, department, supplier, items_count, pdf_data)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(reference, date, requested_by, department, supplier, items_count, pdf_data);
+      INSERT INTO purchase_requests (reference, date, requested_by, department, supplier, items_count, pdf_data, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(reference, date, requested_by, department, supplier, items_count, pdf_data, finalStatus);
 
     res.json({ id: info.lastInsertRowid });
   } catch (error) {
@@ -341,14 +349,29 @@ app.post('/api/purchase-requests/:id/send', async (req, res) => {
 
 app.put('/api/purchase-requests/:id', (req, res) => {
   const { id } = req.params;
-  const { reference, date, requested_by, department, supplier, items_count, pdf_data } = req.body;
+  const { reference, date, requested_by, department, supplier, items_count, pdf_data, status } = req.body;
   try {
     db.prepare(`
       UPDATE purchase_requests
-      SET reference = ?, date = ?, requested_by = ?, department = ?, supplier = ?, items_count = ?, pdf_data = ?
+      SET reference = ?, date = ?, requested_by = ?, department = ?, supplier = ?, items_count = ?, pdf_data = ?, status = COALESCE(?, status, 'Waiting for validation')
       WHERE id = ?
-    `).run(reference, date, requested_by, department, supplier, items_count, pdf_data, id);
+    `).run(reference, date, requested_by, department, supplier, items_count, pdf_data, status, id);
     res.json({ message: 'Purchase request updated' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.patch('/api/purchase-requests/:id/status', (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  try {
+    db.prepare(`
+      UPDATE purchase_requests
+      SET status = ?
+      WHERE id = ?
+    `).run(status, id);
+    res.json({ message: 'Purchase request status updated' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

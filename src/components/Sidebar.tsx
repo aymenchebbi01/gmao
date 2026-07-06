@@ -109,10 +109,11 @@ export default function Sidebar({
       roles: ['admin', 'manager', 'technician'],
       subItems: [
         { id: 'inventory', label: 'Stock', roles: ['admin', 'manager', 'technician'] },
-        { id: 'purchase-requests', label: 'Demande d\'Achat', roles: ['admin', 'manager', 'technician'] },
+        { id: 'purchase-requests', label: 'Demande d\'Achat', roles: ['technician'] },
         { id: 'products', label: 'Items Data', roles: ['admin', 'manager', 'technician'] }
       ]
     },
+    { id: 'purchase-requests', label: 'Achats', icon: ShoppingCart, roles: ['admin', 'manager', 'accounting'] },
     {
       id: 'user-mgmt',
       label: 'User Management',

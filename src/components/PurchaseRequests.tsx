@@ -66,17 +66,40 @@ export default function PurchaseRequests() {
     const [supplier, setSupplier] = useState('');
     const [notes, setNotes] = useState('');
 
-    const [activeView, setActiveTab] = useState<'generator' | 'history'>('generator');
+    const [activeView, setActiveTab] = useState<'generator' | 'history'>(
+        user?.role === 'accounting' ? 'history' : 'generator'
+    );
     const [history, setHistory] = useState<any[]>([]);
     const [lastRef, setLastRef] = useState<string | null>(null);
     const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
 
     // History search and edit states
     const [historySearch, setHistorySearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const PAGE_SIZE = 10;
     const [editingRequest, setEditingRequest] = useState<any | null>(null);
     const [editDemandeur, setEditDemandeur] = useState('');
     const [editSupplier, setEditSupplier] = useState('');
     const [editDepartment, setEditDepartment] = useState('');
+
+    const getStatusStyle = (status: string) => {
+        const val = status || 'Waiting for validation';
+        switch (val) {
+            case 'Waiting for validation':
+                return 'bg-amber-50 text-amber-700 border-amber-100';
+            case 'Waiting for reception':
+                return 'bg-blue-50 text-blue-700 border-blue-100';
+            case 'In progress':
+                return 'bg-purple-50 text-purple-700 border-purple-100';
+            case 'Purchased':
+                return 'bg-emerald-50 text-emerald-700 border-emerald-100';
+            case 'Cancelled':
+                return 'bg-red-50 text-red-700 border-red-100';
+            default:
+                return 'bg-gray-50 text-gray-700 border-gray-100';
+        }
+    };
 
     const handleEditClick = (req: any) => {
         setEditingRequest(req);
@@ -351,21 +374,59 @@ export default function PurchaseRequests() {
 
     const lowStockCount = items.filter(i => !i.isManual).length;
 
+    // --- History computed values ---
+    const filteredHistory = history.filter(req => {
+        const query = historySearch.toLowerCase();
+        const matchesSearch = (
+            req.reference.toLowerCase().includes(query) ||
+            (req.requested_by || '').toLowerCase().includes(query) ||
+            (req.supplier || '').toLowerCase().includes(query) ||
+            (req.department || '').toLowerCase().includes(query)
+        );
+        const matchesStatus = !statusFilter || (req.status || 'Waiting for validation') === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
+
+    const totalPages = Math.ceil(filteredHistory.length / PAGE_SIZE);
+    const paginatedHistory = filteredHistory.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    const statusCounts = {
+        total: history.length,
+        waiting_validation: history.filter(r => (r.status || 'Waiting for validation') === 'Waiting for validation').length,
+        waiting_reception: history.filter(r => (r.status || 'Waiting for validation') === 'Waiting for reception').length,
+        in_progress: history.filter(r => (r.status || 'Waiting for validation') === 'In progress').length,
+        purchased: history.filter(r => (r.status || 'Waiting for validation') === 'Purchased').length,
+        cancelled: history.filter(r => (r.status || 'Waiting for validation') === 'Cancelled').length,
+    };
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    };
+
+    const resetFilters = () => {
+        setHistorySearch('');
+        setStatusFilter('');
+        setCurrentPage(1);
+    };
+
+
     return (
         <div className="space-y-6">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     <div className="flex bg-gray-100 p-1 rounded-xl">
-                        <button
-                            onClick={() => setActiveTab('generator')}
-                            className={cn(
-                                "px-4 py-1.5 text-sm font-medium rounded-lg transition-all",
-                                activeView === 'generator' ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"
-                            )}
-                        >
-                            Générateur
-                        </button>
+                        {user?.role !== 'accounting' && (
+                            <button
+                                onClick={() => setActiveTab('generator')}
+                                className={cn(
+                                    "px-4 py-1.5 text-sm font-medium rounded-lg transition-all",
+                                    activeView === 'generator' ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"
+                                )}
+                            >
+                                Générateur
+                            </button>
+                        )}
                         <button
                             onClick={() => setActiveTab('history')}
                             className={cn(
@@ -616,21 +677,89 @@ export default function PurchaseRequests() {
                 </>
             ) : (
                 /* History View */
-                <div className="space-y-4">
-                    {/* Search Bar */}
-                    <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 flex items-center gap-3">
+                <div className="space-y-5">
+
+                    {/* Stats Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                        <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 flex flex-col gap-1">
+                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total</p>
+                            <p className="text-2xl font-bold text-gray-900">{statusCounts.total}</p>
+                        </div>
+                        <button
+                            onClick={() => { setStatusFilter(statusFilter === 'Waiting for validation' ? '' : 'Waiting for validation'); setCurrentPage(1); }}
+                            className={cn("text-left bg-amber-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Waiting for validation' ? 'border-amber-400 ring-2 ring-amber-300' : 'border-amber-100')}
+                        >
+                            <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">En attente</p>
+                            <p className="text-2xl font-bold text-amber-700">{statusCounts.waiting_validation}</p>
+                        </button>
+                        <button
+                            onClick={() => { setStatusFilter(statusFilter === 'Waiting for reception' ? '' : 'Waiting for reception'); setCurrentPage(1); }}
+                            className={cn("text-left bg-blue-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Waiting for reception' ? 'border-blue-400 ring-2 ring-blue-300' : 'border-blue-100')}
+                        >
+                            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Att. réception</p>
+                            <p className="text-2xl font-bold text-blue-700">{statusCounts.waiting_reception}</p>
+                        </button>
+                        <button
+                            onClick={() => { setStatusFilter(statusFilter === 'In progress' ? '' : 'In progress'); setCurrentPage(1); }}
+                            className={cn("text-left bg-purple-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'In progress' ? 'border-purple-400 ring-2 ring-purple-300' : 'border-purple-100')}
+                        >
+                            <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">En cours</p>
+                            <p className="text-2xl font-bold text-purple-700">{statusCounts.in_progress}</p>
+                        </button>
+                        <button
+                            onClick={() => { setStatusFilter(statusFilter === 'Purchased' ? '' : 'Purchased'); setCurrentPage(1); }}
+                            className={cn("text-left bg-emerald-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Purchased' ? 'border-emerald-400 ring-2 ring-emerald-300' : 'border-emerald-100')}
+                        >
+                            <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Acheté</p>
+                            <p className="text-2xl font-bold text-emerald-700">{statusCounts.purchased}</p>
+                        </button>
+                        <button
+                            onClick={() => { setStatusFilter(statusFilter === 'Cancelled' ? '' : 'Cancelled'); setCurrentPage(1); }}
+                            className={cn("text-left bg-red-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Cancelled' ? 'border-red-400 ring-2 ring-red-300' : 'border-red-100')}
+                        >
+                            <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Annulé</p>
+                            <p className="text-2xl font-bold text-red-700">{statusCounts.cancelled}</p>
+                        </button>
+                    </div>
+
+                    {/* Filter Bar */}
+                    <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                             <input
                                 type="text"
-                                placeholder="Rechercher une demande (Réf, demandeur, fournisseur...)"
-                                className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                placeholder="Rechercher (Réf, demandeur, fournisseur...)"
+                                className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                                 value={historySearch}
-                                onChange={e => setHistorySearch(e.target.value)}
+                                onChange={e => { setHistorySearch(e.target.value); setCurrentPage(1); }}
                             />
                         </div>
+                        <select
+                            value={statusFilter}
+                            onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                            className={cn(
+                                "px-3 py-2.5 text-sm border rounded-xl outline-none transition-all min-w-[190px]",
+                                statusFilter ? 'border-blue-400 ring-2 ring-blue-100 font-semibold' : 'border-gray-200'
+                            )}
+                        >
+                            <option value="">Tous les statuts</option>
+                            <option value="Waiting for validation">Waiting for validation</option>
+                            <option value="Waiting for reception">Waiting for reception</option>
+                            <option value="In progress">In progress</option>
+                            <option value="Purchased">Purchased</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                        {(historySearch || statusFilter) && (
+                            <button
+                                onClick={resetFilters}
+                                className="flex items-center gap-1.5 px-3 py-2.5 text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors whitespace-nowrap"
+                            >
+                                <X size={14} /> Réinitialiser
+                            </button>
+                        )}
                     </div>
 
+                    {/* Table */}
                     <div className="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
@@ -641,106 +770,195 @@ export default function PurchaseRequests() {
                                         <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Demandeur</th>
                                         <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Fournisseur</th>
                                         <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Articles</th>
-                                        <th className="px-6 py-4 text-right">Actions</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Statut</th>
+                                        <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {history
-                                        .filter(req => {
-                                            const query = historySearch.toLowerCase();
-                                            return (
-                                                req.reference.toLowerCase().includes(query) ||
-                                                (req.requested_by || '').toLowerCase().includes(query) ||
-                                                (req.supplier || '').toLowerCase().includes(query) ||
-                                                (req.department || '').toLowerCase().includes(query)
-                                            );
-                                        })
-                                        .map((req) => (
-                                            <tr key={req.id} className="hover:bg-gray-50/60 transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <span className="font-mono font-bold text-blue-600">{req.reference}</span>
-                                                </td>
-                                                <td className="px-6 py-4 text-gray-600">
-                                                    {format(new Date(req.date), 'dd/MM/yyyy')}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="text-sm font-medium text-gray-900">{req.requested_by}</div>
-                                                    <div className="text-xs text-gray-500">{req.department}</div>
-                                                </td>
-                                                <td className="px-6 py-4 text-gray-600">{req.supplier || '—'}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
-                                                        {req.items_count} positions
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <button
-                                                            onClick={() => {
-                                                                const link = document.createElement('a');
-                                                                link.href = req.pdf_data;
-                                                                link.download = `Demande_Achat_${req.reference}.pdf`;
-                                                                link.click();
-                                                            }}
-                                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                                                            title="Télécharger PDF"
-                                                        >
-                                                            <Download size={13} />
-                                                            PDF
-                                                        </button>
-                                                        <button
-                                                             onClick={() => handleSendEmail(req.id)}
-                                                             disabled={sendingEmailId === req.id}
-                                                             className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                                                             title="Envoyer par email"
-                                                         >
-                                                             {sendingEmailId === req.id ? (
-                                                                 <RefreshCw size={13} className="animate-spin" />
-                                                             ) : (
-                                                                 <Send size={13} />
-                                                             )}
-                                                             Envoyer
-                                                         </button>
-                                                        {isAdmin && (
-                                                            <>
-                                                                <button
-                                                                    onClick={() => handleEditClick(req)}
-                                                                    className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all"
-                                                                    title="Modifier"
-                                                                >
-                                                                    <Edit2 size={14} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteRequest(req.id)}
-                                                                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
-                                                                    title="Supprimer"
-                                                                >
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    {history.filter(req => {
-                                        const query = historySearch.toLowerCase();
-                                        return (
-                                            req.reference.toLowerCase().includes(query) ||
-                                            (req.requested_by || '').toLowerCase().includes(query) ||
-                                            (req.supplier || '').toLowerCase().includes(query) ||
-                                            (req.department || '').toLowerCase().includes(query)
-                                        );
-                                    }).length === 0 && (
+                                    {paginatedHistory.length === 0 ? (
                                         <tr>
-                                            <td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic">
-                                                Aucune demande d'achat dans l'historique.
+                                            <td colSpan={7} className="px-6 py-16 text-center">
+                                                <div className="flex flex-col items-center gap-3">
+                                                    <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
+                                                        <FileText size={24} className="text-gray-400" />
+                                                    </div>
+                                                    <p className="text-sm font-semibold text-gray-500">Aucune demande trouvée</p>
+                                                    <p className="text-xs text-gray-400">
+                                                        {historySearch || statusFilter
+                                                            ? 'Aucun résultat pour les filtres actuels.'
+                                                            : 'Aucune demande d\'achat enregistrée.'}
+                                                    </p>
+                                                    {(historySearch || statusFilter) && (
+                                                        <button
+                                                            onClick={resetFilters}
+                                                            className="mt-1 text-xs text-blue-600 hover:underline"
+                                                        >
+                                                            Réinitialiser les filtres
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
-                                    )}
+                                    ) : paginatedHistory.map((req) => (
+                                        <tr key={req.id} className="hover:bg-gray-50/60 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <span className="font-mono font-bold text-blue-600">{req.reference}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-600">
+                                                {format(new Date(req.date), 'dd/MM/yyyy')}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="text-sm font-medium text-gray-900">{req.requested_by}</div>
+                                                <div className="text-xs text-gray-500">{req.department}</div>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-600">{req.supplier || '—'}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
+                                                    {req.items_count} pos.
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {user?.role === 'accounting' ? (
+                                                    <select
+                                                        value={req.status || 'Waiting for validation'}
+                                                        onChange={async (e) => {
+                                                            const newStatus = e.target.value;
+                                                            try {
+                                                                await api.updatePurchaseRequestStatus(req.id, newStatus);
+                                                                toast.success('Statut mis à jour');
+                                                                fetchHistory();
+                                                            } catch (err) {
+                                                                toast.error('Erreur de mise à jour');
+                                                            }
+                                                        }}
+                                                        className={cn(
+                                                            "px-2.5 py-1 rounded-full text-xs font-bold border outline-none cursor-pointer uppercase transition-all",
+                                                            getStatusStyle(req.status)
+                                                        )}
+                                                    >
+                                                        <option value="Waiting for validation">Waiting for validation</option>
+                                                        <option value="Waiting for reception">Waiting for reception</option>
+                                                        <option value="In progress">In progress</option>
+                                                        <option value="Purchased">Purchased</option>
+                                                        <option value="Cancelled">Cancelled</option>
+                                                    </select>
+                                                ) : (
+                                                    <span className={cn(
+                                                        "px-2.5 py-1 rounded-full text-xs font-bold border uppercase inline-block",
+                                                        getStatusStyle(req.status)
+                                                    )}>
+                                                        {req.status || 'Waiting for validation'}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            const link = document.createElement('a');
+                                                            link.href = req.pdf_data;
+                                                            link.download = `Demande_Achat_${req.reference}.pdf`;
+                                                            link.click();
+                                                        }}
+                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                        title="Télécharger PDF"
+                                                    >
+                                                        <Download size={13} />
+                                                        PDF
+                                                    </button>
+                                                    {user?.role !== 'accounting' && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleSendEmail(req.id)}
+                                                                disabled={sendingEmailId === req.id}
+                                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                                                title="Envoyer par email"
+                                                            >
+                                                                {sendingEmailId === req.id ? (
+                                                                    <RefreshCw size={13} className="animate-spin" />
+                                                                ) : (
+                                                                    <Send size={13} />
+                                                                )}
+                                                                Envoyer
+                                                            </button>
+                                                            {isAdmin && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleEditClick(req)}
+                                                                        className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all"
+                                                                        title="Modifier"
+                                                                    >
+                                                                        <Edit2 size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteRequest(req.id)}
+                                                                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                                                                        title="Supprimer"
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="px-6 py-4 border-t border-gray-50 flex items-center justify-between">
+                                <p className="text-xs text-gray-400">
+                                    {filteredHistory.length} résultat{filteredHistory.length > 1 ? 's' : ''} — Page {currentPage} / {totalPages}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        ← Précédent
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                        .reduce((acc: (number | string)[], p, idx, arr) => {
+                                            if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
+                                            acc.push(p);
+                                            return acc;
+                                        }, [])
+                                        .map((p, idx) =>
+                                            p === '...' ? (
+                                                <span key={`ellipsis-${idx}`} className="px-1 text-gray-400 text-xs">…</span>
+                                            ) : (
+                                                <button
+                                                    key={p}
+                                                    onClick={() => handlePageChange(p as number)}
+                                                    className={cn(
+                                                        "w-8 h-8 text-xs font-medium rounded-lg transition-colors",
+                                                        currentPage === p
+                                                            ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
+                                                            : 'text-gray-600 hover:bg-gray-100'
+                                                    )}
+                                                >
+                                                    {p}
+                                                </button>
+                                            )
+                                        )
+                                    }
+                                    <button
+                                        onClick={() => handlePageChange(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                        className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        Suivant →
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Edit Modal (Admin only) */}

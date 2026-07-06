@@ -7,6 +7,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isManager: boolean;
   isTechnician: boolean;
+  isAccounting: boolean;
   login: (user: UserProfile) => void;
   logout: () => Promise<void>;
 }
@@ -57,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAdmin: user?.role === 'admin',
     isManager: user?.role === 'manager' || user?.role === 'admin',
     isTechnician: user?.role === 'technician' || user?.role === 'manager' || user?.role === 'admin',
+    isAccounting: user?.role === 'accounting',
     login,
     logout
   };
