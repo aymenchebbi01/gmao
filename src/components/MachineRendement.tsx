@@ -22,6 +22,7 @@ import {
 import { MachineRendement as MachineRendementType, ProductionProduct, Machine } from '../types';
 import { api } from '../services/api';
 import { cn } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -209,6 +210,10 @@ const emptyForm = (): Omit<MachineRendementType, 'id' | 'createdAt'> => ({
 // ─── component ──────────────────────────────────────────────────────────────
 
 export default function MachineRendement() {
+    const { isAdmin, isManager } = useAuth();
+    const canEdit = isAdmin || isManager;   // admin + manager
+    const canDelete = isAdmin;              // admin only
+
     const [records, setRecords] = useState<MachineRendementType[]>([]);
     const [products, setProducts] = useState<ProductionProduct[]>([]);
     const [machines, setMachines] = useState<Machine[]>([]);
@@ -447,14 +452,14 @@ export default function MachineRendement() {
         if (activeFilters.length > 0) {
             doc.setFontSize(8);
             doc.setFont('helvetica', 'bold');
-            doc.text(`Active Filters: ${activeFilters.join('  |  ')}`, 14, filtersY);
+            doc.text(`Active Filters: ${activeFilters.join('  |  ')}`, 10, filtersY);
             filtersY += 6;
         }
 
         // Summary Info Cards table
         const summaryData = [
-            ['Total Records', filtered.length.toString(), 'Total Qty Produced', totalQty.toLocaleString()],
-            ['Avg Efficiency', `${avgEff.toFixed(1)}%`, 'TRS Total', (totals.qty1 + totals.qty2 + totals.qty3).toLocaleString()],
+            ['Total Records', filtered.length.toString(), 'Total Qty Produced', totalQty.toLocaleString('en-US')],
+            ['Avg Efficiency', `${avgEff.toFixed(1)}%`, 'TRS Total', (totals.qty1 + totals.qty2 + totals.qty3).toLocaleString('en-US')],
             ['Price Target Total', `${totals.priceTarget.toFixed(2)} EUR`, 'Price Actual Total', `${totals.priceActual.toFixed(2)} EUR`]
         ];
 
@@ -462,6 +467,7 @@ export default function MachineRendement() {
             startY: filtersY,
             body: summaryData,
             theme: 'plain',
+            margin: { left: 10, right: 10 },
             styles: { fontSize: 8, cellPadding: 1.5 },
             columnStyles: {
                 0: { fontStyle: 'bold', cellWidth: 35 },
@@ -484,14 +490,14 @@ export default function MachineRendement() {
                 `#${String(r.machineNumber || '').trim() || '---'}`,
                 r.item,
                 r.priceMarket || 'TN',
-                r.targetQty.toLocaleString(),
-                r.qtyShift1.toLocaleString(),
+                r.targetQty.toLocaleString('en-US'),
+                r.qtyShift1.toLocaleString('en-US'),
                 `${r.efficiencyShift1.toFixed(1)}%`,
-                r.qtyShift2.toLocaleString(),
+                r.qtyShift2.toLocaleString('en-US'),
                 `${r.efficiencyShift2.toFixed(1)}%`,
-                r.qtyShift3.toLocaleString(),
+                r.qtyShift3.toLocaleString('en-US'),
                 `${r.efficiencyShift3.toFixed(1)}%`,
-                (r.trs || 0).toLocaleString(),
+                (r.trs || 0).toLocaleString('en-US'),
                 priceTarget.toFixed(2),
                 priceActual.toFixed(2),
                 r.comment || ''
@@ -507,23 +513,24 @@ export default function MachineRendement() {
                 '',
                 '',
                 '',
-                totals.targetQty.toLocaleString(),
-                totals.qty1.toLocaleString(),
+                totals.targetQty.toLocaleString('en-US'),
+                totals.qty1.toLocaleString('en-US'),
                 '',
-                totals.qty2.toLocaleString(),
+                totals.qty2.toLocaleString('en-US'),
                 '',
-                totals.qty3.toLocaleString(),
+                totals.qty3.toLocaleString('en-US'),
                 '',
                 '',
                 totals.priceTarget.toFixed(2),
                 totals.priceActual.toFixed(2),
                 ''
             ]],
+            margin: { left: 10, right: 10 },
             theme: 'grid',
-            headStyles: { fillColor: [37, 99, 235], fontSize: 7, cellPadding: 1.5, halign: 'center' }, // blue-600
-            footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 7, cellPadding: 1.5, halign: 'center' },
-            bodyStyles: { fontSize: 7, cellPadding: 1.5 },
-            styles: { fontSize: 7 },
+            headStyles: { fillColor: [37, 99, 235], fontSize: 6.5, cellPadding: 1, halign: 'center' }, // blue-600
+            footStyles: { fillColor: [241, 245, 249], textColor: [15, 23, 42], fontStyle: 'bold', fontSize: 6.5, cellPadding: 1, halign: 'center' },
+            bodyStyles: { fontSize: 6.5, cellPadding: 1 },
+            styles: { fontSize: 6.5 },
             columnStyles: {
                 0: { cellWidth: 16 },
                 1: { cellWidth: 14 },
@@ -539,7 +546,7 @@ export default function MachineRendement() {
                 11: { cellWidth: 14, halign: 'center' },
                 12: { cellWidth: 18, halign: 'right' },
                 13: { cellWidth: 18, halign: 'right' },
-                14: { cellWidth: 30 } // comment
+                14: { cellWidth: 'auto' } // comment - wraps automatically to fit page width
             }
         });
 
@@ -547,8 +554,8 @@ export default function MachineRendement() {
         doc.setFontSize(8);
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);
-            doc.text(`Page ${i} of ${pageCount}`, 283, 202, { align: 'right' });
-            doc.text('MAINTENANCE & PRODUCTION SYSTEM (CMMS)', 14, 202);
+            doc.text(`Page ${i} of ${pageCount}`, 287, 202, { align: 'right' });
+            doc.text('MAINTENANCE & PRODUCTION SYSTEM (CMMS)', 10, 202);
         }
 
         doc.save(`Machine_Rendement_Report_${format(today, 'yyyyMMdd')}.pdf`);
@@ -926,18 +933,24 @@ export default function MachineRendement() {
                                             </td>
                                             <td className="px-5 py-4 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button
-                                                        onClick={() => openEdit(rec)}
-                                                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                                    >
-                                                        <Edit2 size={15} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(rec.id!)}
-                                                        className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-                                                    >
-                                                        <Trash2 size={15} />
-                                                    </button>
+                                                    {canEdit && (
+                                                        <button
+                                                            onClick={() => openEdit(rec)}
+                                                            className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                                            title="Edit record"
+                                                        >
+                                                            <Edit2 size={15} />
+                                                        </button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() => handleDelete(rec.id!)}
+                                                            className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
+                                                            title="Delete record"
+                                                        >
+                                                            <Trash2 size={15} />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

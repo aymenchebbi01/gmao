@@ -17,8 +17,11 @@ import { cn } from '../lib/utils';
 import TableFooter from './ui/TableFooter';
 import Modal from './ui/Modal';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function MachineConsultation() {
+    const { user } = useAuth();
+    const isTechnician = user?.role === 'technician';
     const [machines, setMachines] = useState<Machine[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
@@ -198,13 +201,15 @@ export default function MachineConsultation() {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => handleEditClick(machine)}
-                                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                title="Update Injected Product"
-                                            >
-                                                <Edit2 size={16} />
-                                            </button>
+                                            {!isTechnician && (
+                                                <button
+                                                    onClick={() => handleEditClick(machine)}
+                                                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                                    title="Update Injected Product"
+                                                >
+                                                    <Edit2 size={16} />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))

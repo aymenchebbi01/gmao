@@ -41,7 +41,8 @@ interface MachineListProps {
 }
 
 export default function MachineList({ historyMachineId, onHistoryClose }: MachineListProps = {}) {
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
+  const canEdit = user?.role === 'admin' || user?.role === 'manager';
   const [machines, setMachines] = useState<Machine[]>([]);
   const prevStatuses = useRef<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,6 +53,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isHoursModalOpen, setIsHoursModalOpen] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+  const [serverLanUrl, setServerLanUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [newHours, setNewHours] = useState(0);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -64,6 +66,24 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // Fetch server LAN IP when opening QR Code modal to ensure mobile scanning works
+  useEffect(() => {
+    if (isQrModalOpen && selectedMachine) {
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        setServerLanUrl(`${window.location.origin}/mobile-status?id=${selectedMachine.id}`);
+      } else {
+        api.getServerIp()
+          .then((res) => {
+            setServerLanUrl(`http://${res.ip}:${res.port}/mobile-status?id=${selectedMachine.id}`);
+          })
+          .catch((err) => {
+            console.error("Failed to fetch server IP:", err);
+            setServerLanUrl(`http://localhost:5033/mobile-status?id=${selectedMachine.id}`);
+          });
+      }
+    }
+  }, [isQrModalOpen, selectedMachine]);
 
   const calculateLiveHours = (machine: Machine) => {
     return calculateMachineLiveHours(machine);
@@ -463,34 +483,36 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                 Clear All
               </button>
             )*/}
-            <button
-              onClick={() => {
-                setIsEditMode(false);
-                setFormData({
-                  id: '',
-                  name: '',
-                  serialNumber: '',
-                  injectingProduct: '',
-                  type: 'Simple Injection',
-                  manufacturingYear: new Date().getFullYear(),
-                  location: '',
-                  siteNumber: '',
-                  condition: 'Excellent',
-                  clampingForce: 0,
-                  status: 'operational',
-                  nextMaintenance: '',
-                  installationDate: '',
-                  currentHours: 0,
-                  imageUrl: '',
-                  preventivePlan: generateRecommendedPlan()
-                });
-                setIsModalOpen(true);
-              }}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Machine
-            </button>
+            {canEdit && (
+              <button
+                onClick={() => {
+                  setIsEditMode(false);
+                  setFormData({
+                    id: '',
+                    name: '',
+                    serialNumber: '',
+                    injectingProduct: '',
+                    type: 'Simple Injection',
+                    manufacturingYear: new Date().getFullYear(),
+                    location: '',
+                    siteNumber: '',
+                    condition: 'Excellent',
+                    clampingForce: 0,
+                    status: 'operational',
+                    nextMaintenance: '',
+                    installationDate: '',
+                    currentHours: 0,
+                    imageUrl: '',
+                    preventivePlan: generateRecommendedPlan()
+                  });
+                  setIsModalOpen(true);
+                }}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Machine
+              </button>
+            )}
           </div>
         </div>
 
@@ -618,17 +640,19 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                             <span className="text-[10px] text-gray-500 font-medium">
                               Current: {formatHoursToDays(calculateLiveHours(item))}
                             </span>
-                            <button
-                              onClick={() => {
-                                setSelectedMachine(item);
-                                setNewHours(item.currentHours || 0);
-                                setIsHoursModalOpen(true);
-                              }}
-                              className="p-0.5 text-gray-400 hover:text-blue-600 transition-colors"
-                              title="Update Hours"
-                            >
-                              <Edit2 size={10} />
-                            </button>
+                            {canEdit && (
+                              <button
+                                onClick={() => {
+                                  setSelectedMachine(item);
+                                  setNewHours(item.currentHours || 0);
+                                  setIsHoursModalOpen(true);
+                                }}
+                                className="p-0.5 text-gray-400 hover:text-blue-600 transition-colors"
+                                title="Update Hours"
+                              >
+                                <Edit2 size={10} />
+                              </button>
+                            )}
                           </div>
                           {item.failureCount > 0 ? (
                             <span className={cn(
@@ -668,13 +692,15 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                         >
                           <QrCode size={18} />
                         </button>
-                        <button
-                          onClick={() => handleEditClick(item)}
-                          className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                          title="Edit"
-                        >
-                          <Edit2 size={18} />
-                        </button>
+                        {canEdit && (
+                          <button
+                            onClick={() => handleEditClick(item)}
+                            className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                            title="Edit"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                        )}
                         {isAdmin && (
                           <button
                             onClick={() => handleDeleteMachine(item.id)}
@@ -1079,15 +1105,19 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
         {selectedMachine && (
           <div className="flex flex-col items-center p-6 space-y-6">
             <div className="p-4 bg-white border-2 border-gray-100 rounded-2xl shadow-sm">
-              <QRCodeCanvas
-                id="machine-qr-code"
-                value={window.location.hostname === 'localhost'
-                  ? `http://192.168.0.216:3000/?tab=mobile-status&id=${selectedMachine.id}`
-                  : `${window.location.origin}/?tab=mobile-status&id=${selectedMachine.id}`}
-                size={200}
-                level="H"
-                includeMargin={true}
-              />
+              {serverLanUrl ? (
+                <QRCodeCanvas
+                  id="machine-qr-code"
+                  value={serverLanUrl}
+                  size={200}
+                  level="H"
+                  includeMargin={true}
+                />
+              ) : (
+                <div className="w-[200px] h-[200px] flex items-center justify-center text-xs text-gray-400">
+                  Generating QR...
+                </div>
+              )}
             </div>
 
             <div className="text-center">

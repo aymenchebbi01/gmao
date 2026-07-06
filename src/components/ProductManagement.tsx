@@ -22,8 +22,11 @@ import Modal from './ui/Modal';
 import TableFooter from './ui/TableFooter';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function ProductManagement() {
+    const { user } = useAuth();
+    const isTechnician = user?.role === 'technician';
     const [products, setProducts] = useState<ProductionProduct[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -347,20 +350,24 @@ export default function ProductManagement() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button
-                                                        onClick={() => openEditModal(p)}
-                                                        className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
-                                                    >
-                                                        <Edit2 size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(p.id)}
-                                                        className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
+                                                {!isTechnician && (
+                                                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={() => openEditModal(p)}
+                                                            className="p-1.5 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                                                            title="Edit product"
+                                                        >
+                                                            <Edit2 size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(p.id)}
+                                                            className="p-1.5 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                                                            title="Delete product"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     ))

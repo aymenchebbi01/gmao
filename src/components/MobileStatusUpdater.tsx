@@ -114,7 +114,27 @@ export default function MobileStatusUpdater({ machineId }: Props) {
 
             // Create a work order automatically if changing to maintenance
             if (newStatus === 'maintenance') {
-                const woId = `WO-${Date.now()}`;
+                let latestOrders: any[] = [];
+                try {
+                    latestOrders = await api.getWorkOrders();
+                } catch (e) {
+                    console.error("Failed to fetch work orders for sequential ID", e);
+                }
+
+                const year = new Date().getFullYear();
+                const prefix = `WO-${year}-`;
+                const yearOrders = latestOrders.filter(o => o.id && o.id.startsWith(prefix));
+
+                let nextNum = 1;
+                if (yearOrders.length > 0) {
+                    const maxNum = Math.max(...yearOrders.map(o => {
+                        const parts = o.id.split('-');
+                        return parseInt(parts[parts.length - 1]) || 0;
+                    }));
+                    nextNum = isFinite(maxNum) && maxNum >= 0 ? maxNum + 1 : 1;
+                }
+                const woId = `${prefix}${nextNum.toString().padStart(4, '0')}`;
+
                 const newWorkOrder = {
                     id: woId,
                     machineId: machine.id,

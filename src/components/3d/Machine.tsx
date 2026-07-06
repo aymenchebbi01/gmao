@@ -12,6 +12,7 @@ interface MachineProps {
   isSelected: boolean;
   onSelect: (id: string) => void;
   onUpdate: (id: string, updates: Partial<MachineType>) => void;
+  readOnly?: boolean;
 }
 
 const ProceduralMachine: React.FC<{ machine: MachineType, isSelected: boolean, hovered: boolean }> = ({ machine, isSelected, hovered }) => {
@@ -139,7 +140,7 @@ const getBrandedModel = (
   return null;
 };
 
-export const Machine: React.FC<MachineProps> = ({ machine, isSelected, onSelect, onUpdate }) => {
+export const Machine: React.FC<MachineProps> = ({ machine, isSelected, onSelect, onUpdate, readOnly }) => {
   const meshRef = useRef<THREE.Group>(null);
   const [hovered, setHovered] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -166,6 +167,7 @@ export const Machine: React.FC<MachineProps> = ({ machine, isSelected, onSelect,
   const handlePointerDown = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     onSelect(machine.id);
+    if (readOnly) return;
     setDragging(true);
     (e.target as any).setPointerCapture(e.pointerId);
   };

@@ -144,9 +144,9 @@ function logAction(userId: string | undefined, username: string | undefined, act
  * still labelled "System" while every authenticated action carries the
  * real user's name.
  */
-function getCallerIdentity(req: any): { userId: string | undefined; userName: string; isAdmin: boolean } {
+function getCallerIdentity(req: any): { userId: string | undefined; userName: string; isAdmin: boolean; role: string } {
   const token = req.cookies?.token;
-  if (!token) return { userId: undefined, userName: 'System', isAdmin: false };
+  if (!token) return { userId: undefined, userName: 'System', isAdmin: false, role: 'anonymous' };
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     if (decoded && decoded.uid) {
@@ -154,12 +154,13 @@ function getCallerIdentity(req: any): { userId: string | undefined; userName: st
         userId: decoded.uid,
         userName: decoded.displayName || decoded.username || 'Unknown',
         isAdmin: decoded.role === 'admin',
+        role: decoded.role || 'technician',
       };
     }
   } catch {
     // invalid / expired token — treat as anonymous
   }
-  return { userId: undefined, userName: 'System', isAdmin: false };
+  return { userId: undefined, userName: 'System', isAdmin: false, role: 'anonymous' };
 }
 
 function getChangesString(entityType: string, entityName: string, oldObj: any, newObj: any): string {
@@ -363,6 +364,24 @@ app.delete('/api/purchase-requests/:id', (req, res) => {
   }
 });
 
+app.get('/api/server-ip', (req, res) => {
+  const interfaces = os.networkInterfaces();
+  let ipAddress = 'localhost';
+  for (const name of Object.keys(interfaces)) {
+    const netInterface = interfaces[name];
+    if (netInterface) {
+      for (const net of netInterface) {
+        if (net.family === 'IPv4' && !net.internal) {
+          ipAddress = net.address;
+          break;
+        }
+      }
+    }
+    if (ipAddress !== 'localhost') break;
+  }
+  res.json({ ip: ipAddress, port: PORT });
+});
+
 // Machines
 app.get('/api/machines', (req, res) => {
   try {
@@ -380,6 +399,10 @@ app.get('/api/machines', (req, res) => {
 
 app.post('/api/machines', (req, res) => {
   try {
+    const { role } = getCallerIdentity(req);
+    if (role !== 'admin' && role !== 'manager') {
+      return res.status(403).json({ error: 'Forbidden: Manager or Admin role required' });
+    }
     const machine = { ...req.body };
     if (machine.preventivePlan) {
       machine.preventivePlan = JSON.stringify(machine.preventivePlan);
@@ -417,6 +440,10 @@ app.post('/api/machines', (req, res) => {
 
 app.put('/api/machines/:id', (req, res) => {
   try {
+    const { role } = getCallerIdentity(req);
+    if (role !== 'admin' && role !== 'manager') {
+      return res.status(403).json({ error: 'Forbidden: Manager or Admin role required' });
+    }
     const { id } = req.params;
     const machine = { ...req.body };
     machine.updatedAt = new Date().toISOString();
@@ -930,6 +957,10 @@ app.get('/api/products', (req, res) => {
 
 app.post('/api/products', (req, res) => {
   try {
+    const { role } = getCallerIdentity(req);
+    if (role === 'anonymous') {
+      return res.status(401).json({ error: 'Unauthorized: Authentication required' });
+    }
     const items = Array.isArray(req.body) ? req.body : [req.body];
     const insert = db.prepare(`
       INSERT OR REPLACE INTO products (id, item, description, color, cycleTime, qtyProduced, priceTN, priceMalta, updatedAt)
@@ -961,6 +992,10 @@ app.post('/api/products', (req, res) => {
 
 app.put('/api/products/:id', (req, res) => {
   try {
+    const { role } = getCallerIdentity(req);
+    if (role !== 'admin' && role !== 'manager') {
+      return res.status(403).json({ error: 'Forbidden: Manager or Admin role required' });
+    }
     const { id } = req.params;
     const updates = req.body;
     updates.updatedAt = new Date().toISOString();
@@ -977,6 +1012,10 @@ app.put('/api/products/:id', (req, res) => {
 
 app.delete('/api/products/:id', (req, res) => {
   try {
+    const { role } = getCallerIdentity(req);
+    if (role !== 'admin' && role !== 'manager') {
+      return res.status(403).json({ error: 'Forbidden: Manager or Admin role required' });
+    }
     const { id } = req.params;
     db.prepare('DELETE FROM products WHERE id = ?').run(id);
     res.json({ message: 'Product deleted' });
@@ -987,6 +1026,10 @@ app.delete('/api/products/:id', (req, res) => {
 
 app.post('/api/spare-parts', (req, res) => {
   try {
+    const { role } = getCallerIdentity(req);
+    if (role === 'anonymous') {
+      return res.status(401).json({ error: 'Unauthorized: Authentication required' });
+    }
     const part = req.body;
     const columns = Object.keys(part).join(', ');
     const placeholders = Object.keys(part).map(() => '?').join(', ');
@@ -1003,6 +1046,10 @@ app.post('/api/spare-parts', (req, res) => {
 
 app.put('/api/spare-parts/:id', (req, res) => {
   try {
+    const { role } = getCallerIdentity(req);
+    if (role === 'anonymous') {
+      return res.status(401).json({ error: 'Unauthorized: Authentication required' });
+    }
     const { id } = req.params;
     const part = { ...req.body };
     part.updatedAt = new Date().toISOString();
@@ -1314,6 +1361,10 @@ app.post('/api/machine-rendement', (req, res) => {
 
 app.put('/api/machine-rendement/:id', (req, res) => {
   try {
+    const { role } = getCallerIdentity(req);
+    if (role !== 'admin' && role !== 'manager') {
+      return res.status(403).json({ error: 'Forbidden: Manager or Admin role required' });
+    }
     const { id } = req.params;
     const { date, machineNumber, item, targetQty, qtyShift1, qtyShift2, qtyShift3, efficiencyShift1, efficiencyShift2, efficiencyShift3, actualCycleTime, actualCavitiesRunning, trs, comment, priceMarket } = req.body;
     db.prepare(`
@@ -1328,6 +1379,10 @@ app.put('/api/machine-rendement/:id', (req, res) => {
 
 app.delete('/api/machine-rendement/:id', (req, res) => {
   try {
+    const { isAdmin } = getCallerIdentity(req);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
     const { id } = req.params;
     db.prepare('DELETE FROM machine_rendement WHERE id = ?').run(id);
     res.json({ message: 'Record deleted' });

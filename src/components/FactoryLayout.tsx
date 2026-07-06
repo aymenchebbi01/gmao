@@ -11,6 +11,7 @@ import { Machine as MachineType } from '../types';
 import { api } from '../services/api';
 import { Loader2, Box, Save, RefreshCw, Building2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
 
 class CanvasErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: string }> {
   constructor(props: { children: React.ReactNode }) {
@@ -49,6 +50,9 @@ interface FactoryLayoutProps {
 }
 
 export default function FactoryLayout({ setActiveTab, setHistoryMachineId }: FactoryLayoutProps) {
+  const { user } = useAuth();
+  const readOnly = user?.role === 'technician';
+
   const [machines, setMachines] = useState<MachineType[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -141,18 +145,20 @@ export default function FactoryLayout({ setActiveTab, setHistoryMachineId }: Fac
           >
             <RefreshCw className="w-5 h-5" />
           </button>
-          <button
-            onClick={handleSaveLayout}
-            disabled={!hasChanges}
-            className={`p-3 rounded-xl transition-all flex items-center gap-2 ${hasChanges
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
-              : 'text-gray-300 cursor-not-allowed'
-              }`}
-            title="Save Layout"
-          >
-            <Save className="w-5 h-5" />
-            {hasChanges && <span className="text-xs font-bold pr-1">SAVE</span>}
-          </button>
+          {!readOnly && (
+            <button
+              onClick={handleSaveLayout}
+              disabled={!hasChanges}
+              className={`p-3 rounded-xl transition-all flex items-center gap-2 ${hasChanges
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                : 'text-gray-300 cursor-not-allowed'
+                }`}
+              title="Save Layout"
+            >
+              <Save className="w-5 h-5" />
+              {hasChanges && <span className="text-xs font-bold pr-1">SAVE</span>}
+            </button>
+          )}
         </div>
 
         <div className="px-4 py-3 bg-white/80 backdrop-blur-md border border-gray-200 rounded-2xl shadow-lg">
@@ -195,6 +201,7 @@ export default function FactoryLayout({ setActiveTab, setHistoryMachineId }: Fac
                   isSelected={selectedId === machine.id}
                   onSelect={setSelectedId}
                   onUpdate={handleUpdateMachine}
+                  readOnly={readOnly}
                 />
               ))}
               <ContactShadows
@@ -215,6 +222,7 @@ export default function FactoryLayout({ setActiveTab, setHistoryMachineId }: Fac
         onClose={() => setSelectedId(null)}
         setActiveTab={setActiveTab}
         setHistoryMachineId={setHistoryMachineId}
+        readOnly={readOnly}
       />
     </div>
   );

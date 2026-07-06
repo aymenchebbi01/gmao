@@ -9,6 +9,7 @@ interface PropertiesPanelProps {
   onClose: () => void;
   setActiveTab?: (tab: string) => void;
   setHistoryMachineId?: (id: string | null) => void;
+  readOnly?: boolean;
 }
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ 
@@ -16,7 +17,8 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onUpdate, 
   onClose,
   setActiveTab,
-  setHistoryMachineId
+  setHistoryMachineId,
+  readOnly
 }) => {
   if (!selectedMachine) return null;
 
@@ -90,13 +92,15 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           <div className="space-y-3">
             <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400 block">Actions</label>
             
-            <button 
-              onClick={handleRotation}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl transition-all text-sm font-medium text-gray-700"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Rotate 90°
-            </button>
+            {!readOnly && (
+              <button 
+                onClick={handleRotation}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-white hover:bg-gray-50 border border-gray-200 rounded-xl transition-all text-sm font-medium text-gray-700"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Rotate 90°
+              </button>
+            )}
 
             <button 
               onClick={() => {
@@ -114,8 +118,17 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </div>
 
         <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center gap-2">
-          <Move className="w-3 h-3 text-gray-400" />
-          <span className="text-[10px] text-gray-400 font-medium">DRAG MACHINE TO REPOSITION</span>
+          {readOnly ? (
+            <>
+              <Info className="w-3 h-3 text-gray-400" />
+              <span className="text-[10px] text-gray-400 font-medium">VIEW ONLY MODE — EDITING DISABLED</span>
+            </>
+          ) : (
+            <>
+              <Move className="w-3 h-3 text-gray-400" />
+              <span className="text-[10px] text-gray-400 font-medium">DRAG MACHINE TO REPOSITION</span>
+            </>
+          )}
         </div>
       </motion.div>
     </AnimatePresence>

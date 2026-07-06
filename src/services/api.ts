@@ -373,4 +373,8 @@ export const api = {
     const res = await fetch(`${API_BASE}/backups/restore-upload`, { method: 'POST', body: formData });
     return handleResponse(res);
   },
+  getServerIp: async (): Promise<{ ip: string; port: number }> => {
+    const res = await fetch(`${API_BASE}/server-ip`);
+    return handleResponse(res);
+  },
 };

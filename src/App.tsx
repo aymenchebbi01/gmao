@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -19,30 +20,54 @@ import PurchaseRequests from './components/PurchaseRequests';
 import MachineRendement from './components/MachineRendement';
 import BackupManager from './components/BackupManager';
 import { Toaster } from 'sonner';
-import { Machine } from './types';
 import { cn, calculateMachineLiveHours } from './lib/utils';
 import { api } from './services/api';
 
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const location = useLocation();
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  return <>{children}</>;
+}
+
+function LoginRoute() {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  if (user) {
+    const from = (location.state as any)?.from;
+    const fallbackPath = from ? `${from.pathname}${from.search || ''}` : '/dashboard';
+    return <Navigate to={fallbackPath} replace />;
+  }
+
+  return <Login />;
+}
+
+function RequireRole({ children, allowed }: { children: React.ReactNode, allowed: string | string[] }) {
+  const { user } = useAuth();
+  const allowedRoles = Array.isArray(allowed) ? allowed : [allowed];
+  if (!user || !allowedRoles.includes(user.role)) {
+    return <div className="p-8 text-center text-gray-500">Access Denied</div>;
+  }
+  return <>{children}</>;
+}
+
+function MobileStatusWrapper() {
+  const [searchParams] = useSearchParams();
+  const id = searchParams.get('id');
+  return <MobileStatusUpdater machineId={id} />;
+}
+
+function MobileStockWrapper() {
+  const [searchParams] = useSearchParams();
+  const id = searchParams.get('id');
+  return <MobileStockUpdater partId={id} />;
+}
+
 function AppContent() {
-  const { user, loading, isAdmin, isManager } = useAuth();
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [historyMachineId, setHistoryMachineId] = useState<string | null>(null);
-  const [deepLinkId, setDeepLinkId] = useState<string | null>(null);
-
-  // Parse deep links
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const initialTab = params.get('tab');
-    const machineId = params.get('id');
-
-    if (machineId) {
-      setDeepLinkId(machineId);
-    }
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, []);
+  const { user, loading } = useAuth();
 
   // Global background task to sync machine hours to DB every 10 minutes
   useEffect(() => {
@@ -93,75 +118,107 @@ function AppContent() {
     );
   }
 
-  if (!user) {
-    return <Login />;
-  }
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginRoute />} />
+      
+      {/* Mobile status and stock routes without Sidebar and Top Header */}
+      <Route
+        path="/mobile-status"
+        element={
+          <RequireAuth>
+            <div className="p-4 sm:p-8 overflow-y-auto h-screen bg-gray-50">
+              <MobileStatusWrapper />
+            </div>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/mobile-stock"
+        element={
+          <RequireAuth>
+            <div className="p-4 sm:p-8 overflow-y-auto h-screen bg-gray-50">
+              <MobileStockWrapper />
+            </div>
+          </RequireAuth>
+        }
+      />
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard': return <Dashboard setActiveTab={setActiveTab} />;
-      case 'layout': return <FactoryLayout setActiveTab={setActiveTab} setHistoryMachineId={setHistoryMachineId} />;
-      case 'machines': return <MachineList historyMachineId={historyMachineId} onHistoryClose={() => setHistoryMachineId(null)} />;
-      case 'consultation': return <MachineConsultation />;
-      case 'products': return <ProductManagement />;
-      case 'work-orders':
-      case 'work-orders-list': return <WorkOrderList view="list" />;
-      case 'intervention-reports': return <WorkOrderList view="reports" />;
-      case 'inventory': return <Inventory />;
-      case 'purchase-requests': return isManager ? <PurchaseRequests /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
-      case 'calendar': return <MaintenanceCalendar setActiveTab={setActiveTab} />;
-      case 'audit-logs': return isAdmin ? <AuditLogList /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
-      case 'analytics': return <AdvancedAnalytics />;
-      case 'users': return isManager ? <UserManagement /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
-      case 'mobile-status': return <MobileStatusUpdater machineId={deepLinkId} />;
-      case 'mobile-stock': return <MobileStockUpdater partId={deepLinkId} />;
-      case 'rendement': return <MachineRendement />;
-      case 'backups': return isAdmin ? <BackupManager /> : <div className="p-8 text-center text-gray-500">Access Denied</div>;
-      default: return <Dashboard setActiveTab={setActiveTab} />;
-    }
-  };
+      <Route
+        path="/*"
+        element={
+          <RequireAuth>
+            <AppLayout />
+          </RequireAuth>
+        }
+      />
+    </Routes>
+  );
+}
+
+function AppLayout() {
+  const { user } = useAuth();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  const [historyMachineId, setHistoryMachineId] = React.useState<string | null>(null);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  const activePath = location.pathname.replace(/^\//, '') || 'dashboard';
+
+  const setActiveTab = (tab: string) => navigate(`/${tab}`);
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Toaster position="top-right" richColors />
-      {activeTab !== 'mobile-status' && activeTab !== 'mobile-stock' && (
-        <Sidebar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          isCollapsed={isSidebarCollapsed}
-          setIsCollapsed={setIsSidebarCollapsed}
-        />
-      )}
+      
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
+      />
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Header */}
-        {activeTab !== 'mobile-status' && activeTab !== 'mobile-stock' && (
-          <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 flex-shrink-0">
-            <div className="flex-1 max-w-xl hidden md:block">
-              <div className="relative">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 flex-shrink-0">
+          <div className="flex-1 max-w-xl hidden md:block">
+            <div className="relative"></div>
+          </div>
 
+          <div className="flex items-center space-x-4">
+            <div className="h-8 w-px bg-gray-200 mx-2"></div>
+            <div className="flex items-center">
+              <div className="w-8 h-8 bg-blue-100 text-blue-600 flex items-center justify-center rounded-lg font-bold text-xs">
+                {(user?.displayName || user?.username || 'U').charAt(0).toUpperCase()}
               </div>
             </div>
-
-            <div className="flex items-center space-x-4">
-
-              <div className="h-8 w-px bg-gray-200 mx-2"></div>
-              <div className="flex items-center">
-                <div className="w-8 h-8 bg-blue-100 text-blue-600 flex items-center justify-center rounded-lg font-bold text-xs">
-                  {(user?.displayName || user?.username || 'U').charAt(0).toUpperCase()}
-                </div>
-              </div>
-            </div>
-          </header>
-        )}
+          </div>
+        </header>
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-8">
           <div className={cn(
             "mx-auto transition-all duration-500",
-            activeTab === 'layout' ? "max-w-[1600px] w-full" : "max-w-7xl"
+            activePath === 'layout' ? "max-w-[1600px] w-full" : "max-w-7xl"
           )}>
-            {renderContent()}
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard setActiveTab={setActiveTab} />} />
+              <Route path="/layout" element={<FactoryLayout setActiveTab={setActiveTab} setHistoryMachineId={setHistoryMachineId} />} />
+              <Route path="/machines" element={<MachineList historyMachineId={historyMachineId} onHistoryClose={() => setHistoryMachineId(null)} />} />
+              <Route path="/consultation" element={<MachineConsultation />} />
+              <Route path="/products" element={<ProductManagement />} />
+              <Route path="/work-orders" element={<WorkOrderList view="list" />} />
+              <Route path="/work-orders-list" element={<WorkOrderList view="list" />} />
+              <Route path="/intervention-reports" element={<WorkOrderList view="reports" />} />
+              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/purchase-requests" element={<PurchaseRequests />} />
+              <Route path="/calendar" element={<MaintenanceCalendar setActiveTab={setActiveTab} />} />
+              <Route path="/audit-logs" element={<RequireRole allowed="admin"><AuditLogList /></RequireRole>} />
+              <Route path="/analytics" element={<AdvancedAnalytics />} />
+              <Route path="/users" element={<RequireRole allowed="manager"><UserManagement /></RequireRole>} />
+              <Route path="/rendement" element={<MachineRendement />} />
+              <Route path="/backups" element={<RequireRole allowed="admin"><BackupManager /></RequireRole>} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
           </div>
         </div>
       </main>
@@ -171,8 +228,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
