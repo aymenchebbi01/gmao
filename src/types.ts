@@ -101,7 +101,8 @@ export interface InterventionReport {
     control: boolean;
   };
   maintenanceType: 'corrective' | 'preventive';
-  failureCause: 'wear' | 'user' | 'product' | 'other';
+  failureCategory?: string;
+  failureCause: string;
   relatedCause: string;
   interventionTime: string;
   actions: string;

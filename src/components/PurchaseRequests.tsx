@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
     ShoppingCart,
-    AlertTriangle,
     Download,
     Plus,
     Trash2,
     RefreshCw,
     FileText,
     Package,
-    History,
     CheckCircle2,
     Edit2,
     Search,
@@ -25,7 +23,7 @@ import { format } from 'date-fns';
 import { THERMOPLASTICS_LOGO_BASE64 } from '../constants/logo';
 import { useAuth } from '../contexts/AuthContext';
 
-interface PurchaseItem {
+export interface PurchaseItem {
     id: string;
     name: string;
     sku: string;
@@ -37,10 +35,11 @@ interface PurchaseItem {
     qtyToOrder: number;
     remark: string;
     isManual?: boolean;
+    imageDataUrl?: string; // base64 data URL for item photo
 }
 
 const defaultManualItem = (): PurchaseItem => ({
-    id: `manual-${Date.now()}`,
+    id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     name: '',
     sku: '',
     category: '',
@@ -51,37 +50,39 @@ const defaultManualItem = (): PurchaseItem => ({
     qtyToOrder: 1,
     remark: '',
     isManual: true,
+    imageDataUrl: undefined,
 });
 
 export default function PurchaseRequests() {
     const { user, isAdmin } = useAuth();
-    const [parts, setParts] = useState<SparePart[]>([]);
-    const [items, setItems] = useState<PurchaseItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
-
-    // Header form
-    const [requestedBy, setRequestedBy] = useState(user?.displayName || user?.username || '');
-    const [department, setDepartment] = useState('Maintenance');
-    const [supplier, setSupplier] = useState('');
-    const [notes, setNotes] = useState('');
-
-    const [activeView, setActiveTab] = useState<'generator' | 'history'>(
-        user?.role === 'accounting' ? 'history' : 'generator'
-    );
     const [history, setHistory] = useState<any[]>([]);
     const [lastRef, setLastRef] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
     const [sendingEmailId, setSendingEmailId] = useState<number | null>(null);
+
+    // Spare parts list for auto-complete when creating a PR
+    const [spareParts, setSpareParts] = useState<SparePart[]>([]);
 
     // History search and edit states
     const [historySearch, setHistorySearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const PAGE_SIZE = 10;
+    
+    // Admin Edit modal state
     const [editingRequest, setEditingRequest] = useState<any | null>(null);
     const [editDemandeur, setEditDemandeur] = useState('');
     const [editSupplier, setEditSupplier] = useState('');
     const [editDepartment, setEditDepartment] = useState('');
+
+    // New Purchase Request inline form state
+    const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
+    const [createRequestedBy, setCreateRequestedBy] = useState('');
+    const [createDepartment, setCreateDepartment] = useState('Maintenance');
+    const [createSupplier, setCreateSupplier] = useState('');
+    const [createNotes, setCreateNotes] = useState('');
+    const [createItems, setCreateItems] = useState<PurchaseItem[]>([]);
+    const [isSubmittingCreate, setIsSubmittingCreate] = useState(false);
 
     const getStatusStyle = (status: string) => {
         const val = status || 'Waiting for validation';
@@ -100,6 +101,46 @@ export default function PurchaseRequests() {
                 return 'bg-gray-50 text-gray-700 border-gray-100';
         }
     };
+
+    const fetchHistory = async () => {
+        setLoading(true);
+        try {
+            const data = await api.getPurchaseRequests();
+            setHistory(data);
+            const lr = await api.getLastPurchaseRequestRef();
+            setLastRef(lr.lastRef);
+        } catch (err) {
+            console.error('Failed to load history', err);
+            toast.error('Erreur lors du chargement des demandes d\'achat');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchHistory();
+    }, []);
+
+    const generateNextRef = (currentLastRef: string | null) => {
+        const year = new Date().getFullYear();
+        if (!currentLastRef) return `DA-${year}00001`;
+
+        const parts = currentLastRef.split('-');
+        if (parts.length < 2) return `DA-${year}00001`;
+
+        const refPart = parts[1]; // e.g. "202600001"
+        const refYear = parseInt(refPart.substring(0, 4));
+        const seq = parseInt(refPart.substring(4));
+
+        if (refYear < year) {
+            return `DA-${year}00001`;
+        }
+
+        const nextSeq = (seq + 1).toString().padStart(5, '0');
+        return `DA-${year}${nextSeq}`;
+    };
+
+    const currentRefNum = generateNextRef(lastRef);
 
     const handleEditClick = (req: any) => {
         setEditingRequest(req);
@@ -149,96 +190,82 @@ export default function PurchaseRequests() {
         }
     };
 
-    const generateNextRef = (currentLastRef: string | null) => {
-        const year = new Date().getFullYear();
-        if (!currentLastRef) return `DA-${year}00001`;
+    // Open creation inline form
+    const handleOpenCreateModal = async () => {
+        setCreateRequestedBy(user?.displayName || user?.username || '');
+        setCreateDepartment('Maintenance');
+        setCreateSupplier('');
+        setCreateNotes('');
+        setCreateItems([defaultManualItem()]);
+        setIsCreateFormOpen(true);
 
-        const parts = currentLastRef.split('-');
-        if (parts.length < 2) return `DA-${year}00001`;
-
-        const refPart = parts[1]; // e.g. "202600001"
-        const refYear = parseInt(refPart.substring(0, 4));
-        const seq = parseInt(refPart.substring(4));
-
-        if (refYear < year) {
-            return `DA-${year}00001`;
-        }
-
-        const nextSeq = (seq + 1).toString().padStart(5, '0');
-        return `DA-${year}${nextSeq}`;
-    };
-
-    const currentRefNum = generateNextRef(lastRef);
-
-    const fetchHistory = async () => {
-        try {
-            const data = await api.getPurchaseRequests();
-            setHistory(data);
-            const lr = await api.getLastPurchaseRequestRef();
-            setLastRef(lr.lastRef);
-        } catch (err) {
-            console.error('Failed to load history', err);
-        }
-    };
-
-    const fetchAndBuild = async () => {
-        setLoading(true);
         try {
             const allParts = await api.getSpareParts();
-            setParts(allParts);
-            const lowStock = allParts.filter(p => p.stock <= p.minStock);
-            const built: PurchaseItem[] = lowStock.map(p => ({
-                id: p.id,
-                name: p.name,
-                sku: p.sku,
-                category: p.category,
-                location: p.location,
-                unit: p.unit,
-                currentStock: p.stock,
-                minStock: p.minStock,
-                qtyToOrder: Math.max(1, p.minStock - p.stock + p.minStock), // reorder enough to double minStock
-                remark: '',
-                isManual: false,
-            }));
-            setItems(prev => {
-                // Keep any manual items already added
-                const manualItems = prev.filter(i => i.isManual);
-                return [...built, ...manualItems];
-            });
+            setSpareParts(allParts);
         } catch (err) {
-            toast.error('Failed to load inventory');
-        } finally {
-            setLoading(false);
+            console.error('Failed to fetch spare parts', err);
         }
     };
 
-    useEffect(() => {
-        fetchAndBuild();
-        fetchHistory();
-    }, []);
-
-    const updateItem = (id: string, field: keyof PurchaseItem, value: any) => {
-        setItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
+    // Handle item image upload
+    const handleItemImageUpload = (itemId: string, file: File) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            setCreateItems(prev => prev.map(i => i.id === itemId ? { ...i, imageDataUrl: dataUrl } : i));
+        };
+        reader.readAsDataURL(file);
     };
 
-    const removeItem = (id: string) => {
-        setItems(prev => prev.filter(i => i.id !== id));
+    const handleAddCreateItem = () => {
+        setCreateItems(prev => [...prev, defaultManualItem()]);
     };
 
-    const addManualItem = () => {
-        setItems(prev => [...prev, defaultManualItem()]);
+    const handleUpdateCreateItem = (id: string, field: keyof PurchaseItem, value: any) => {
+        setCreateItems(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
     };
 
-    const generatePDF = () => {
-        if (items.length === 0) {
-            toast.error('No items to include in the request');
+    const handleRemoveCreateItem = (id: string) => {
+        if (createItems.length <= 1) {
+            toast.error('Une demande doit contenir au moins un article');
             return;
         }
+        setCreateItems(prev => prev.filter(i => i.id !== id));
+    };
 
+    const handleSelectSparePart = (itemId: string, partId: string) => {
+        const selected = spareParts.find(p => p.id === partId);
+        if (!selected) return;
+
+        setCreateItems(prev => prev.map(item => {
+            if (item.id === itemId) {
+                return {
+                    ...item,
+                    name: selected.name,
+                    sku: selected.sku || '',
+                    category: selected.category || '',
+                    location: selected.location || '',
+                    unit: selected.unit || 'pcs',
+                    currentStock: selected.stock || 0,
+                    minStock: selected.minStock || 0,
+                    isManual: false,
+                };
+            }
+            return item;
+        }));
+    };
+
+    const generatePDFForRequest = (
+        refNum: string,
+        reqBy: string,
+        dept: string,
+        supp: string,
+        remarks: string,
+        prItems: PurchaseItem[]
+    ) => {
         const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
         // ---- Header ----
-        // Logo
         try {
             doc.addImage(THERMOPLASTICS_LOGO_BASE64, 'PNG', 14, 10, 35, 15);
         } catch (e) {
@@ -260,29 +287,42 @@ export default function PurchaseRequests() {
         // Meta Info
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
-        doc.text(`N° DA : ${currentRefNum}`, 14, 40);
-        doc.text(`Date d’émission : ${format(new Date(), 'dd/MM/yyyy')}`, 130, 40);
+        doc.text(`N° DA : ${refNum}`, 14, 40);
+        doc.text(`Date d'émission : ${format(new Date(), 'dd/MM/yyyy')}`, 130, 40);
 
-        // ---- Table ----
-        const tableBody = items.map((item) => [
-            item.sku || '',
-            item.name,
-            String(item.qtyToOrder),
-            item.unit,
-            item.isManual ? '' : String(item.currentStock),
-            supplier || '',
-        ]);
+        // Table — include photo column if any item has an image
+        const hasImages = prItems.some(i => !!i.imageDataUrl);
+        const tableHead = hasImages
+            ? [['Reference', 'Désignation Article', 'Quantité', 'Unité', 'Stock actuel', 'Fournisseur', 'Photo']]
+            : [['Reference', 'Désignation Article', 'Quantité', 'Unité', 'Stock actuel', 'Fournisseur']];
 
-        // Add 3 empty rows to match the "form" look if the list is short
-        if (tableBody.length < 5) {
-            for (let i = 0; i < 3; i++) {
-                tableBody.push(['', '', '', '', '', '']);
-            }
-        }
+        const tableBody = prItems.map((item) => {
+            const base = [
+                item.sku || '',
+                item.name,
+                String(item.qtyToOrder),
+                item.unit,
+                item.isManual ? '' : String(item.currentStock),
+                supp || '',
+            ];
+            if (hasImages) base.push(item.imageDataUrl ? '' : ''); // placeholder — images added didDrawCell
+            return base;
+        });
+
+
+        const columnStylesBase: any = {
+            0: { cellWidth: 28 },
+            1: { cellWidth: hasImages ? 38 : 45 },
+            2: { halign: 'center' as const, cellWidth: 18 },
+            3: { halign: 'center' as const, cellWidth: 14 },
+            4: { halign: 'center' as const, cellWidth: 22 },
+            5: { halign: 'center' as const, cellWidth: hasImages ? 22 : undefined },
+        };
+        if (hasImages) columnStylesBase[6] = { cellWidth: 30, halign: 'center' as const };
 
         autoTable(doc, {
             startY: 46,
-            head: [['Reference', 'Désignation Article', 'Quantité', 'unité', 'Stock actuel', 'Fournisseur']],
+            head: tableHead,
             body: tableBody,
             theme: 'grid',
             headStyles: {
@@ -299,80 +339,113 @@ export default function PurchaseRequests() {
                 cellPadding: 3,
                 textColor: [0, 0, 0],
                 lineWidth: 0.2,
-                lineColor: [0, 0, 0]
+                lineColor: [0, 0, 0],
+                minCellHeight: hasImages ? 28 : 10,
             },
-            columnStyles: {
-                0: { cellWidth: 30 },
-                1: { cellWidth: 45 },
-                2: { halign: 'center', cellWidth: 20 },
-                3: { halign: 'center', cellWidth: 15 },
-                4: { halign: 'center', cellWidth: 25 },
-                5: { halign: 'center' },
-            },
+            columnStyles: columnStylesBase,
             margin: { left: 14, right: 14 },
+            didDrawCell: (data: any) => {
+                if (!hasImages) return;
+                const col = data.column.index;
+                const row = data.row.index;
+                if (data.section === 'body' && col === 6 && row < prItems.length) {
+                    const item = prItems[row];
+                    if (item.imageDataUrl) {
+                        try {
+                            const ext = item.imageDataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+                            doc.addImage(
+                                item.imageDataUrl,
+                                ext,
+                                data.cell.x + 2,
+                                data.cell.y + 2,
+                                26,
+                                24
+                            );
+                        } catch (_) {}
+                    }
+                }
+            },
         });
 
         let finalY = (doc as any).lastAutoTable.finalY + 15;
 
-        // Ensure we don't go off page
         if (finalY > 230) {
             doc.addPage();
             finalY = 20;
         }
 
-        // ---- Remark ----
+        // Remarks
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        const remarkText = notes ? `Remarque : ${notes}` : 'Remarque : ..............................................................................................................................................';
+        const remarkText = remarks ? `Remarque : ${remarks}` : 'Remarque : ..............................................................................................................................................';
         doc.text(remarkText, 14, finalY);
 
         finalY += 10;
 
-        // ---- Signatures Block ----
+        // Signatures Block
         doc.setLineWidth(0.2);
-        doc.rect(14, finalY, 91, 14); // Demandeur box
-        doc.rect(105, finalY, 91, 14); // Validation box
+        doc.rect(14, finalY, 91, 14);
+        doc.rect(105, finalY, 91, 14);
 
         doc.setFontSize(9);
-        doc.text(`Demandeur : ${requestedBy || '....................................................'}`, 16, finalY + 5);
+        doc.text(`Demandeur : ${reqBy || '....................................................'}`, 16, finalY + 5);
         doc.text(`Visa : .................................................................`, 16, finalY + 11);
 
         doc.text(`Validation supérieur hiérarchique: .............................`, 107, finalY + 5);
         doc.text(`Date : .................................................................`, 107, finalY + 11);
 
         finalY += 25;
-
-        // Director Signature
         doc.text(`Visa Directeur des opérations: .........................................................................`, 105, finalY, { align: 'center' });
 
-        // ---- Bottom Footer ----
         doc.setFontSize(8);
         doc.text('Page : 1 / 1', 14, 285);
         doc.text('DASACH03/V01/01032025/WN', 196, 285, { align: 'right' });
 
         const pdfBase64 = doc.output('datauristring');
-
-        doc.save(`Demande_Achat_${currentRefNum}.pdf`);
-
-        // Save to DB
-        api.savePurchaseRequest({
-            reference: currentRefNum,
-            date: format(new Date(), 'yyyy-MM-dd'),
-            requested_by: requestedBy,
-            department: department,
-            supplier: supplier,
-            items_count: items.length,
-            pdf_data: pdfBase64
-        }).then(() => {
-            fetchHistory();
-        }).catch(err => {
-            console.error('Failed to save PR to history', err);
-        });
-
-        toast.success('Demande d\'achat générée selon le modèle');
+        doc.save(`Demande_Achat_${refNum}.pdf`);
+        return pdfBase64;
     };
 
-    const lowStockCount = items.filter(i => !i.isManual).length;
+    const handleCreateSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        const validItems = createItems.filter(i => i.name.trim() !== '');
+        if (validItems.length === 0) {
+            toast.error('Veuillez ajouter au moins un article avec un nom valide');
+            return;
+        }
+
+        setIsSubmittingCreate(true);
+        try {
+            const pdfBase64 = generatePDFForRequest(
+                currentRefNum,
+                createRequestedBy,
+                createDepartment,
+                createSupplier,
+                createNotes,
+                validItems
+            );
+
+            await api.savePurchaseRequest({
+                reference: currentRefNum,
+                date: format(new Date(), 'yyyy-MM-dd'),
+                requested_by: createRequestedBy,
+                department: createDepartment,
+                supplier: createSupplier,
+                items_count: validItems.length,
+                pdf_data: pdfBase64
+            });
+
+            toast.success(`Demande d'achat ${currentRefNum} créée et enregistrée !`);
+            setIsCreateFormOpen(false);
+            fetchHistory();
+        } catch (err) {
+            console.error('Failed to create purchase request', err);
+            toast.error('Erreur lors de la création de la demande d\'achat');
+        } finally {
+            setIsSubmittingCreate(false);
+        }
+    };
 
     // --- History computed values ---
     const filteredHistory = history.filter(req => {
@@ -387,7 +460,7 @@ export default function PurchaseRequests() {
         return matchesSearch && matchesStatus;
     });
 
-    const totalPages = Math.ceil(filteredHistory.length / PAGE_SIZE);
+    const totalPages = Math.ceil(filteredHistory.length / PAGE_SIZE) || 1;
     const paginatedHistory = filteredHistory.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
     const statusCounts = {
@@ -409,618 +482,623 @@ export default function PurchaseRequests() {
         setCurrentPage(1);
     };
 
-
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative min-h-[800px]">
+            {/* Main Content with Blur Effect */}
+            <div className={cn(
+                "transition-all duration-500 ease-in-out space-y-6",
+                (isCreateFormOpen || !!editingRequest) ? "blur-xl opacity-20 scale-95 pointer-events-none" : "blur-0 opacity-100 scale-100"
+            )}>
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="flex bg-gray-100 p-1 rounded-xl">
-                        {user?.role !== 'accounting' && (
-                            <button
-                                onClick={() => setActiveTab('generator')}
-                                className={cn(
-                                    "px-4 py-1.5 text-sm font-medium rounded-lg transition-all",
-                                    activeView === 'generator' ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"
-                                )}
-                            >
-                                Générateur
-                            </button>
-                        )}
-                        <button
-                            onClick={() => setActiveTab('history')}
-                            className={cn(
-                                "px-4 py-1.5 text-sm font-medium rounded-lg transition-all",
-                                activeView === 'history' ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"
-                            )}
-                        >
-                            Historique
-                        </button>
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Demande d'Achat</h1>
-                    </div>
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-900">Demande d'Achat</h1>
+                    <p className="text-xs text-gray-500 mt-0.5">Gestion et suivi des demandes d'achat</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {activeView === 'generator' && (
-                        <>
-                            <button
-                                onClick={fetchAndBuild}
-                                disabled={loading}
-                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
-                            >
-                                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                                Actualiser
-                            </button>
-                            <button
-                                onClick={generatePDF}
-                                className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
-                            >
-                                <Download size={16} />
-                                Générer & Télécharger
-                            </button>
-                        </>
+                    <button
+                        onClick={fetchHistory}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
+                        title="Actualiser l'historique"
+                    >
+                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                    </button>
+                    {user?.role !== 'accounting' && (
+                        <button
+                            onClick={handleOpenCreateModal}
+                            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+                        >
+                            <Plus size={18} />
+                            Nouvelle Demande
+                        </button>
                     )}
                 </div>
             </div>
 
-            {activeView === 'generator' ? (
-                <>
-                    {/* Stats */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex items-center gap-4">
-                            <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                                <AlertTriangle size={20} className="text-red-500" />
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Articles en rupture</p>
-                                <p className="text-2xl font-bold text-gray-900">{lowStockCount}</p>
-                            </div>
-                        </div>
-                        <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex items-center gap-4">
-                            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                                <ShoppingCart size={20} className="text-blue-500" />
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Total articles DA</p>
-                                <p className="text-2xl font-bold text-gray-900">{items.length}</p>
-                            </div>
-                        </div>
-                        <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-5 flex items-center gap-4">
-                            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                                <FileText size={20} className="text-emerald-500" />
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Référence (Prochaine)</p>
-                                <p className="text-sm font-bold text-gray-900 font-mono">{currentRefNum}</p>
-                            </div>
-                        </div>
-                    </div>
+            {/* Summary Stats Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 flex flex-col gap-1">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total</p>
+                    <p className="text-2xl font-bold text-gray-900">{statusCounts.total}</p>
+                </div>
+                <button
+                    onClick={() => { setStatusFilter(statusFilter === 'Waiting for validation' ? '' : 'Waiting for validation'); setCurrentPage(1); }}
+                    className={cn("text-left bg-amber-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Waiting for validation' ? 'border-amber-400 ring-2 ring-amber-300' : 'border-amber-100')}
+                >
+                    <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">En attente</p>
+                    <p className="text-2xl font-bold text-amber-700">{statusCounts.waiting_validation}</p>
+                </button>
+                <button
+                    onClick={() => { setStatusFilter(statusFilter === 'Waiting for reception' ? '' : 'Waiting for reception'); setCurrentPage(1); }}
+                    className={cn("text-left bg-blue-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Waiting for reception' ? 'border-blue-400 ring-2 ring-blue-300' : 'border-blue-100')}
+                >
+                    <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Att. réception</p>
+                    <p className="text-2xl font-bold text-blue-700">{statusCounts.waiting_reception}</p>
+                </button>
+                <button
+                    onClick={() => { setStatusFilter(statusFilter === 'In progress' ? '' : 'In progress'); setCurrentPage(1); }}
+                    className={cn("text-left bg-purple-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'In progress' ? 'border-purple-400 ring-2 ring-purple-300' : 'border-purple-100')}
+                >
+                    <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">En cours</p>
+                    <p className="text-2xl font-bold text-purple-700">{statusCounts.in_progress}</p>
+                </button>
+                <button
+                    onClick={() => { setStatusFilter(statusFilter === 'Purchased' ? '' : 'Purchased'); setCurrentPage(1); }}
+                    className={cn("text-left bg-emerald-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Purchased' ? 'border-emerald-400 ring-2 ring-emerald-300' : 'border-emerald-100')}
+                >
+                    <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Acheté</p>
+                    <p className="text-2xl font-bold text-emerald-700">{statusCounts.purchased}</p>
+                </button>
+                <button
+                    onClick={() => { setStatusFilter(statusFilter === 'Cancelled' ? '' : 'Cancelled'); setCurrentPage(1); }}
+                    className={cn("text-left bg-red-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Cancelled' ? 'border-red-400 ring-2 ring-red-300' : 'border-red-100')}
+                >
+                    <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Annulé</p>
+                    <p className="text-2xl font-bold text-red-700">{statusCounts.cancelled}</p>
+                </button>
+            </div>
 
-                    {/* Header Form */}
-                    <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-6">
-                        <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Informations de la demande</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Demandeur</label>
-                                <input
-                                    type="text"
-                                    placeholder="Votre nom"
-                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                                    value={requestedBy}
-                                    onChange={e => setRequestedBy(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Département</label>
-                                <input
-                                    type="text"
-                                    placeholder="ex: Maintenance"
-                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                                    value={department}
-                                    onChange={e => setDepartment(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Fournisseur</label>
-                                <input
-                                    type="text"
-                                    placeholder="Fournisseur souhaité"
-                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                                    value={supplier}
-                                    onChange={e => setSupplier(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Notes</label>
-                                <input
-                                    type="text"
-                                    placeholder="Observations..."
-                                    className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                                    value={notes}
-                                    onChange={e => setNotes(e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    </div>
+            {/* Filter Bar */}
+            <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                        type="text"
+                        placeholder="Rechercher (Réf, demandeur, fournisseur...)"
+                        className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        value={historySearch}
+                        onChange={e => { setHistorySearch(e.target.value); setCurrentPage(1); }}
+                    />
+                </div>
+                <select
+                    value={statusFilter}
+                    onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                    className={cn(
+                        "px-3 py-2.5 text-sm border rounded-xl outline-none transition-all min-w-[190px]",
+                        statusFilter ? 'border-blue-400 ring-2 ring-blue-100 font-semibold' : 'border-gray-200'
+                    )}
+                >
+                    <option value="">Tous les statuts</option>
+                    <option value="Waiting for validation">Waiting for validation</option>
+                    <option value="Waiting for reception">Waiting for reception</option>
+                    <option value="In progress">In progress</option>
+                    <option value="Purchased">Purchased</option>
+                    <option value="Cancelled">Cancelled</option>
+                </select>
+                {(historySearch || statusFilter) && (
+                    <button
+                        onClick={resetFilters}
+                        className="flex items-center gap-1.5 px-3 py-2.5 text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors whitespace-nowrap"
+                    >
+                        <X size={14} /> Réinitialiser
+                    </button>
+                )}
+            </div>
 
-                    {/* Items Table */}
-                    <div className="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
-                            <h2 className="text-sm font-bold text-gray-700">Articles à commander</h2>
+            {/* Table */}
+            <div className="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm">
+                        <thead>
+                            <tr className="bg-gray-50/70 border-b border-gray-100">
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Référence</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Demandeur</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Fournisseur</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Articles</th>
+                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Statut</th>
+                                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {loading ? (
+                                <tr>
+                                    <td colSpan={7} className="px-6 py-16 text-center">
+                                        <div className="flex items-center justify-center gap-2 text-gray-500">
+                                            <RefreshCw size={18} className="animate-spin text-blue-600" />
+                                            <span>Chargement des demandes d'achat...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : paginatedHistory.length === 0 ? (
+                                <tr>
+                                    <td colSpan={7} className="px-6 py-16 text-center">
+                                        <div className="flex flex-col items-center gap-3">
+                                            <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
+                                                <FileText size={24} className="text-gray-400" />
+                                            </div>
+                                            <p className="text-sm font-semibold text-gray-500">Aucune demande trouvée</p>
+                                            <p className="text-xs text-gray-400">
+                                                {historySearch || statusFilter
+                                                    ? 'Aucun résultat pour les filtres actuels.'
+                                                    : 'Aucune demande d\'achat enregistrée.'}
+                                            </p>
+                                            {(historySearch || statusFilter) && (
+                                                <button
+                                                    onClick={resetFilters}
+                                                    className="mt-1 text-xs text-blue-600 hover:underline"
+                                                >
+                                                    Réinitialiser les filtres
+                                                </button>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : paginatedHistory.map((req) => (
+                                <tr key={req.id} className="hover:bg-gray-50/60 transition-colors">
+                                    <td className="px-6 py-4">
+                                        <span className="font-mono font-bold text-blue-600">{req.reference}</span>
+                                    </td>
+                                    <td className="px-6 py-4 text-gray-600">
+                                        {format(new Date(req.date), 'dd/MM/yyyy')}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="text-sm font-medium text-gray-900">{req.requested_by}</div>
+                                        <div className="text-xs text-gray-500">{req.department}</div>
+                                    </td>
+                                    <td className="px-6 py-4 text-gray-600">{req.supplier || '—'}</td>
+                                    <td className="px-6 py-4">
+                                        <span className="px-2.5 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
+                                            {req.items_count} pos.
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        {user?.role === 'accounting' ? (
+                                            <select
+                                                value={req.status || 'Waiting for validation'}
+                                                onChange={async (e) => {
+                                                    const newStatus = e.target.value;
+                                                    try {
+                                                        await api.updatePurchaseRequestStatus(req.id, newStatus);
+                                                        toast.success('Statut mis à jour');
+                                                        fetchHistory();
+                                                    } catch (err) {
+                                                        toast.error('Erreur de mise à jour');
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "px-2.5 py-1 rounded-full text-xs font-bold border outline-none cursor-pointer uppercase transition-all",
+                                                    getStatusStyle(req.status)
+                                                )}
+                                            >
+                                                <option value="Waiting for validation">Waiting for validation</option>
+                                                <option value="Waiting for reception">Waiting for reception</option>
+                                                <option value="In progress">In progress</option>
+                                                <option value="Purchased">Purchased</option>
+                                                <option value="Cancelled">Cancelled</option>
+                                            </select>
+                                        ) : (
+                                            <span className={cn(
+                                                "px-2.5 py-1 rounded-full text-xs font-bold border uppercase inline-block",
+                                                getStatusStyle(req.status)
+                                            )}>
+                                                {req.status || 'Waiting for validation'}
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    const link = document.createElement('a');
+                                                    link.href = req.pdf_data;
+                                                    link.download = `Demande_Achat_${req.reference}.pdf`;
+                                                    link.click();
+                                                }}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                title="Télécharger PDF"
+                                            >
+                                                <Download size={13} />
+                                                PDF
+                                            </button>
+                                            {user?.role !== 'accounting' && (
+                                                <>
+                                                    <button
+                                                        onClick={() => handleSendEmail(req.id)}
+                                                        disabled={sendingEmailId === req.id}
+                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                                        title="Envoyer par email"
+                                                    >
+                                                        {sendingEmailId === req.id ? (
+                                                            <RefreshCw size={13} className="animate-spin" />
+                                                        ) : (
+                                                            <Send size={13} />
+                                                        )}
+                                                        Envoyer
+                                                    </button>
+                                                    {isAdmin && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleEditClick(req)}
+                                                                className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all"
+                                                                title="Modifier"
+                                                            >
+                                                                <Edit2 size={14} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteRequest(req.id)}
+                                                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                                                                title="Supprimer"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Pagination Footer */}
+                {totalPages > 1 && (
+                    <div className="px-6 py-4 border-t border-gray-50 flex items-center justify-between">
+                        <p className="text-xs text-gray-400">
+                            {filteredHistory.length} résultat{filteredHistory.length > 1 ? 's' : ''} — Page {currentPage} / {totalPages}
+                        </p>
+                        <div className="flex items-center gap-2">
                             <button
-                                onClick={addManualItem}
-                                className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                onClick={() => handlePageChange(currentPage - 1)}
+                                disabled={currentPage === 1}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                                <Plus size={14} />
-                                Ajouter manuellement
+                                ← Précédent
+                            </button>
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                .reduce((acc: (number | string)[], p, idx, arr) => {
+                                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
+                                    acc.push(p);
+                                    return acc;
+                                }, [])
+                                .map((p, idx) =>
+                                    p === '...' ? (
+                                        <span key={`ellipsis-${idx}`} className="px-1 text-gray-400 text-xs">…</span>
+                                    ) : (
+                                        <button
+                                            key={p}
+                                            onClick={() => handlePageChange(p as number)}
+                                            className={cn(
+                                                "w-8 h-8 text-xs font-medium rounded-lg transition-colors",
+                                                currentPage === p
+                                                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
+                                                    : 'text-gray-600 hover:bg-gray-100'
+                                            )}
+                                        >
+                                            {p}
+                                        </button>
+                                    )
+                                )
+                            }
+                            <button
+                                onClick={() => handlePageChange(currentPage + 1)}
+                                disabled={currentPage === totalPages}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                Suivant →
                             </button>
                         </div>
-                        {loading ? (
-                            <div className="flex items-center justify-center py-16">
-                                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                )}
+            </div>
+            </div>
+
+            {/* ── Inline Create Form Overlay (same pattern as Rendement/Inventory) ── */}
+            {isCreateFormOpen && (
+                <div className="absolute inset-x-0 top-0 z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {/* Form Header */}
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">Nouvelle Demande d'Achat</h1>
+                            <p className="text-sm font-mono font-semibold text-blue-600 mt-0.5">Référence : {currentRefNum}</p>
+                        </div>
+                        <button
+                            onClick={() => setIsCreateFormOpen(false)}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                            ← Retour à la liste
+                        </button>
+                    </div>
+
+                    <div className="bg-white/90 backdrop-blur-2xl border border-white/20 shadow-2xl rounded-2xl p-8">
+                        <form onSubmit={handleCreateSubmit} className="space-y-6">
+                            {/* General Information */}
+                            <div className="bg-gray-50/70 border border-gray-100 rounded-2xl p-5 space-y-4">
+                                <h4 className="text-xs font-bold text-blue-600 uppercase tracking-wider">Informations Générales</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Demandeur *</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            placeholder="Nom du demandeur"
+                                            className="w-full px-3 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                                            value={createRequestedBy}
+                                            onChange={e => setCreateRequestedBy(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Département</label>
+                                        <input
+                                            type="text"
+                                            placeholder="ex: Maintenance"
+                                            className="w-full px-3 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                                            value={createDepartment}
+                                            onChange={e => setCreateDepartment(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Fournisseur</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Nom du fournisseur"
+                                            className="w-full px-3 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                                            value={createSupplier}
+                                            onChange={e => setCreateSupplier(e.target.value)}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Notes / Remarques</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Remarques éventuelles"
+                                            className="w-full px-3 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                                            value={createNotes}
+                                            onChange={e => setCreateNotes(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                        ) : items.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                                <Package size={40} className="mb-3 text-gray-300" />
-                                <p className="font-semibold text-gray-500">Aucun article en rupture de stock</p>
-                                <p className="text-sm mt-1">Tous les stocks sont à des niveaux suffisants.</p>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-sm">
-                                    <thead>
-                                        <tr className="bg-gray-50/70 border-b border-gray-100">
-                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Désignation</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Référence</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Catégorie</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider text-center">Stock actuel</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider text-center">Stock min.</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-blue-500 uppercase tracking-wider text-center">Qté à commander</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Unité</th>
-                                            <th className="px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">Remarque</th>
-                                            <th className="px-4 py-3" />
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {items.map(item => (
-                                            <tr key={item.id} className={cn('group hover:bg-gray-50/60 transition-colors', item.isManual && 'bg-blue-50/30')}>
-                                                <td className="px-4 py-3">
-                                                    {item.isManual ? (
-                                                        <input
-                                                            className="w-full min-w-[140px] bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                                                            value={item.name}
-                                                            placeholder="Nom de la pièce"
-                                                            onChange={e => updateItem(item.id, 'name', e.target.value)}
-                                                        />
-                                                    ) : (
-                                                        <span className="font-semibold text-gray-800">{item.name}</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {item.isManual ? (
-                                                        <input
-                                                            className="w-28 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-mono focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                                                            value={item.sku}
-                                                            placeholder="Réf."
-                                                            onChange={e => updateItem(item.id, 'sku', e.target.value)}
-                                                        />
-                                                    ) : (
-                                                        <span className="text-gray-500">{item.sku}</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-500">{item.category}</td>
-                                                <td className="px-4 py-3 text-center">
-                                                    {item.isManual ? '—' : (
-                                                        <span className={cn('font-bold', item.currentStock <= item.minStock ? 'text-red-600' : 'text-gray-800')}>
-                                                            {item.currentStock}
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-center text-gray-500">{item.isManual ? '—' : item.minStock}</td>
-                                                <td className="px-4 py-3 text-center">
+
+                            {/* Items */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Liste des Articles</h4>
+                                    <button
+                                        type="button"
+                                        onClick={handleAddCreateItem}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                    >
+                                        <Plus size={14} />
+                                        Ajouter un article
+                                    </button>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {createItems.map((item, idx) => (
+                                        <div key={item.id} className="bg-gray-50/80 border border-gray-100 rounded-2xl p-4 space-y-3">
+                                            {/* Row top: index + delete */}
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Article {idx + 1}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveCreateItem(item.id)}
+                                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                    title="Supprimer"
+                                                >
+                                                    <Trash2 size={15} />
+                                                </button>
+                                            </div>
+
+                                            {/* Stock picker */}
+                                            {spareParts.length > 0 && (
+                                                <select
+                                                    className="w-full text-xs text-gray-600 bg-white border border-gray-200 rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                                    onChange={(e) => { if (e.target.value) handleSelectSparePart(item.id, e.target.value); }}
+                                                    defaultValue=""
+                                                >
+                                                    <option value="">— Choisir depuis le Stock (optionnel) —</option>
+                                                    {spareParts.map(p => (
+                                                        <option key={p.id} value={p.id}>
+                                                            {p.name} ({p.sku || 'Sans réf'}) — Stock: {p.stock} {p.unit}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            )}
+
+                                            {/* Main fields row */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                                                <div className="lg:col-span-2">
+                                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Désignation *</label>
+                                                    <input
+                                                        type="text"
+                                                        required
+                                                        placeholder="Nom de l'article"
+                                                        className="w-full px-3 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                                                        value={item.name}
+                                                        onChange={e => handleUpdateCreateItem(item.id, 'name', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Référence SKU</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Réf SKU"
+                                                        className="w-full px-3 py-2.5 bg-white border border-gray-100 rounded-xl text-sm font-mono focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                                                        value={item.sku}
+                                                        onChange={e => handleUpdateCreateItem(item.id, 'sku', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Qté *</label>
                                                     <input
                                                         type="number"
                                                         min="1"
-                                                        className="w-20 text-center bg-white border border-blue-200 rounded-lg px-2 py-1 text-sm font-bold text-blue-700 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 outline-none"
+                                                        required
+                                                        className="w-full text-center px-3 py-2.5 bg-white border border-blue-100 rounded-xl text-sm font-bold text-blue-700 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
                                                         value={item.qtyToOrder}
-                                                        onChange={e => updateItem(item.id, 'qtyToOrder', Math.max(1, parseInt(e.target.value) || 1))}
+                                                        onChange={e => handleUpdateCreateItem(item.id, 'qtyToOrder', Math.max(1, parseInt(e.target.value) || 1))}
                                                     />
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {item.isManual ? (
-                                                        <input
-                                                            className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
-                                                            value={item.unit}
-                                                            onChange={e => updateItem(item.id, 'unit', e.target.value)}
-                                                        />
-                                                    ) : (
-                                                        <span className="text-gray-500">{item.unit}</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3">
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Unité</label>
                                                     <input
-                                                        className="w-full min-w-[120px] bg-transparent border-b border-gray-200 focus:border-blue-400 px-1 py-0.5 text-sm outline-none transition-colors"
-                                                        value={item.remark}
-                                                        placeholder="Remarque..."
-                                                        onChange={e => updateItem(item.id, 'remark', e.target.value)}
+                                                        type="text"
+                                                        placeholder="pcs"
+                                                        className="w-full px-3 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                                                        value={item.unit}
+                                                        onChange={e => handleUpdateCreateItem(item.id, 'unit', e.target.value)}
                                                     />
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <button
-                                                        onClick={() => removeItem(item.id)}
-                                                        className="p-1.5 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                                        title="Retirer"
-                                                    >
-                                                        <Trash2 size={15} />
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                                </div>
+                                            </div>
+
+                                            {/* Remark + Image upload */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Remarque</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Remarque sur cet article..."
+                                                        className="w-full px-3 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                                                        value={item.remark}
+                                                        onChange={e => handleUpdateCreateItem(item.id, 'remark', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Photo de l'article (PDF)</label>
+                                                    <div className="flex items-center gap-3">
+                                                        <label className="flex items-center gap-2 px-3 py-2 bg-white border border-dashed border-gray-200 rounded-xl text-xs font-medium text-gray-500 hover:border-blue-400 hover:text-blue-600 cursor-pointer transition-all flex-1">
+                                                            <Package size={14} />
+                                                            {item.imageDataUrl ? 'Changer la photo' : 'Importer une photo'}
+                                                            <input
+                                                                type="file"
+                                                                accept="image/*"
+                                                                className="hidden"
+                                                                onChange={e => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (file) handleItemImageUpload(item.id, file);
+                                                                }}
+                                                            />
+                                                        </label>
+                                                        {item.imageDataUrl && (
+                                                            <div className="relative flex-shrink-0">
+                                                                <img
+                                                                    src={item.imageDataUrl}
+                                                                    alt="aperçu"
+                                                                    className="w-12 h-12 object-cover rounded-xl border border-gray-200 shadow-sm"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleUpdateCreateItem(item.id, 'imageDataUrl', undefined)}
+                                                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                                                                >
+                                                                    <X size={10} />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        )}
-                        {items.length > 0 && (
-                            <div className="px-6 py-4 border-t border-gray-50 flex items-center justify-between">
-                                <p className="text-xs text-gray-400">{items.length} article(s) dans la demande</p>
+
+                            {/* Form Actions */}
+                            <div className="pt-4 flex items-center justify-end gap-3 border-t border-gray-100">
                                 <button
-                                    onClick={generatePDF}
-                                    className="flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20"
+                                    type="button"
+                                    onClick={() => setIsCreateFormOpen(false)}
+                                    className="px-5 py-2.5 text-sm font-bold text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all active:scale-95"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingCreate}
+                                    className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all active:scale-95 disabled:opacity-50"
                                 >
                                     <Download size={16} />
-                                    Télécharger la Demande d'Achat (PDF)
+                                    {isSubmittingCreate ? 'Génération...' : 'Générer & Enregistrer (PDF)'}
                                 </button>
                             </div>
-                        )}
+                        </form>
                     </div>
-                </>
-            ) : (
-                /* History View */
-                <div className="space-y-5">
+                </div>
+            )}
 
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                        <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 flex flex-col gap-1">
-                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total</p>
-                            <p className="text-2xl font-bold text-gray-900">{statusCounts.total}</p>
-                        </div>
-                        <button
-                            onClick={() => { setStatusFilter(statusFilter === 'Waiting for validation' ? '' : 'Waiting for validation'); setCurrentPage(1); }}
-                            className={cn("text-left bg-amber-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Waiting for validation' ? 'border-amber-400 ring-2 ring-amber-300' : 'border-amber-100')}
-                        >
-                            <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">En attente</p>
-                            <p className="text-2xl font-bold text-amber-700">{statusCounts.waiting_validation}</p>
-                        </button>
-                        <button
-                            onClick={() => { setStatusFilter(statusFilter === 'Waiting for reception' ? '' : 'Waiting for reception'); setCurrentPage(1); }}
-                            className={cn("text-left bg-blue-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Waiting for reception' ? 'border-blue-400 ring-2 ring-blue-300' : 'border-blue-100')}
-                        >
-                            <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Att. réception</p>
-                            <p className="text-2xl font-bold text-blue-700">{statusCounts.waiting_reception}</p>
-                        </button>
-                        <button
-                            onClick={() => { setStatusFilter(statusFilter === 'In progress' ? '' : 'In progress'); setCurrentPage(1); }}
-                            className={cn("text-left bg-purple-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'In progress' ? 'border-purple-400 ring-2 ring-purple-300' : 'border-purple-100')}
-                        >
-                            <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">En cours</p>
-                            <p className="text-2xl font-bold text-purple-700">{statusCounts.in_progress}</p>
-                        </button>
-                        <button
-                            onClick={() => { setStatusFilter(statusFilter === 'Purchased' ? '' : 'Purchased'); setCurrentPage(1); }}
-                            className={cn("text-left bg-emerald-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Purchased' ? 'border-emerald-400 ring-2 ring-emerald-300' : 'border-emerald-100')}
-                        >
-                            <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Acheté</p>
-                            <p className="text-2xl font-bold text-emerald-700">{statusCounts.purchased}</p>
-                        </button>
-                        <button
-                            onClick={() => { setStatusFilter(statusFilter === 'Cancelled' ? '' : 'Cancelled'); setCurrentPage(1); }}
-                            className={cn("text-left bg-red-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Cancelled' ? 'border-red-400 ring-2 ring-red-300' : 'border-red-100')}
-                        >
-                            <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Annulé</p>
-                            <p className="text-2xl font-bold text-red-700">{statusCounts.cancelled}</p>
-                        </button>
-                    </div>
-
-                    {/* Filter Bar */}
-                    <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                            <input
-                                type="text"
-                                placeholder="Rechercher (Réf, demandeur, fournisseur...)"
-                                className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                value={historySearch}
-                                onChange={e => { setHistorySearch(e.target.value); setCurrentPage(1); }}
-                            />
-                        </div>
-                        <select
-                            value={statusFilter}
-                            onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-                            className={cn(
-                                "px-3 py-2.5 text-sm border rounded-xl outline-none transition-all min-w-[190px]",
-                                statusFilter ? 'border-blue-400 ring-2 ring-blue-100 font-semibold' : 'border-gray-200'
-                            )}
-                        >
-                            <option value="">Tous les statuts</option>
-                            <option value="Waiting for validation">Waiting for validation</option>
-                            <option value="Waiting for reception">Waiting for reception</option>
-                            <option value="In progress">In progress</option>
-                            <option value="Purchased">Purchased</option>
-                            <option value="Cancelled">Cancelled</option>
-                        </select>
-                        {(historySearch || statusFilter) && (
-                            <button
-                                onClick={resetFilters}
-                                className="flex items-center gap-1.5 px-3 py-2.5 text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors whitespace-nowrap"
-                            >
-                                <X size={14} /> Réinitialiser
+            {/* Edit Modal (Admin only) */}
+            {editingRequest && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 animate-in fade-in duration-200" style={{position:'fixed'}}>
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 border border-gray-100 animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-gray-900">Modifier la Demande</h3>
+                            <button onClick={() => setEditingRequest(null)} className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                                <X size={18} />
                             </button>
-                        )}
-                    </div>
-
-                    {/* Table */}
-                    <div className="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead>
-                                    <tr className="bg-gray-50/70 border-b border-gray-100">
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Référence</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Demandeur</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Fournisseur</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Articles</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Statut</th>
-                                        <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
-                                    {paginatedHistory.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={7} className="px-6 py-16 text-center">
-                                                <div className="flex flex-col items-center gap-3">
-                                                    <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
-                                                        <FileText size={24} className="text-gray-400" />
-                                                    </div>
-                                                    <p className="text-sm font-semibold text-gray-500">Aucune demande trouvée</p>
-                                                    <p className="text-xs text-gray-400">
-                                                        {historySearch || statusFilter
-                                                            ? 'Aucun résultat pour les filtres actuels.'
-                                                            : 'Aucune demande d\'achat enregistrée.'}
-                                                    </p>
-                                                    {(historySearch || statusFilter) && (
-                                                        <button
-                                                            onClick={resetFilters}
-                                                            className="mt-1 text-xs text-blue-600 hover:underline"
-                                                        >
-                                                            Réinitialiser les filtres
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ) : paginatedHistory.map((req) => (
-                                        <tr key={req.id} className="hover:bg-gray-50/60 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <span className="font-mono font-bold text-blue-600">{req.reference}</span>
-                                            </td>
-                                            <td className="px-6 py-4 text-gray-600">
-                                                {format(new Date(req.date), 'dd/MM/yyyy')}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="text-sm font-medium text-gray-900">{req.requested_by}</div>
-                                                <div className="text-xs text-gray-500">{req.department}</div>
-                                            </td>
-                                            <td className="px-6 py-4 text-gray-600">{req.supplier || '—'}</td>
-                                            <td className="px-6 py-4">
-                                                <span className="px-2 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
-                                                    {req.items_count} pos.
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                {user?.role === 'accounting' ? (
-                                                    <select
-                                                        value={req.status || 'Waiting for validation'}
-                                                        onChange={async (e) => {
-                                                            const newStatus = e.target.value;
-                                                            try {
-                                                                await api.updatePurchaseRequestStatus(req.id, newStatus);
-                                                                toast.success('Statut mis à jour');
-                                                                fetchHistory();
-                                                            } catch (err) {
-                                                                toast.error('Erreur de mise à jour');
-                                                            }
-                                                        }}
-                                                        className={cn(
-                                                            "px-2.5 py-1 rounded-full text-xs font-bold border outline-none cursor-pointer uppercase transition-all",
-                                                            getStatusStyle(req.status)
-                                                        )}
-                                                    >
-                                                        <option value="Waiting for validation">Waiting for validation</option>
-                                                        <option value="Waiting for reception">Waiting for reception</option>
-                                                        <option value="In progress">In progress</option>
-                                                        <option value="Purchased">Purchased</option>
-                                                        <option value="Cancelled">Cancelled</option>
-                                                    </select>
-                                                ) : (
-                                                    <span className={cn(
-                                                        "px-2.5 py-1 rounded-full text-xs font-bold border uppercase inline-block",
-                                                        getStatusStyle(req.status)
-                                                    )}>
-                                                        {req.status || 'Waiting for validation'}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => {
-                                                            const link = document.createElement('a');
-                                                            link.href = req.pdf_data;
-                                                            link.download = `Demande_Achat_${req.reference}.pdf`;
-                                                            link.click();
-                                                        }}
-                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                                                        title="Télécharger PDF"
-                                                    >
-                                                        <Download size={13} />
-                                                        PDF
-                                                    </button>
-                                                    {user?.role !== 'accounting' && (
-                                                        <>
-                                                            <button
-                                                                onClick={() => handleSendEmail(req.id)}
-                                                                disabled={sendingEmailId === req.id}
-                                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                                                                title="Envoyer par email"
-                                                            >
-                                                                {sendingEmailId === req.id ? (
-                                                                    <RefreshCw size={13} className="animate-spin" />
-                                                                ) : (
-                                                                    <Send size={13} />
-                                                                )}
-                                                                Envoyer
-                                                            </button>
-                                                            {isAdmin && (
-                                                                <>
-                                                                    <button
-                                                                        onClick={() => handleEditClick(req)}
-                                                                        className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all"
-                                                                        title="Modifier"
-                                                                    >
-                                                                        <Edit2 size={14} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleDeleteRequest(req.id)}
-                                                                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
-                                                                        title="Supprimer"
-                                                                    >
-                                                                        <Trash2 size={14} />
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
                         </div>
-
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="px-6 py-4 border-t border-gray-50 flex items-center justify-between">
-                                <p className="text-xs text-gray-400">
-                                    {filteredHistory.length} résultat{filteredHistory.length > 1 ? 's' : ''} — Page {currentPage} / {totalPages}
-                                </p>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => handlePageChange(currentPage - 1)}
-                                        disabled={currentPage === 1}
-                                        className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        ← Précédent
-                                    </button>
-                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                        .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                                        .reduce((acc: (number | string)[], p, idx, arr) => {
-                                            if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
-                                            acc.push(p);
-                                            return acc;
-                                        }, [])
-                                        .map((p, idx) =>
-                                            p === '...' ? (
-                                                <span key={`ellipsis-${idx}`} className="px-1 text-gray-400 text-xs">…</span>
-                                            ) : (
-                                                <button
-                                                    key={p}
-                                                    onClick={() => handlePageChange(p as number)}
-                                                    className={cn(
-                                                        "w-8 h-8 text-xs font-medium rounded-lg transition-colors",
-                                                        currentPage === p
-                                                            ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
-                                                            : 'text-gray-600 hover:bg-gray-100'
-                                                    )}
-                                                >
-                                                    {p}
-                                                </button>
-                                            )
-                                        )
-                                    }
-                                    <button
-                                        onClick={() => handlePageChange(currentPage + 1)}
-                                        disabled={currentPage === totalPages}
-                                        className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                    >
-                                        Suivant →
-                                    </button>
-                                </div>
+                        <p className="text-xs text-blue-600 font-mono font-bold mb-4 bg-blue-50 px-3 py-1 rounded-lg w-fit">Réf : {editingRequest.reference}</p>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Demandeur</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                    value={editDemandeur}
+                                    onChange={e => setEditDemandeur(e.target.value)}
+                                />
                             </div>
-                        )}
-                    </div>
-
-                    {/* Edit Modal (Admin only) */}
-                    {editingRequest && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 border border-gray-100 animate-in zoom-in-95 duration-200">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-bold text-gray-900">Modifier la Demande</h3>
-                                    <button onClick={() => setEditingRequest(null)} className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-                                        <X size={18} />
-                                    </button>
-                                </div>
-                                <p className="text-xs text-blue-600 font-mono font-bold mb-4 bg-blue-50 px-3 py-1 rounded-lg w-fit">Réf : {editingRequest.reference}</p>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Demandeur</label>
-                                        <input
-                                            type="text"
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                                            value={editDemandeur}
-                                            onChange={e => setEditDemandeur(e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Département</label>
-                                        <input
-                                            type="text"
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                                            value={editDepartment}
-                                            onChange={e => setEditDepartment(e.target.value)}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Fournisseur</label>
-                                        <input
-                                            type="text"
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
-                                            value={editSupplier}
-                                            onChange={e => setEditSupplier(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="mt-6 flex justify-end gap-3">
-                                    <button
-                                        onClick={() => setEditingRequest(null)}
-                                        className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
-                                    >
-                                        Annuler
-                                    </button>
-                                    <button
-                                        onClick={handleSaveEdit}
-                                        className="px-4 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
-                                    >
-                                        Enregistrer
-                                    </button>
-                                </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Département</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                    value={editDepartment}
+                                    onChange={e => setEditDepartment(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5 ml-1">Fournisseur</label>
+                                <input
+                                    type="text"
+                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                                    value={editSupplier}
+                                    onChange={e => setEditSupplier(e.target.value)}
+                                />
                             </div>
                         </div>
-                    )}
+                        <div className="mt-6 flex justify-end gap-3">
+                            <button
+                                onClick={() => setEditingRequest(null)}
+                                className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={handleSaveEdit}
+                                className="px-4 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors"
+                            >
+                                Enregistrer
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
     );
 }
-

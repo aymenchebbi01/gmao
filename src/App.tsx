@@ -186,25 +186,34 @@ function AppLayout() {
         setIsCollapsed={setIsSidebarCollapsed}
       />
 
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-slate-50/60">
         {/* Top Header */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 flex-shrink-0">
-          <div className="flex-1 max-w-xl hidden md:block">
-            <div className="relative"></div>
+        <header className="h-16 bg-white/90 backdrop-blur-md border-b border-gray-200/80 flex items-center justify-between px-4 sm:px-8 flex-shrink-0 z-10 shadow-xs">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 hidden sm:inline-block font-inter">
+              GMAO Thermoplastics
+            </span>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <div className="h-8 w-px bg-gray-200 mx-2"></div>
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-blue-100 text-blue-600 flex items-center justify-center rounded-lg font-bold text-xs">
+          <div className="flex items-center space-x-3 sm:space-x-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center rounded-xl font-bold text-xs shadow-sm">
                 {(user?.displayName || user?.username || 'U').charAt(0).toUpperCase()}
+              </div>
+              <div className="hidden sm:flex flex-col text-left">
+                <span className="text-xs font-bold text-gray-900 leading-tight">
+                  {user?.displayName || user?.username}
+                </span>
+                <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
+                  {user?.role}
+                </span>
               </div>
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8">
           <div className={cn(
             "mx-auto transition-all duration-500",
             activePath === 'layout' ? "max-w-[1600px] w-full" : "max-w-7xl"

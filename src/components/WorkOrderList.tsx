@@ -31,6 +31,91 @@ import { exportToCSV } from '../lib/exportUtils';
 import { THERMOPLASTICS_LOGO } from '../constants/logo';
 import TableFooter from './ui/TableFooter';
 
+export interface CauseOption {
+  id: string;
+  labelFr: string;
+  labelEn: string;
+}
+
+export interface CategoryOption {
+  id: string;
+  labelFr: string;
+  labelEn: string;
+  causes: CauseOption[];
+}
+
+export const FAILURE_CAUSE_CATEGORIES: CategoryOption[] = [
+  {
+    id: 'mechanical',
+    labelFr: 'Mécanique',
+    labelEn: 'Mechanical',
+    causes: [
+      { id: 'mech_lubrication', labelFr: 'Manque de lubrification', labelEn: 'Lack of Lubrication' },
+      { id: 'mech_overload', labelFr: 'Surcharge / Surutilisation', labelEn: 'Overload / Overuse' },
+      { id: 'mech_misalignment', labelFr: 'Désalignement / Pièces desserrées', labelEn: 'Misalignment / Loose Parts' },
+      { id: 'mech_fatigue', labelFr: 'Rupture par fatigue', labelEn: 'Fatigue Failure' },
+    ]
+  },
+  {
+    id: 'environmental',
+    labelFr: 'Environnemental',
+    labelEn: 'Environmental',
+    causes: [
+      { id: 'env_contamination', labelFr: 'Contamination', labelEn: 'Contamination' },
+      { id: 'env_temp_humidity', labelFr: 'Températures / Humidité extrêmes', labelEn: 'Temperature / Humidity Extremes' },
+    ]
+  },
+  {
+    id: 'electrical',
+    labelFr: 'Électrique',
+    labelEn: 'Electrical',
+    causes: [
+      { id: 'elec_fault', labelFr: 'Défaut électrique', labelEn: 'Electrical Fault' },
+      { id: 'elec_sensor_control', labelFr: 'Défaillance capteur / commande', labelEn: 'Sensor / Control Failure' },
+    ]
+  },
+  {
+    id: 'human_process',
+    labelFr: 'Humain / Process',
+    labelEn: 'Human / Process',
+    causes: [
+      { id: 'human_user_error', labelFr: 'Erreur utilisateur / Mauvaise utilisation', labelEn: 'User Error / Misuse' },
+      { id: 'human_poor_maint', labelFr: 'Maintenance insuffisante / Omission', labelEn: 'Poor / Missed Maintenance' },
+      { id: 'human_setup', labelFr: 'Installation / Réglage incorrect', labelEn: 'Incorrect Installation / Setup' },
+    ]
+  },
+  {
+    id: 'equipment',
+    labelFr: 'Équipement',
+    labelEn: 'Equipment',
+    causes: [
+      { id: 'equip_product_defect', labelFr: 'Défaut de fabrication / Vice caché', labelEn: 'Product Defect' },
+      { id: 'equip_end_life', labelFr: 'Fin de vie du composant', labelEn: 'End of Service Life' },
+    ]
+  },
+  {
+    id: 'other',
+    labelFr: 'Autre',
+    labelEn: 'Other',
+    causes: [
+      { id: 'other_custom', labelFr: 'Autre (à préciser)', labelEn: 'Other (Specify)' },
+    ]
+  }
+];
+
+export const getCategoryForCause = (cause?: string, category?: string): string => {
+  if (category) return category;
+  if (!cause) return '';
+  for (const cat of FAILURE_CAUSE_CATEGORIES) {
+    if (cat.id === cause || cat.causes.some(c => c.id === cause)) return cat.id;
+  }
+  if (cause === 'wear') return 'mechanical';
+  if (cause === 'user') return 'human_process';
+  if (cause === 'product') return 'equipment';
+  if (cause === 'other') return 'other';
+  return 'other';
+};
+
 interface WorkOrderListProps {
   view?: 'list' | 'reports';
 }
@@ -53,6 +138,21 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(13);
   const [refreshing, setRefreshing] = useState(false);
+  const [machineSearch, setMachineSearch] = useState('');
+  const [machineDropdownOpen, setMachineDropdownOpen] = useState(false);
+  const machineDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Close machine dropdown on outside click
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (machineDropdownRef.current && !machineDropdownRef.current.contains(e.target as Node)) {
+        setMachineDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
 
   const generateWorkOrderId = () => {
     const year = new Date().getFullYear();
@@ -79,6 +179,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
     machineId: '',
     priority: 'medium' as WorkOrder['priority'],
     type: 'corrective' as WorkOrder['type'],
+    status: 'pending' as WorkOrder['status'],
     parentFaultId: '',
     childFaultIds: [] as string[],
     assignedTo: '',
@@ -107,7 +208,8 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
       control: false,
     },
     maintenanceType: 'corrective' as 'corrective' | 'preventive',
-    failureCause: 'wear' as 'wear' | 'user' | 'product' | 'other',
+    failureCategory: '',
+    failureCause: '',
     relatedCause: '',
     interventionTime: '',
     actions: '',
@@ -202,7 +304,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
           id: formData.id.trim(),
           title: formData.id, // Use ID as title
           machineName: selectedMachine?.name || 'Unknown',
-          status: 'pending',
+          status: formData.status || 'pending',
           createdAt: new Date().toISOString(),
           createdBy: user?.uid,
           createdByName: user?.displayName || user?.username,
@@ -220,6 +322,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
         machineId: '',
         priority: 'medium',
         type: 'corrective',
+        status: 'pending',
         parentFaultId: '',
         childFaultIds: [],
         assignedTo: '',
@@ -245,6 +348,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
       machineId: order.machineId || '',
       priority: order.priority || 'medium',
       type: order.type || 'corrective',
+      status: order.status || 'pending',
       parentFaultId: order.parentFaultId || '',
       childFaultIds: order.childFaultIds || [],
       assignedTo: order.assignedTo || '',
@@ -269,27 +373,126 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
     }
   };
 
-  const generateStartPDF = (order: WorkOrder) => {
+  const generateWorkOrderPDF = (order: WorkOrder) => {
     const doc = new jsPDF();
+    const logoUrl = THERMOPLASTICS_LOGO;
 
-    doc.setFontSize(20);
-    doc.text('Work Order - Start Notification', 20, 20);
+    try {
+      doc.addImage(logoUrl, 'PNG', 12, 12, 50, 15);
+    } catch (e) {
+      doc.setFontSize(16);
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.text('Thermoplastics', 15, 22);
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Design & Manufacture', 15, 26);
+    }
 
-    doc.setFontSize(12);
-    doc.text(`Order ID: ${order.id}`, 20, 35);
-    doc.text(`Title: ${order.title}`, 20, 45);
-    doc.text(`Machine: ${order.machineName}`, 20, 55);
-    doc.text(`Priority: ${order.priority.toUpperCase()}`, 20, 65);
-    doc.text(`Type: ${order.type.toUpperCase()}`, 20, 75);
-    doc.text(`Started By: ${user?.displayName || user?.username}`, 20, 85);
-    doc.text(`Start Date: ${format(new Date(), 'PPP p')}`, 20, 95);
+    doc.setFillColor(255, 255, 255);
+    doc.setDrawColor(0);
+    doc.setLineWidth(0.1);
+    doc.rect(10, 10, 190, 277);
 
-    doc.text('Description:', 20, 110);
+    // Title
+    doc.setFontSize(16);
+    doc.setTextColor(0, 51, 102);
+    doc.setFont("helvetica", "bold");
+    doc.text('WORK ORDER / ORDRE DE TRAVAIL', 65, 24);
+    doc.line(65, 25, 185, 25);
+
+    // Section: Work Order Overview
+    doc.setFillColor(31, 73, 125);
+    doc.rect(10, 30, 190, 6, 'F');
+    doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
-    const splitDescription = doc.splitTextToSize(order.description, 170);
-    doc.text(splitDescription, 20, 115);
+    doc.text('Work Order Details', 105, 34, { align: 'center' });
 
-    doc.save(`work_order_start_${order.id}.pdf`);
+    doc.setTextColor(0);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+
+    doc.text('WO Number:', 12, 43);
+    doc.text('Creation Date:', 107, 43);
+    doc.text('Priority:', 12, 50);
+    doc.text('Status:', 107, 50);
+    doc.text('Type:', 12, 57);
+    doc.text('Assigned To:', 107, 57);
+
+    doc.setFont("helvetica", "normal");
+    doc.text(`${order.id}`, 45, 43);
+    doc.text(`${order.createdAt ? format(toDate(order.createdAt), 'PPP p') : 'N/A'}`, 140, 43);
+    doc.text(`${order.priority ? order.priority.toUpperCase() : 'MEDIUM'}`, 45, 50);
+    doc.text(`${order.status ? order.status.toUpperCase() : 'PENDING'}`, 140, 50);
+    doc.text(`${order.type ? order.type.toUpperCase() : 'CORRECTIVE'}`, 45, 57);
+    doc.text(`${order.assignedName || order.assignedTo || 'Unassigned'}`, 140, 57);
+
+    doc.line(10, 62, 200, 62);
+
+    // Section: Machine Information
+    const machine = machines.find(m => m.id === order.machineId);
+    doc.setFillColor(31, 73, 125);
+    doc.rect(10, 62, 190, 6, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.text('Machine Information', 105, 66, { align: 'center' });
+
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "bold");
+    doc.text('Machine Name:', 12, 74);
+    doc.text('Serial Number:', 107, 74);
+    doc.text('Machine Type:', 12, 80);
+    doc.text('Location:', 107, 80);
+
+    doc.setFont("helvetica", "normal");
+    doc.text(`${machine?.name || order.machineName || 'N/A'}`, 45, 74);
+    doc.text(`${machine?.serialNumber || 'N/A'}`, 140, 74);
+    doc.text(`${machine?.type || 'N/A'}`, 45, 80);
+    doc.text(`${machine?.location || order.location || 'N/A'}`, 140, 80);
+
+    let currentY = 86;
+    if (machine?.imageUrl) {
+      try {
+        doc.addImage(machine.imageUrl, 'JPEG', 150, 86, 40, 30);
+        currentY = 118;
+      } catch (e) {
+        console.error("Error adding machine image to PDF:", e);
+      }
+    }
+
+    doc.line(10, currentY, 200, currentY);
+
+    // Section: Issue / Description
+    doc.setFillColor(31, 73, 125);
+    doc.rect(10, currentY, 190, 6, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.text('Issue / Description', 105, currentY + 4, { align: 'center' });
+
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "normal");
+    const descriptionText = order.description || order.malfunctionDescription || 'No description provided.';
+    const splitDesc = doc.splitTextToSize(descriptionText, 185);
+    doc.text(splitDesc, 12, currentY + 12);
+
+    currentY += Math.max(30, splitDesc.length * 6 + 12);
+    doc.line(10, currentY, 200, currentY);
+
+    // Section: Requester & Notes
+    doc.setFillColor(31, 73, 125);
+    doc.rect(10, currentY, 190, 6, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.text('Requester & Instructions for Technician', 105, currentY + 4, { align: 'center' });
+
+    doc.setTextColor(0);
+    doc.setFont("helvetica", "bold");
+    doc.text('Created By / Requester:', 12, currentY + 14);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${order.createdByName || order.requesterName || 'N/A'}`, 60, currentY + 14);
+
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    doc.text('* Please complete the maintenance intervention and fill out the Intervention Report upon job completion.', 12, currentY + 24);
+
+    doc.save(`work_order_${order.id}.pdf`);
   };
 
   const generateReportPDF = async (order: WorkOrder, report: any) => {
@@ -416,11 +619,6 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
     doc.text('Corrective', 82, currentY + 17);
     doc.text('Preventive', 82, currentY + 23);
 
-    doc.text('Normal wear', 132, currentY + 17);
-    doc.text('User error', 132, currentY + 23);
-    doc.text('Product defect', 132, currentY + 29);
-    doc.text('Other', 132, currentY + 35);
-
     // Checkmarks for operations
     if (report.operations?.replacement) doc.text('X', 75, currentY + 17);
     if (report.operations?.diagnostic) doc.text('X', 75, currentY + 23);
@@ -430,10 +628,27 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
     if (report.maintenanceType === 'corrective') doc.text('X', 125, currentY + 17);
     if (report.maintenanceType === 'preventive') doc.text('X', 125, currentY + 23);
 
-    if (report.failureCause === 'wear') doc.text('X', 195, currentY + 17);
-    if (report.failureCause === 'user') doc.text('X', 195, currentY + 23);
-    if (report.failureCause === 'product') doc.text('X', 195, currentY + 29);
-    if (report.failureCause === 'other') doc.text('X', 195, currentY + 35);
+    // Failure Cause details
+    const catId = getCategoryForCause(report.failureCause, report.failureCategory);
+    const catObj = FAILURE_CAUSE_CATEGORIES.find(c => c.id === catId);
+    const causeObj = catObj?.causes.find(c => c.id === report.failureCause);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(31, 73, 125);
+    doc.text('Category:', 132, currentY + 17);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0);
+    doc.text(`${catObj ? catObj.labelFr : 'N/A'}`, 150, currentY + 17);
+
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(31, 73, 125);
+    doc.text('Cause:', 132, currentY + 24);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(0);
+    const causeText = causeObj ? `${causeObj.labelFr} (${causeObj.labelEn})` : (report.failureCause || 'N/A');
+    const splitCauseText = doc.splitTextToSize(causeText, 62);
+    doc.text(splitCauseText, 132, currentY + 29);
 
     currentY += 40;
     doc.line(10, currentY, 200, currentY);
@@ -499,7 +714,22 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
 
   const handleCompleteIntervention = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedOrder) return;
+    if (!selectedOrder) {
+      toast.error('Please select a Maintenance Order to link this report to');
+      return;
+    }
+    if (!interventionData.failureCategory) {
+      toast.error('Veuillez sélectionner une catégorie de cause de défaillance / Please select a failure cause category');
+      return;
+    }
+    if (!interventionData.failureCause) {
+      toast.error('Veuillez sélectionner une cause spécifique de défaillance / Please select a specific failure cause');
+      return;
+    }
+    if ((interventionData.failureCategory === 'other' || interventionData.failureCause === 'other_custom') && !interventionData.relatedCause.trim()) {
+      toast.error('Veuillez préciser la cause dans le champ "Préciser la cause" / Please specify cause details');
+      return;
+    }
     setLoading(true);
 
     try {
@@ -511,9 +741,12 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
         completedAt: isEditingReport ? (selectedOrder.intervention?.completedAt || new Date().toISOString()) : new Date().toISOString(),
       };
 
+      const repNum = selectedOrder.reportNumber || selectedOrder.id.replace('WO', 'REP');
+
       // Update Work Order
       await api.updateWorkOrder(selectedOrder.id, {
         status: 'completed',
+        reportNumber: repNum,
         completedAt: isEditingReport ? (selectedOrder.completedAt || new Date().toISOString()) : new Date().toISOString(),
         intervention: report as any
       });
@@ -589,7 +822,8 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
           control: false,
         },
         maintenanceType: 'corrective',
-        failureCause: 'wear',
+        failureCategory: '',
+        failureCause: '',
         relatedCause: '',
         interventionTime: '',
         actions: '',
@@ -678,13 +912,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
 
           </div>
           <div className="flex gap-2">
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
-            >
-              <Download size={18} />
-              Export CSV
-            </button>
+
             <button
               onClick={() => fetchData(true)}
               disabled={refreshing}
@@ -696,7 +924,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
             >
               <RotateCw size={18} />
             </button>
-            {view === 'list' && (
+            {view === 'list' ? (
               <button
                 onClick={() => {
                   setIsEditMode(false);
@@ -708,6 +936,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                     machineId: '',
                     priority: 'medium',
                     type: 'corrective',
+                    status: 'pending',
                     parentFaultId: '',
                     childFaultIds: [],
                     assignedTo: '',
@@ -724,6 +953,45 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
               >
                 <Plus className="w-4 h-4 mr-2" />
                 New Work Order
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  setSelectedOrder(null);
+                  setIsEditingReport(false);
+                  setInterventionData({
+                    issuerName: user?.displayName || user?.username || '',
+                    issuerSector: '',
+                    requesterName: '',
+                    requestDate: format(new Date(), 'yyyy-MM-dd'),
+                    technicians: user?.displayName || user?.username || '',
+                    location: '',
+                    malfunctionDescription: '',
+                    currentHours: 0,
+                    operations: {
+                      replacement: false,
+                      diagnostic: false,
+                      improvement: false,
+                      control: false,
+                    },
+                    maintenanceType: 'corrective',
+                    failureCategory: '',
+                    failureCause: '',
+                    relatedCause: '',
+                    interventionTime: '',
+                    actions: '',
+                    difficulties: '',
+                    partsUsed: [],
+                    startTime: '',
+                    endTime: '',
+                    comments: '',
+                  });
+                  setIsInterventionModalOpen(true);
+                }}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Intervention Report
               </button>
             )}
           </div>
@@ -934,7 +1202,8 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                                   control: false,
                                 },
                                 maintenanceType: report?.maintenanceType || order.type || 'corrective',
-                                failureCause: report?.failureCause || 'wear',
+                                failureCategory: getCategoryForCause(report?.failureCause, report?.failureCategory),
+                                failureCause: report?.failureCause || '',
                                 relatedCause: report?.relatedCause || '',
                                 interventionTime: report?.interventionTime || '',
                                 actions: report?.actions || '',
@@ -1021,7 +1290,8 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                                     control: false,
                                   },
                                   maintenanceType: report?.maintenanceType || order.type || 'corrective',
-                                  failureCause: report?.failureCause || 'wear',
+                                  failureCategory: getCategoryForCause(report?.failureCause, report?.failureCategory),
+                                  failureCause: report?.failureCause || '',
                                   relatedCause: report?.relatedCause || '',
                                   interventionTime: report?.interventionTime || '',
                                   actions: report?.actions || '',
@@ -1051,40 +1321,14 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                           </>
                         ) : (
                           <>
-                            {(order.status === 'pending' || order.status === 'completed') && (
-                              <button
-                                onClick={async () => {
-                                  // Fetch latest machine data to calculate live hours
-                                  const machinesData = await api.getMachines();
-                                  const machineData = machinesData.find(m => m.id === order.machineId);
-
-                                  if (!machineData) return;
-                                  const liveHours = calculateMachineLiveHours(machineData);
-
-                                  await api.updateWorkOrder(order.id, {
-                                    status: 'in-progress',
-                                    assignedTo: user?.uid,
-                                    assignedName: user?.displayName || user?.username,
-                                    reportNumber: order.id.replace('WO', 'REP'),
-                                    intervention: undefined, // Replace deleteField()
-                                    completedAt: undefined // Replace deleteField()
-                                  });
-
-                                  // Update Machine Status to maintenance and update hours
-                                  await api.updateMachine(order.machineId, {
-                                    status: 'maintenance',
-                                    currentHours: liveHours,
-                                    operationalStartTime: undefined, // Replace null
-                                    totalOperatingTime: liveHours * 60
-                                  });
-
-                                  toast.success(order.status === 'completed' ? 'Report reset and work order restarted' : 'Work order started');
-                                }}
-                                className="inline-flex items-center px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-                              >
-                                {order.status === 'completed' ? 'Restart' : 'Start'}
-                              </button>
-                            )}
+                            <button
+                              onClick={() => generateWorkOrderPDF(order)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-all"
+                              title="Download Work Order PDF"
+                            >
+                              <Download size={14} />
+                              PDF
+                            </button>
                             <button
                               onClick={() => handleEditClick(order)}
                               className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
@@ -1137,7 +1381,6 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">{isEditMode ? "Edit Work Order" : "Create New Work Order"}</h1>
-              <p className="text-gray-500">Fill in the details below to {isEditMode ? "update" : "schedule"} a maintenance task.</p>
             </div>
             <button
               onClick={() => {
@@ -1158,7 +1401,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. WO-2024-001"
+                    placeholder="e.g. WO-2026-001"
                     disabled={true}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all disabled:opacity-50"
                     value={formData.id}
@@ -1167,24 +1410,94 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="md:col-span-1">
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Machine</label>
-                  <div className="relative">
-                    <HardDrive className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <select
-                      required
-                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all appearance-none"
-                      value={formData.machineId}
-                      onChange={(e) => setFormData({ ...formData, machineId: e.target.value })}
+                  <div className="relative" ref={machineDropdownRef}>
+                    {/* Trigger button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMachineDropdownOpen(v => !v);
+                        setMachineSearch('');
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all text-left"
                     >
-                      <option value="">Select Machine</option>
-                      {machines.map(m => (
-                        <option key={m.id} value={m.id}>{m.name} ({m.location})</option>
-                      ))}
-                    </select>
+                      <HardDrive className="text-gray-400 flex-shrink-0" size={16} />
+                      <span className={formData.machineId ? 'text-gray-900 truncate' : 'text-gray-400'}>
+                        {formData.machineId
+                          ? (() => { const m = machines.find(m => m.id === formData.machineId); return m ? `${m.name} (${m.location})` : 'Select Machine'; })()
+                          : 'Select Machine'}
+                      </span>
+                      <svg className="ml-auto flex-shrink-0 text-gray-400" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </button>
+
+                    {/* Hidden required input for form validation */}
+                    <input
+                      type="text"
+                      required
+                      readOnly
+                      tabIndex={-1}
+                      value={formData.machineId}
+                      className="absolute inset-0 opacity-0 pointer-events-none w-full"
+                    />
+
+                    {/* Dropdown panel */}
+                    {machineDropdownOpen && (
+                      <div className="absolute z-50 mt-1 w-full min-w-[280px] bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                        {/* Search input */}
+                        <div className="p-2 border-b border-gray-100">
+                          <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input
+                              type="text"
+                              autoFocus
+                              placeholder="Search by name, location or serial no..."
+                              className="w-full pl-8 pr-3 py-2 text-sm bg-gray-50 border border-gray-100 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                              value={machineSearch}
+                              onChange={(e) => setMachineSearch(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        {/* Option list */}
+                        <ul className="max-h-52 overflow-y-auto py-1">
+                          {(() => {
+                            const q = machineSearch.toLowerCase();
+                            const filtered = machines.filter(m =>
+                              m.name?.toLowerCase().includes(q) ||
+                              m.location?.toLowerCase().includes(q) ||
+                              m.siteNumber?.toLowerCase().includes(q) ||
+                              (`#${m.siteNumber}`).toLowerCase().includes(q) ||
+                              m.id?.toLowerCase().includes(q)
+                            );
+                            if (filtered.length === 0) return (
+                              <li className="px-4 py-3 text-sm text-gray-400 italic">No machines found</li>
+                            );
+                            return filtered.map(m => (
+                              <li key={m.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData({ ...formData, machineId: m.id });
+                                    setMachineDropdownOpen(false);
+                                  }}
+                                  className={`w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors flex items-center gap-3 ${formData.machineId === m.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-800'}`}
+                                >
+                                  {m.siteNumber && (
+                                    <span className="flex-shrink-0 w-8 text-center text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded px-1 py-0.5">#{m.siteNumber}</span>
+                                  )}
+                                  <span className="truncate flex-1">{m.name}</span>
+                                  <span className="flex-shrink-0 text-xs text-gray-400">{m.location}</span>
+                                </button>
+                              </li>
+                            ));
+                          })()}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
+
 
                 <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Priority</label>
@@ -1207,128 +1520,28 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                     value={formData.type}
                     onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
                   >
-                    <option value="corrective">Corrective (Breakdown)</option>
+                    <option value="corrective">Corrective</option>
                     <option value="preventive">Preventive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Status</label>
+                  <select
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
               </div>
 
-              {/* Section 1: Intervention Report */}
-              <div className="space-y-4 p-6 bg-gray-50/50 rounded-2xl border border-gray-100">
-                <h3 className="text-sm font-bold text-blue-600 uppercase tracking-wider border-b border-blue-100 pb-2">Intervention Report</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4 p-4 bg-white rounded-xl border border-gray-100">
-                    <p className="text-xs font-bold text-gray-400 uppercase">Issuer (Assigned To)</p>
-                    <input
-                      type="text"
-                      placeholder="Issuer Name"
-                      className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
-                      value={formData.issuerName}
-                      onChange={(e) => setFormData({ ...formData, issuerName: e.target.value })}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Sector"
-                      className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
-                      value={formData.issuerSector}
-                      onChange={(e) => setFormData({ ...formData, issuerSector: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-4 p-4 bg-white rounded-xl border border-gray-100">
-                    <p className="text-xs font-bold text-gray-400 uppercase">Requester (Created By)</p>
-                    <input
-                      type="text"
-                      placeholder="Requester Name"
-                      className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
-                      value={formData.requesterName}
-                      onChange={(e) => setFormData({ ...formData, requesterName: e.target.value })}
-                    />
-                    <input
-                      type="date"
-                      className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
-                      value={formData.requestDate}
-                      onChange={(e) => setFormData({ ...formData, requestDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 2: Location & Description */}
-              <div className="space-y-4 p-6 bg-gray-50/50 rounded-2xl border border-gray-100">
-                <h3 className="text-sm font-bold text-blue-600 uppercase tracking-wider border-b border-blue-100 pb-2">Location & Description</h3>
-                <div className="grid grid-cols-1 gap-6">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Intervention Location</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Workshop A, Line 3"
-                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
-                      value={formData.location}
-                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1 ml-1">Malfunction Description</label>
-                    <textarea
-                      rows={2}
-                      placeholder="Describe the initial problem..."
-                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none resize-none"
-                      value={formData.malfunctionDescription}
-                      onChange={(e) => setFormData({ ...formData, malfunctionDescription: e.target.value, description: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/*{formData.type === 'corrective' && (
-                <div className="space-y-4 p-6 bg-blue-50/50 rounded-2xl border border-blue-100/50">
-                  <h4 className="text-sm font-bold text-blue-900 flex items-center gap-2">
-                    <AlertTriangle size={16} />
-                    Fault Analysis
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-xs font-bold text-blue-400 uppercase tracking-wider mb-2 ml-1">Category</label>
-                      <select
-                        className="w-full px-4 py-3 bg-white border border-blue-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
-                        value={formData.parentFaultId}
-                        onChange={(e) => setFormData({ ...formData, parentFaultId: e.target.value, childFaultIds: [] })}
-                      >
-                        <option value="">Select Category</option>
-                        {parentFaults.map(f => (
-                          <option key={f.id} value={f.id}>{f.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-blue-400 uppercase tracking-wider mb-2 ml-1">Specific Faults</label>
-                      <div className="space-y-2 max-h-40 overflow-y-auto p-3 bg-white rounded-xl border border-blue-100">
-                        {childFaults.length > 0 ? childFaults.map(f => (
-                          <label key={f.id} className="flex items-center gap-3 p-2 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer text-sm text-gray-700">
-                            <input
-                              type="checkbox"
-                              className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-blue-200"
-                              checked={formData.childFaultIds.includes(f.id)}
-                              onChange={(e) => {
-                                const ids = e.target.checked
-                                  ? [...formData.childFaultIds, f.id]
-                                  : formData.childFaultIds.filter(id => id !== f.id);
-                                setFormData({ ...formData, childFaultIds: ids });
-                              }}
-                            />
-                            {f.name}
-                          </label>
-                        )) : (
-                          <p className="text-xs text-gray-400 italic p-2">Select a category first</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}*/}
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="md:col-span-1">
+                <div>
                   <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Assigned To</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -1338,8 +1551,8 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                       onChange={(e) => {
                         const uid = e.target.value;
                         const tech = technicians.find(t => t.uid === uid);
-                        setFormData({ 
-                          ...formData, 
+                        setFormData({
+                          ...formData,
                           assignedTo: uid,
                           issuerName: tech ? (tech.displayName || tech.username) : ''
                         });
@@ -1353,17 +1566,38 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                   </div>
                 </div>
 
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Description</label>
-                  <textarea
-                    required
-                    rows={1}
-                    placeholder="Describe the issue or task..."
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Location</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Workshop A, Line 3"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Request Date</label>
+                  <input
+                    type="date"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    value={formData.requestDate}
+                    onChange={(e) => setFormData({ ...formData, requestDate: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Description / Problem Statement</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Describe the issue or task to be performed..."
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value, malfunctionDescription: e.target.value })}
+                />
               </div>
 
               <div className="pt-6 flex gap-4">
@@ -1379,7 +1613,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                   disabled={loading}
                   className="flex-[2] px-6 py-3 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition-all active:scale-95 disabled:opacity-50"
                 >
-                  {loading ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save Changes' : 'Create Work Order')}
+                  {loading ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save Changes' : 'Save')}
                 </button>
               </div>
             </form>
@@ -1387,12 +1621,11 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
         </div>
       )}
       {/* Intervention Report Overlay */}
-      {isInterventionModalOpen && selectedOrder && (
+      {isInterventionModalOpen && (
         <div className="absolute inset-x-0 top-0 z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Intervention Report</h1>
-              <p className="text-gray-500">Document the maintenance actions for {selectedOrder.id}.</p>
             </div>
             <button
               onClick={() => {
@@ -1407,10 +1640,74 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
 
           <div className="bg-white/90 backdrop-blur-2xl border border-white/20 shadow-2xl rounded-2xl p-8 max-h-[80vh] overflow-y-auto">
             <form onSubmit={handleCompleteIntervention} className="space-y-8">
+              {/* Section 0: Select Maintenance Order */}
+              <div className="space-y-4 p-6 bg-blue-50/50 rounded-2xl border border-blue-100">
+                <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                  <h3 className="text-sm font-bold text-blue-900 uppercase tracking-wider">
+                    Maintenance Order (WO) Selection
+                  </h3>
+                  {selectedOrder && (
+                    <span className="text-xs font-bold text-blue-700 bg-blue-100/80 px-2.5 py-1 rounded-md">
+                      WO Number: {selectedOrder.id}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 ml-1">
+                    Select Maintenance Order *
+                  </label>
+                  <select
+                    required
+                    className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    value={selectedOrder?.id || ''}
+                    onChange={(e) => {
+                      const woId = e.target.value;
+                      const found = orders.find(o => o.id === woId);
+                      if (found) {
+                        setSelectedOrder(found);
+                        const report = found.intervention;
+                        const machineObj = machines.find(m => m.id === found.machineId);
+                        setInterventionData(prev => ({
+                          ...prev,
+                          issuerName: report?.issuerName || found.issuerName || found.assignedName || user?.displayName || user?.username || '',
+                          issuerSector: report?.issuerSector || found.issuerSector || '',
+                          requesterName: report?.requesterName || found.requesterName || found.createdByName || '',
+                          requestDate: report?.requestDate || found.requestDate || format(new Date(), 'yyyy-MM-dd'),
+                          technicians: report?.technicians || found.assignedName || '',
+                          location: report?.location || found.location || machineObj?.location || '',
+                          malfunctionDescription: report?.malfunctionDescription || found.malfunctionDescription || found.description || '',
+                          currentHours: report?.currentHours || machineObj?.currentHours || 0,
+                          maintenanceType: report?.maintenanceType || found.type || 'corrective',
+                          failureCategory: getCategoryForCause(report?.failureCause, report?.failureCategory),
+                          failureCause: report?.failureCause || '',
+                        }));
+                      } else {
+                        setSelectedOrder(null);
+                      }
+                    }}
+                  >
+                    <option value="">-- Choose a Maintenance Order to Link --</option>
+                    {orders.filter(o => o.status !== 'completed' || o.id === selectedOrder?.id).map(o => (
+                      <option key={o.id} value={o.id}>
+                        {o.id} — {o.machineName || 'Unknown Machine'} ({o.priority.toUpperCase()}) | Status: {o.status}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {selectedOrder && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2 text-xs text-gray-600 bg-white p-3 rounded-xl border border-blue-100">
+                    <div><span className="text-gray-400 font-bold block">WO ID:</span> {selectedOrder.id}</div>
+                    <div><span className="text-gray-400 font-bold block">MACHINE:</span> {selectedOrder.machineName || 'Unknown'}</div>
+                    <div><span className="text-gray-400 font-bold block">PRIORITY:</span> {selectedOrder.priority.toUpperCase()}</div>
+                    <div><span className="text-gray-400 font-bold block">ASSIGNED TO:</span> {selectedOrder.assignedName || 'Unassigned'}</div>
+                  </div>
+                )}
+              </div>
+
               {/* Section 3: Operations & Analysis */}
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-blue-600 uppercase tracking-wider border-b border-blue-100 pb-2">Operations & Analysis</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Operations</p>
                     {Object.keys(interventionData.operations || {}).map((op) => (
@@ -1456,25 +1753,6 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                     </label>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Failure Cause</p>
-                    {['wear', 'user', 'product', 'other'].map((cause) => (
-                      <label key={cause} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="failureCause"
-                          className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                          checked={interventionData.failureCause === cause}
-                          onChange={() => setInterventionData({ ...interventionData, failureCause: cause as any })}
-                        />
-                        <span className="text-sm text-gray-600 capitalize">
-                          {cause === 'wear' ? 'Normal wear' :
-                            cause === 'user' ? 'User error' :
-                              cause === 'product' ? 'Product defect' : 'Other'}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="md:col-span-3 space-y-2">
                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-2">Technicians (Comma separated)</p>
                     <input
                       type="text"
@@ -1484,6 +1762,118 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                       onChange={(e) => setInterventionData({ ...interventionData, technicians: e.target.value })}
                     />
                   </div>
+                </div>
+
+                {/* Categorized Two-Step Failure Cause Selector */}
+                <div className="space-y-4 p-5 bg-gray-50/80 rounded-2xl border border-gray-200/80">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                        Cause de la défaillance / Failure Cause *
+                      </h4>
+                      {interventionData.failureCategory && (
+                        <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded border border-blue-100">
+                          Catégorie: {FAILURE_CAUSE_CATEGORIES.find(c => c.id === interventionData.failureCategory)?.labelFr}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Étape 1 : Choisissez la catégorie de la défaillance / Step 1: Select the cause category
+                    </p>
+
+                    {/* Step 1: Category Selection */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                      {FAILURE_CAUSE_CATEGORIES.map((cat) => {
+                        const isCatSelected = interventionData.failureCategory === cat.id;
+                        return (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => {
+                              const firstCause = cat.causes[0]?.id || '';
+                              setInterventionData({
+                                ...interventionData,
+                                failureCategory: cat.id,
+                                failureCause: firstCause,
+                              });
+                            }}
+                            className={cn(
+                              "p-3 rounded-xl border text-left transition-all flex flex-col justify-between min-h-[76px]",
+                              isCatSelected
+                                ? "bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20"
+                                : "bg-white border-gray-200 text-gray-800 hover:border-blue-300 hover:bg-blue-50/50"
+                            )}
+                          >
+                            <span className="text-xs font-bold leading-tight">{cat.labelFr}</span>
+                            <span className={cn(
+                              "text-[10px] mt-1 font-medium",
+                              isCatSelected ? "text-blue-100" : "text-gray-400"
+                            )}>
+                              {cat.labelEn}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Step 2: Specific Cause Selection */}
+                  {(() => {
+                    const currentCatObj = FAILURE_CAUSE_CATEGORIES.find(c => c.id === interventionData.failureCategory);
+                    if (!currentCatObj) return null;
+                    return (
+                      <div className="space-y-3 pt-3 border-t border-gray-200/60 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                          Étape 2 : Sélectionnez la cause précise / Step 2: Select specific cause ({currentCatObj.labelFr}) *
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {currentCatObj.causes.map((cause) => {
+                            const isCauseSelected = interventionData.failureCause === cause.id;
+                            return (
+                              <label
+                                key={cause.id}
+                                className={cn(
+                                  "flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                                  isCauseSelected
+                                    ? "bg-white border-blue-500 text-blue-900 shadow-sm ring-2 ring-blue-500/20"
+                                    : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                                )}
+                              >
+                                <input
+                                  type="radio"
+                                  name="failureCauseSpecific"
+                                  className="mt-0.5 w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                  checked={isCauseSelected}
+                                  onChange={() => setInterventionData({ ...interventionData, failureCause: cause.id })}
+                                />
+                                <div>
+                                  <span className="text-xs font-bold block text-gray-900">{cause.labelFr}</span>
+                                  <span className="text-[11px] text-gray-500">{cause.labelEn}</span>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+
+                        {/* Free text field if Category is Other or Cause is Other */}
+                        {(interventionData.failureCategory === 'other' || interventionData.failureCause === 'other_custom') && (
+                          <div className="pt-2">
+                            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                              Préciser la cause / Specify cause details *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="Veuillez détailler la cause exacte / Please describe the exact cause..."
+                              className="w-full px-4 py-2.5 bg-white border border-blue-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
+                              value={interventionData.relatedCause}
+                              onChange={(e) => setInterventionData({ ...interventionData, relatedCause: e.target.value })}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                   <div>

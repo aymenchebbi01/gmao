@@ -29,7 +29,6 @@ export default function TableFooter({
             {/* Left: counts */}
             <div className="flex flex-col gap-0.5 min-w-[120px]">
                 <span>Total Items: <span className="font-semibold text-gray-700">{totalItems}</span></span>
-                <span>Selected Items: <span className="font-semibold text-gray-700">{selectedItems}</span></span>
             </div>
 
             {/* Center: page size */}

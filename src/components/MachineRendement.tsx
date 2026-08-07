@@ -997,10 +997,6 @@ export default function MachineRendement() {
                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Items</span>
                                 <span className="text-sm font-bold text-gray-700">{totalItems}</span>
                             </div>
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Selected Items</span>
-                                <span className="text-sm font-bold text-gray-700">0</span>
-                            </div>
                         </div>
 
                         <div className="flex items-center gap-6">

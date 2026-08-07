@@ -2,6 +2,8 @@
 @import "leaflet/dist/leaflet.css";
 
 :root {
+  --font-inter: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   --color-background-primary: #ffffff;
   --color-background-secondary: #f8f9fb;
   --color-background-tertiary: #f1f3f6;
@@ -18,6 +20,51 @@
   --accent-gray: #9ca3af;
 }
 
+body {
+  font-family: var(--font-inter);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--color-text-primary);
+  background-color: #f8fafc;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
+
+/* Custom scrollbar styling for tables and panels */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Glassmorphism & UI Card Utilities */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+}
+
 /* Dashboard-specific keyframes */
 @keyframes dash-highlight {
   0%   { background-color: #fefce8; }
@@ -25,4 +72,11 @@
 }
 .dash-new-item {
   animation: dash-highlight 2.5s ease-out forwards;
+}
+
+/* Responsive Table scroll hint gradient */
+.table-scroll-container {
+  position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
