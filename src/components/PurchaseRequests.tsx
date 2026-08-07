@@ -68,7 +68,7 @@ export default function PurchaseRequests() {
     const [statusFilter, setStatusFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const PAGE_SIZE = 10;
-    
+
     // Admin Edit modal state
     const [editingRequest, setEditingRequest] = useState<any | null>(null);
     const [editDemandeur, setEditDemandeur] = useState('');
@@ -361,7 +361,7 @@ export default function PurchaseRequests() {
                                 26,
                                 24
                             );
-                        } catch (_) {}
+                        } catch (_) { }
                     }
                 }
             },
@@ -489,323 +489,323 @@ export default function PurchaseRequests() {
                 "transition-all duration-500 ease-in-out space-y-6",
                 (isCreateFormOpen || !!editingRequest) ? "blur-xl opacity-20 scale-95 pointer-events-none" : "blur-0 opacity-100 scale-100"
             )}>
-            {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Demande d'Achat</h1>
-                    <p className="text-xs text-gray-500 mt-0.5">Gestion et suivi des demandes d'achat</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={fetchHistory}
-                        disabled={loading}
-                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
-                        title="Actualiser l'historique"
-                    >
-                        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-                    </button>
-                    {user?.role !== 'accounting' && (
+                {/* Page Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Demande d'Achat</h1>
+                        <p className="text-xs text-gray-500 mt-0.5">Gestion et suivi des demandes d'achat</p>
+                    </div>
+                    <div className="flex items-center gap-3">
                         <button
-                            onClick={handleOpenCreateModal}
-                            className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+                            onClick={fetchHistory}
+                            disabled={loading}
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
+                            title="Actualiser l'historique"
                         >
-                            <Plus size={18} />
-                            Nouvelle Demande
+                            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                        </button>
+                        {user?.role !== 'accounting' && (
+                            <button
+                                onClick={handleOpenCreateModal}
+                                className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95"
+                            >
+                                <Plus size={18} />
+                                Nouvelle Demande
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Summary Stats Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                    <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 flex flex-col gap-1">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total</p>
+                        <p className="text-2xl font-bold text-gray-900">{statusCounts.total}</p>
+                    </div>
+                    <button
+                        onClick={() => { setStatusFilter(statusFilter === 'Waiting for validation' ? '' : 'Waiting for validation'); setCurrentPage(1); }}
+                        className={cn("text-left bg-amber-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Waiting for validation' ? 'border-amber-400 ring-2 ring-amber-300' : 'border-amber-100')}
+                    >
+                        <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Waiting for validation</p>
+                        <p className="text-2xl font-bold text-amber-700">{statusCounts.waiting_validation}</p>
+                    </button>
+                    <button
+                        onClick={() => { setStatusFilter(statusFilter === 'Waiting for reception' ? '' : 'Waiting for reception'); setCurrentPage(1); }}
+                        className={cn("text-left bg-blue-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Waiting for reception' ? 'border-blue-400 ring-2 ring-blue-300' : 'border-blue-100')}
+                    >
+                        <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Waiting for reception</p>
+                        <p className="text-2xl font-bold text-blue-700">{statusCounts.waiting_reception}</p>
+                    </button>
+                    <button
+                        onClick={() => { setStatusFilter(statusFilter === 'In progress' ? '' : 'In progress'); setCurrentPage(1); }}
+                        className={cn("text-left bg-purple-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'In progress' ? 'border-purple-400 ring-2 ring-purple-300' : 'border-purple-100')}
+                    >
+                        <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">In progress</p>
+                        <p className="text-2xl font-bold text-purple-700">{statusCounts.in_progress}</p>
+                    </button>
+                    <button
+                        onClick={() => { setStatusFilter(statusFilter === 'Purchased' ? '' : 'Purchased'); setCurrentPage(1); }}
+                        className={cn("text-left bg-emerald-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Purchased' ? 'border-emerald-400 ring-2 ring-emerald-300' : 'border-emerald-100')}
+                    >
+                        <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Purchased</p>
+                        <p className="text-2xl font-bold text-emerald-700">{statusCounts.purchased}</p>
+                    </button>
+                    <button
+                        onClick={() => { setStatusFilter(statusFilter === 'Cancelled' ? '' : 'Cancelled'); setCurrentPage(1); }}
+                        className={cn("text-left bg-red-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Cancelled' ? 'border-red-400 ring-2 ring-red-300' : 'border-red-100')}
+                    >
+                        <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Cancelled</p>
+                        <p className="text-2xl font-bold text-red-700">{statusCounts.cancelled}</p>
+                    </button>
+                </div>
+
+                {/* Filter Bar */}
+                <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Rechercher (Réf, demandeur, fournisseur...)"
+                            className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            value={historySearch}
+                            onChange={e => { setHistorySearch(e.target.value); setCurrentPage(1); }}
+                        />
+                    </div>
+                    <select
+                        value={statusFilter}
+                        onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                        className={cn(
+                            "px-3 py-2.5 text-sm border rounded-xl outline-none transition-all min-w-[190px]",
+                            statusFilter ? 'border-blue-400 ring-2 ring-blue-100 font-semibold' : 'border-gray-200'
+                        )}
+                    >
+                        <option value="">Tous les statuts</option>
+                        <option value="Waiting for validation">Waiting for validation</option>
+                        <option value="Waiting for reception">Waiting for reception</option>
+                        <option value="In progress">In progress</option>
+                        <option value="Purchased">Purchased</option>
+                        <option value="Cancelled">Cancelled</option>
+                    </select>
+                    {(historySearch || statusFilter) && (
+                        <button
+                            onClick={resetFilters}
+                            className="flex items-center gap-1.5 px-3 py-2.5 text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors whitespace-nowrap"
+                        >
+                            <X size={14} /> Clear filters
                         </button>
                     )}
                 </div>
-            </div>
 
-            {/* Summary Stats Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 flex flex-col gap-1">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total</p>
-                    <p className="text-2xl font-bold text-gray-900">{statusCounts.total}</p>
-                </div>
-                <button
-                    onClick={() => { setStatusFilter(statusFilter === 'Waiting for validation' ? '' : 'Waiting for validation'); setCurrentPage(1); }}
-                    className={cn("text-left bg-amber-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Waiting for validation' ? 'border-amber-400 ring-2 ring-amber-300' : 'border-amber-100')}
-                >
-                    <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">En attente</p>
-                    <p className="text-2xl font-bold text-amber-700">{statusCounts.waiting_validation}</p>
-                </button>
-                <button
-                    onClick={() => { setStatusFilter(statusFilter === 'Waiting for reception' ? '' : 'Waiting for reception'); setCurrentPage(1); }}
-                    className={cn("text-left bg-blue-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Waiting for reception' ? 'border-blue-400 ring-2 ring-blue-300' : 'border-blue-100')}
-                >
-                    <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Att. réception</p>
-                    <p className="text-2xl font-bold text-blue-700">{statusCounts.waiting_reception}</p>
-                </button>
-                <button
-                    onClick={() => { setStatusFilter(statusFilter === 'In progress' ? '' : 'In progress'); setCurrentPage(1); }}
-                    className={cn("text-left bg-purple-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'In progress' ? 'border-purple-400 ring-2 ring-purple-300' : 'border-purple-100')}
-                >
-                    <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">En cours</p>
-                    <p className="text-2xl font-bold text-purple-700">{statusCounts.in_progress}</p>
-                </button>
-                <button
-                    onClick={() => { setStatusFilter(statusFilter === 'Purchased' ? '' : 'Purchased'); setCurrentPage(1); }}
-                    className={cn("text-left bg-emerald-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Purchased' ? 'border-emerald-400 ring-2 ring-emerald-300' : 'border-emerald-100')}
-                >
-                    <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Acheté</p>
-                    <p className="text-2xl font-bold text-emerald-700">{statusCounts.purchased}</p>
-                </button>
-                <button
-                    onClick={() => { setStatusFilter(statusFilter === 'Cancelled' ? '' : 'Cancelled'); setCurrentPage(1); }}
-                    className={cn("text-left bg-red-50 border rounded-2xl p-4 flex flex-col gap-1 transition-all hover:shadow-md", statusFilter === 'Cancelled' ? 'border-red-400 ring-2 ring-red-300' : 'border-red-100')}
-                >
-                    <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Annulé</p>
-                    <p className="text-2xl font-bold text-red-700">{statusCounts.cancelled}</p>
-                </button>
-            </div>
-
-            {/* Filter Bar */}
-            <div className="bg-white border border-gray-100 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                    <input
-                        type="text"
-                        placeholder="Rechercher (Réf, demandeur, fournisseur...)"
-                        className="w-full pl-10 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                        value={historySearch}
-                        onChange={e => { setHistorySearch(e.target.value); setCurrentPage(1); }}
-                    />
-                </div>
-                <select
-                    value={statusFilter}
-                    onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-                    className={cn(
-                        "px-3 py-2.5 text-sm border rounded-xl outline-none transition-all min-w-[190px]",
-                        statusFilter ? 'border-blue-400 ring-2 ring-blue-100 font-semibold' : 'border-gray-200'
-                    )}
-                >
-                    <option value="">Tous les statuts</option>
-                    <option value="Waiting for validation">Waiting for validation</option>
-                    <option value="Waiting for reception">Waiting for reception</option>
-                    <option value="In progress">In progress</option>
-                    <option value="Purchased">Purchased</option>
-                    <option value="Cancelled">Cancelled</option>
-                </select>
-                {(historySearch || statusFilter) && (
-                    <button
-                        onClick={resetFilters}
-                        className="flex items-center gap-1.5 px-3 py-2.5 text-sm text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors whitespace-nowrap"
-                    >
-                        <X size={14} /> Réinitialiser
-                    </button>
-                )}
-            </div>
-
-            {/* Table */}
-            <div className="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead>
-                            <tr className="bg-gray-50/70 border-b border-gray-100">
-                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Référence</th>
-                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
-                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Demandeur</th>
-                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Fournisseur</th>
-                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Articles</th>
-                                <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Statut</th>
-                                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {loading ? (
-                                <tr>
-                                    <td colSpan={7} className="px-6 py-16 text-center">
-                                        <div className="flex items-center justify-center gap-2 text-gray-500">
-                                            <RefreshCw size={18} className="animate-spin text-blue-600" />
-                                            <span>Chargement des demandes d'achat...</span>
-                                        </div>
-                                    </td>
+                {/* Table */}
+                <div className="bg-white border border-gray-100 shadow-sm rounded-2xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead>
+                                <tr className="bg-gray-50/70 border-b border-gray-100">
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Référence</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Date</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Demandeur</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Fournisseur</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Articles</th>
+                                    <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Statut</th>
+                                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-400 uppercase tracking-wider">Actions</th>
                                 </tr>
-                            ) : paginatedHistory.length === 0 ? (
-                                <tr>
-                                    <td colSpan={7} className="px-6 py-16 text-center">
-                                        <div className="flex flex-col items-center gap-3">
-                                            <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
-                                                <FileText size={24} className="text-gray-400" />
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={7} className="px-6 py-16 text-center">
+                                            <div className="flex items-center justify-center gap-2 text-gray-500">
+                                                <RefreshCw size={18} className="animate-spin text-blue-600" />
+                                                <span>Chargement des demandes d'achat...</span>
                                             </div>
-                                            <p className="text-sm font-semibold text-gray-500">Aucune demande trouvée</p>
-                                            <p className="text-xs text-gray-400">
-                                                {historySearch || statusFilter
-                                                    ? 'Aucun résultat pour les filtres actuels.'
-                                                    : 'Aucune demande d\'achat enregistrée.'}
-                                            </p>
-                                            {(historySearch || statusFilter) && (
-                                                <button
-                                                    onClick={resetFilters}
-                                                    className="mt-1 text-xs text-blue-600 hover:underline"
+                                        </td>
+                                    </tr>
+                                ) : paginatedHistory.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={7} className="px-6 py-16 text-center">
+                                            <div className="flex flex-col items-center gap-3">
+                                                <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
+                                                    <FileText size={24} className="text-gray-400" />
+                                                </div>
+                                                <p className="text-sm font-semibold text-gray-500">Aucune demande trouvée</p>
+                                                <p className="text-xs text-gray-400">
+                                                    {historySearch || statusFilter
+                                                        ? 'Aucun résultat pour les filtres actuels.'
+                                                        : 'Aucune demande d\'achat enregistrée.'}
+                                                </p>
+                                                {(historySearch || statusFilter) && (
+                                                    <button
+                                                        onClick={resetFilters}
+                                                        className="mt-1 text-xs text-blue-600 hover:underline"
+                                                    >
+                                                        Réinitialiser les filtres
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : paginatedHistory.map((req) => (
+                                    <tr key={req.id} className="hover:bg-gray-50/60 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <span className="font-mono font-bold text-blue-600">{req.reference}</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-gray-600">
+                                            {format(new Date(req.date), 'dd/MM/yyyy')}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm font-medium text-gray-900">{req.requested_by}</div>
+                                            <div className="text-xs text-gray-500">{req.department}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-gray-600">{req.supplier || '—'}</td>
+                                        <td className="px-6 py-4">
+                                            <span className="px-2.5 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
+                                                {req.items_count} pos.
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {user?.role === 'accounting' ? (
+                                                <select
+                                                    value={req.status || 'Waiting for validation'}
+                                                    onChange={async (e) => {
+                                                        const newStatus = e.target.value;
+                                                        try {
+                                                            await api.updatePurchaseRequestStatus(req.id, newStatus);
+                                                            toast.success('Statut mis à jour');
+                                                            fetchHistory();
+                                                        } catch (err) {
+                                                            toast.error('Erreur de mise à jour');
+                                                        }
+                                                    }}
+                                                    className={cn(
+                                                        "px-2.5 py-1 rounded-full text-xs font-bold border outline-none cursor-pointer uppercase transition-all",
+                                                        getStatusStyle(req.status)
+                                                    )}
                                                 >
-                                                    Réinitialiser les filtres
-                                                </button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : paginatedHistory.map((req) => (
-                                <tr key={req.id} className="hover:bg-gray-50/60 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <span className="font-mono font-bold text-blue-600">{req.reference}</span>
-                                    </td>
-                                    <td className="px-6 py-4 text-gray-600">
-                                        {format(new Date(req.date), 'dd/MM/yyyy')}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-sm font-medium text-gray-900">{req.requested_by}</div>
-                                        <div className="text-xs text-gray-500">{req.department}</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-gray-600">{req.supplier || '—'}</td>
-                                    <td className="px-6 py-4">
-                                        <span className="px-2.5 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
-                                            {req.items_count} pos.
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        {user?.role === 'accounting' ? (
-                                            <select
-                                                value={req.status || 'Waiting for validation'}
-                                                onChange={async (e) => {
-                                                    const newStatus = e.target.value;
-                                                    try {
-                                                        await api.updatePurchaseRequestStatus(req.id, newStatus);
-                                                        toast.success('Statut mis à jour');
-                                                        fetchHistory();
-                                                    } catch (err) {
-                                                        toast.error('Erreur de mise à jour');
-                                                    }
-                                                }}
-                                                className={cn(
-                                                    "px-2.5 py-1 rounded-full text-xs font-bold border outline-none cursor-pointer uppercase transition-all",
+                                                    <option value="Waiting for validation">Waiting for validation</option>
+                                                    <option value="Waiting for reception">Waiting for reception</option>
+                                                    <option value="In progress">In progress</option>
+                                                    <option value="Purchased">Purchased</option>
+                                                    <option value="Cancelled">Cancelled</option>
+                                                </select>
+                                            ) : (
+                                                <span className={cn(
+                                                    "px-2.5 py-1 rounded-full text-xs font-bold border uppercase inline-block",
                                                     getStatusStyle(req.status)
+                                                )}>
+                                                    {req.status || 'Waiting for validation'}
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        const link = document.createElement('a');
+                                                        link.href = req.pdf_data;
+                                                        link.download = `Demande_Achat_${req.reference}.pdf`;
+                                                        link.click();
+                                                    }}
+                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                                                    title="Télécharger PDF"
+                                                >
+                                                    <Download size={13} />
+                                                    PDF
+                                                </button>
+                                                {user?.role !== 'accounting' && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleSendEmail(req.id)}
+                                                            disabled={sendingEmailId === req.id}
+                                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                                                            title="Envoyer par email"
+                                                        >
+                                                            {sendingEmailId === req.id ? (
+                                                                <RefreshCw size={13} className="animate-spin" />
+                                                            ) : (
+                                                                <Send size={13} />
+                                                            )}
+                                                            Envoyer
+                                                        </button>
+                                                        {isAdmin && (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => handleEditClick(req)}
+                                                                    className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all"
+                                                                    title="Modifier"
+                                                                >
+                                                                    <Edit2 size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteRequest(req.id)}
+                                                                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
+                                                                    title="Supprimer"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Pagination Footer */}
+                    {totalPages > 1 && (
+                        <div className="px-6 py-4 border-t border-gray-50 flex items-center justify-between">
+                            <p className="text-xs text-gray-400">
+                                {filteredHistory.length} résultat{filteredHistory.length > 1 ? 's' : ''} — Page {currentPage} / {totalPages}
+                            </p>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handlePageChange(currentPage - 1)}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    ← Précédent
+                                </button>
+                                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                    .reduce((acc: (number | string)[], p, idx, arr) => {
+                                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
+                                        acc.push(p);
+                                        return acc;
+                                    }, [])
+                                    .map((p, idx) =>
+                                        p === '...' ? (
+                                            <span key={`ellipsis-${idx}`} className="px-1 text-gray-400 text-xs">…</span>
+                                        ) : (
+                                            <button
+                                                key={p}
+                                                onClick={() => handlePageChange(p as number)}
+                                                className={cn(
+                                                    "w-8 h-8 text-xs font-medium rounded-lg transition-colors",
+                                                    currentPage === p
+                                                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
+                                                        : 'text-gray-600 hover:bg-gray-100'
                                                 )}
                                             >
-                                                <option value="Waiting for validation">Waiting for validation</option>
-                                                <option value="Waiting for reception">Waiting for reception</option>
-                                                <option value="In progress">In progress</option>
-                                                <option value="Purchased">Purchased</option>
-                                                <option value="Cancelled">Cancelled</option>
-                                            </select>
-                                        ) : (
-                                            <span className={cn(
-                                                "px-2.5 py-1 rounded-full text-xs font-bold border uppercase inline-block",
-                                                getStatusStyle(req.status)
-                                            )}>
-                                                {req.status || 'Waiting for validation'}
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <button
-                                                onClick={() => {
-                                                    const link = document.createElement('a');
-                                                    link.href = req.pdf_data;
-                                                    link.download = `Demande_Achat_${req.reference}.pdf`;
-                                                    link.click();
-                                                }}
-                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
-                                                title="Télécharger PDF"
-                                            >
-                                                <Download size={13} />
-                                                PDF
+                                                {p}
                                             </button>
-                                            {user?.role !== 'accounting' && (
-                                                <>
-                                                    <button
-                                                        onClick={() => handleSendEmail(req.id)}
-                                                        disabled={sendingEmailId === req.id}
-                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors disabled:opacity-50"
-                                                        title="Envoyer par email"
-                                                    >
-                                                        {sendingEmailId === req.id ? (
-                                                            <RefreshCw size={13} className="animate-spin" />
-                                                        ) : (
-                                                            <Send size={13} />
-                                                        )}
-                                                        Envoyer
-                                                    </button>
-                                                    {isAdmin && (
-                                                        <>
-                                                            <button
-                                                                onClick={() => handleEditClick(req)}
-                                                                className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-all"
-                                                                title="Modifier"
-                                                            >
-                                                                <Edit2 size={14} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteRequest(req.id)}
-                                                                className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-all"
-                                                                title="Supprimer"
-                                                            >
-                                                                <Trash2 size={14} />
-                                                            </button>
-                                                        </>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Pagination Footer */}
-                {totalPages > 1 && (
-                    <div className="px-6 py-4 border-t border-gray-50 flex items-center justify-between">
-                        <p className="text-xs text-gray-400">
-                            {filteredHistory.length} résultat{filteredHistory.length > 1 ? 's' : ''} — Page {currentPage} / {totalPages}
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => handlePageChange(currentPage - 1)}
-                                disabled={currentPage === 1}
-                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                ← Précédent
-                            </button>
-                            {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                                .reduce((acc: (number | string)[], p, idx, arr) => {
-                                    if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
-                                    acc.push(p);
-                                    return acc;
-                                }, [])
-                                .map((p, idx) =>
-                                    p === '...' ? (
-                                        <span key={`ellipsis-${idx}`} className="px-1 text-gray-400 text-xs">…</span>
-                                    ) : (
-                                        <button
-                                            key={p}
-                                            onClick={() => handlePageChange(p as number)}
-                                            className={cn(
-                                                "w-8 h-8 text-xs font-medium rounded-lg transition-colors",
-                                                currentPage === p
-                                                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
-                                                    : 'text-gray-600 hover:bg-gray-100'
-                                            )}
-                                        >
-                                            {p}
-                                        </button>
+                                        )
                                     )
-                                )
-                            }
-                            <button
-                                onClick={() => handlePageChange(currentPage + 1)}
-                                disabled={currentPage === totalPages}
-                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                Suivant →
-                            </button>
+                                }
+                                <button
+                                    onClick={() => handlePageChange(currentPage + 1)}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    Suivant →
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                )}
-            </div>
+                    )}
+                </div>
             </div>
 
             {/* ── Inline Create Form Overlay (same pattern as Rendement/Inventory) ── */}
@@ -1044,7 +1044,7 @@ export default function PurchaseRequests() {
 
             {/* Edit Modal (Admin only) */}
             {editingRequest && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 animate-in fade-in duration-200" style={{position:'fixed'}}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 animate-in fade-in duration-200" style={{ position: 'fixed' }}>
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 border border-gray-100 animate-in zoom-in-95 duration-200">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-bold text-gray-900">Modifier la Demande</h3>
