@@ -1715,6 +1715,350 @@ app.delete('/api/calendar-events/:id', (req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PRODUCTION MODULE API (migrated from production101)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── PRODUCTION LINES (renamed from "machines" in production101) ──────────────
+app.get('/api/production/lines', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM production_lines ORDER BY name ASC').all();
+    res.json(rows);
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.post('/api/production/lines', (req, res) => {
+  try {
+    const { id, name, cadence, category } = req.body;
+    db.prepare(
+      'INSERT INTO production_lines (id, name, cadence, category) VALUES (?, ?, ?, ?) ON CONFLICT(name) DO UPDATE SET cadence=excluded.cadence, category=excluded.category'
+    ).run(id, name, cadence, category || null);
+    res.status(201).json({ message: 'Production line added or updated' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.put('/api/production/lines/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, cadence, category } = req.body;
+    db.prepare('UPDATE production_lines SET name = ?, cadence = ?, category = ? WHERE id = ?').run(name, cadence, category || null, id);
+    res.json({ message: 'Production line updated' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.delete('/api/production/lines/all', (req, res) => {
+  try {
+    db.prepare('DELETE FROM production_lines').run();
+    res.json({ message: 'All production lines deleted' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.delete('/api/production/lines/:id', (req, res) => {
+  try {
+    db.prepare('DELETE FROM production_lines WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Production line deleted' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+// ── PRODUCTION WORKERS ────────────────────────────────────────────────────────
+app.get('/api/production/workers', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT * FROM production_workers ORDER BY worker_id ASC').all();
+    res.json(rows);
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.post('/api/production/workers', (req, res) => {
+  try {
+    const { id, worker_id, name } = req.body;
+    db.prepare(
+      'INSERT INTO production_workers (id, worker_id, name) VALUES (?, ?, ?) ON CONFLICT(worker_id) DO UPDATE SET name=excluded.name'
+    ).run(id, worker_id, name);
+    res.status(201).json({ message: 'Worker added or updated' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.put('/api/production/workers/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { worker_id, name } = req.body;
+    db.prepare('UPDATE production_workers SET worker_id = ?, name = ? WHERE id = ?').run(worker_id, name, id);
+    res.json({ message: 'Worker updated' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.delete('/api/production/workers/all', (req, res) => {
+  try {
+    db.prepare('DELETE FROM production_workers').run();
+    res.json({ message: 'All workers deleted' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.delete('/api/production/workers/:id', (req, res) => {
+  try {
+    db.prepare('DELETE FROM production_workers WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Worker deleted' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+// ── PRODUCTION RECORDS ────────────────────────────────────────────────────────
+app.get('/api/production/records', (req, res) => {
+  try {
+    const { dateStart, dateEnd, workerId, workerName, setNumber, itemNumber, machineCategory } = req.query as Record<string, string>;
+    let sql = 'SELECT r.*, l.category as machine_category FROM production_records r LEFT JOIN production_lines l ON r.machine_name = l.name WHERE 1=1';
+    const params: any[] = [];
+    if (dateStart) { sql += ' AND r.date >= ?'; params.push(dateStart); }
+    if (dateEnd) { sql += ' AND r.date <= ?'; params.push(dateEnd); }
+    sql += ' ORDER BY r.date DESC';
+    let rows = db.prepare(sql).all(...params) as any[];
+    if (workerId) rows = rows.filter((r: any) => r.worker_id.toLowerCase().includes(workerId.toLowerCase()));
+    if (workerName) rows = rows.filter((r: any) => (r.worker_name || '').toLowerCase().includes(workerName.toLowerCase()));
+    if (setNumber) rows = rows.filter((r: any) => r.set_number.toLowerCase().includes(setNumber.toLowerCase()));
+    if (itemNumber) rows = rows.filter((r: any) => r.item_number.toLowerCase().includes(itemNumber.toLowerCase()));
+    if (machineCategory) rows = rows.filter((r: any) => (r.machine_category || '').toLowerCase() === machineCategory.toLowerCase());
+    res.json(rows);
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.post('/api/production/records/batch', (req, res) => {
+  try {
+    const { records } = req.body as { records: any[] };
+    if (!records || records.length === 0) return res.status(400).json({ error: 'No records provided' });
+    const insert = db.prepare(
+      'INSERT OR REPLACE INTO production_records (id, date, worker_id, worker_name, set_number, item_number, quantity, upload_id, created_at, machine_name, hours_worked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    const insertMany = db.transaction((rows: any[]) => {
+      for (const r of rows) {
+        insert.run(r.id, r.date, r.worker_id, r.worker_name, r.set_number, r.item_number, r.quantity, r.upload_id, r.created_at, r.machine_name || null, r.hours_worked || null);
+      }
+    });
+    insertMany(records);
+    res.status(201).json({ inserted: records.length });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.post('/api/production/records/replace', (req, res) => {
+  try {
+    const { records, dates } = req.body as { records: any[]; dates: string[] };
+    if (!records || records.length === 0) return res.status(400).json({ error: 'No records provided' });
+    const deleteByDate = db.prepare('DELETE FROM production_records WHERE date = ?');
+    const insert = db.prepare(
+      'INSERT INTO production_records (id, date, worker_id, worker_name, set_number, item_number, quantity, upload_id, created_at, machine_name, hours_worked) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    );
+    const replaceAll = db.transaction(() => {
+      for (const date of dates) { deleteByDate.run(date); }
+      for (const r of records) {
+        insert.run(r.id, r.date, r.worker_id, r.worker_name, r.set_number, r.item_number, r.quantity, r.upload_id, r.created_at, r.machine_name || null, r.hours_worked || null);
+      }
+    });
+    replaceAll();
+    res.status(201).json({ inserted: records.length });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.put('/api/production/records/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body as Partial<{ date: string; worker_id: string; worker_name: string; set_number: string; item_number: string; quantity: number; machine_name: string; hours_worked: number }>;
+    const sets = Object.keys(data).map(k => `${k} = ?`).join(', ');
+    const values = Object.values(data);
+    db.prepare(`UPDATE production_records SET ${sets} WHERE id = ?`).run(...values, id);
+    res.json({ message: 'Record updated' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.delete('/api/production/records/all', (req, res) => {
+  try {
+    db.prepare('DELETE FROM production_records').run();
+    res.json({ message: 'All production records deleted' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.delete('/api/production/records/:id', (req, res) => {
+  try {
+    db.prepare('DELETE FROM production_records WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Record deleted' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+// ── PRODUCTION USER ACTIONS LOG ───────────────────────────────────────────────
+app.get('/api/production/user-actions', (req, res) => {
+  try {
+    const { userName, dateStart, dateEnd } = req.query as Record<string, string>;
+    let sql = 'SELECT * FROM production_user_actions WHERE 1=1';
+    const params: any[] = [];
+    if (userName) { sql += ' AND user_name LIKE ?'; params.push(`%${userName}%`); }
+    if (dateStart) { sql += ' AND record_date >= ?'; params.push(dateStart); }
+    if (dateEnd) { sql += ' AND record_date <= ?'; params.push(dateEnd); }
+    sql += ' ORDER BY created_at DESC';
+    res.json(db.prepare(sql).all(...params));
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.post('/api/production/user-actions', (req, res) => {
+  try {
+    const { id, user_name, action, worker_id, worker_name, set_number, item_number, quantity, hours_worked, machine_name, record_date } = req.body;
+    db.prepare(
+      'INSERT INTO production_user_actions (id, user_name, action, worker_id, worker_name, set_number, item_number, quantity, hours_worked, machine_name, record_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, user_name, action, worker_id || null, worker_name || null, set_number || null, item_number || null, quantity || null, hours_worked || null, machine_name || null, record_date || null);
+    res.status(201).json({ message: 'Action logged' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+// ── PRODUCTION ORDERS ─────────────────────────────────────────────────────────
+app.get('/api/production/orders', (req, res) => {
+  try {
+    const { supplier, status, dateStart, dateEnd, orderNumber } = req.query as Record<string, string>;
+    let sql = 'SELECT * FROM production_orders WHERE 1=1';
+    const params: any[] = [];
+    if (supplier) { sql += ' AND supplier LIKE ?'; params.push(`%${supplier}%`); }
+    if (status) { sql += ' AND is_delivered = ?'; params.push(status); }
+    if (dateStart) { sql += ' AND expected_delivery_date >= ?'; params.push(dateStart); }
+    if (dateEnd) { sql += ' AND expected_delivery_date <= ?'; params.push(dateEnd); }
+    if (orderNumber) { sql += ' AND order_number LIKE ?'; params.push(`%${orderNumber}%`); }
+    sql += ' ORDER BY expected_delivery_date ASC';
+    res.json(db.prepare(sql).all(...params));
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.post('/api/production/orders/batch', (req, res) => {
+  try {
+    const { orders } = req.body as { orders: any[] };
+    if (!orders || orders.length === 0) return res.status(400).json({ error: 'No orders provided' });
+    const insert = db.prepare(
+      `INSERT INTO production_orders (id, supplier, order_number, set_number, description, expected_delivery_date, quantity_expected, quantity_delivered, is_delivered, actual_delivered_date, actual_quantity_delivered, comment, week)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         supplier=excluded.supplier, order_number=excluded.order_number, set_number=excluded.set_number,
+         description=excluded.description, expected_delivery_date=excluded.expected_delivery_date,
+         quantity_expected=excluded.quantity_expected, quantity_delivered=excluded.quantity_delivered,
+         week=excluded.week`
+    );
+    const insertMany = db.transaction((rows: any[]) => {
+      for (const o of rows) {
+        insert.run(o.id, o.supplier, o.order_number, o.set_number, o.description || null, o.expected_delivery_date, o.quantity_expected || 0, o.quantity_delivered || 0, o.is_delivered || 'in progress', o.actual_delivered_date || null, o.actual_quantity_delivered || null, o.comment || null, o.week || null);
+      }
+    });
+    insertMany(orders);
+    res.status(201).json({ inserted: orders.length });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.post('/api/production/orders', (req, res) => {
+  try {
+    const { id, supplier, order_number, set_number, description, expected_delivery_date, quantity_expected, quantity_delivered, is_delivered, comment, department, updated_by, week } = req.body;
+    db.prepare(
+      `INSERT INTO production_orders (id, supplier, order_number, set_number, description, expected_delivery_date, quantity_expected, quantity_delivered, is_delivered, comment, department, updated_by, week) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, supplier || 'Unknown', order_number, set_number, description || null, expected_delivery_date, quantity_expected || 0, quantity_delivered || 0, is_delivered || 'in progress', comment || null, department || null, updated_by || null, week || null);
+    res.status(201).json({ message: 'Order created' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.put('/api/production/orders/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { is_delivered, actual_delivered_date, actual_quantity_delivered, comment, department, updated_by, expected_delivery_date, week, supplier, order_number, set_number, description, quantity_expected } = req.body;
+    db.prepare(
+      `UPDATE production_orders SET
+         is_delivered = ?, actual_delivered_date = ?, actual_quantity_delivered = ?,
+         comment = ?, department = ?, updated_by = ?, expected_delivery_date = ?, week = ?,
+         supplier = COALESCE(?, supplier), order_number = COALESCE(?, order_number),
+         set_number = COALESCE(?, set_number), description = COALESCE(?, description),
+         quantity_expected = COALESCE(?, quantity_expected)
+       WHERE id = ?`
+    ).run(is_delivered, actual_delivered_date || null, actual_quantity_delivered ?? null, comment || null, department || null, updated_by || null, expected_delivery_date, week || null, supplier || null, order_number || null, set_number || null, description || null, quantity_expected ?? null, id);
+    res.json({ message: 'Order updated' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.delete('/api/production/orders/all', (req, res) => {
+  try {
+    db.prepare('DELETE FROM production_orders').run();
+    res.json({ message: 'All orders deleted' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.delete('/api/production/orders/:id', (req, res) => {
+  try {
+    db.prepare('DELETE FROM production_orders WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Order deleted' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+// ── PRODUCTION PLANNING ───────────────────────────────────────────────────────
+app.get('/api/production/planning', (req, res) => {
+  try {
+    res.json(db.prepare('SELECT * FROM production_planning ORDER BY created_at DESC').all());
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.post('/api/production/planning/batch', (req, res) => {
+  try {
+    const { records } = req.body as { records: any[] };
+    if (!records || records.length === 0) return res.status(400).json({ error: 'No records provided' });
+    const insert = db.prepare(
+      `INSERT INTO production_planning (id, set_number, description, quantity, week, total_amount, total_number_in_box, total_number_of_pallets, order_numbers)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET set_number=excluded.set_number, description=excluded.description, quantity=excluded.quantity, week=excluded.week, total_amount=excluded.total_amount, total_number_in_box=excluded.total_number_in_box, total_number_of_pallets=excluded.total_number_of_pallets, order_numbers=excluded.order_numbers`
+    );
+    const insertMany = db.transaction((rows: any[]) => {
+      for (const r of rows) {
+        insert.run(r.id, String(r.set_number).trim(), r.description ? String(r.description).trim() : null, parseInt(r.quantity || '0'), r.week || null, r.total_amount != null ? parseFloat(r.total_amount) : null, r.total_number_in_box != null ? parseInt(r.total_number_in_box) : null, r.total_number_of_pallets != null ? parseInt(r.total_number_of_pallets) : null, r.order_numbers ? String(r.order_numbers).trim() : null);
+      }
+    });
+    insertMany(records);
+    res.status(201).json({ inserted: records.length });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.post('/api/production/planning', (req, res) => {
+  try {
+    const { id, set_number, description, quantity, week, total_amount, total_number_in_box, total_number_of_pallets, order_numbers } = req.body;
+    db.prepare(
+      'INSERT INTO production_planning (id, set_number, description, quantity, week, total_amount, total_number_in_box, total_number_of_pallets, order_numbers) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, String(set_number).trim(), description || null, parseInt(quantity || '0'), week || null, total_amount != null ? parseFloat(total_amount) : null, total_number_in_box != null ? parseInt(total_number_in_box) : null, total_number_of_pallets != null ? parseInt(total_number_of_pallets) : null, order_numbers ? String(order_numbers).trim() : null);
+    res.status(201).json({ message: 'Planning record created' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.put('/api/production/planning/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { set_number, description, quantity, week, total_amount, total_number_in_box, total_number_of_pallets, order_numbers } = req.body;
+    db.prepare(
+      'UPDATE production_planning SET set_number = ?, description = ?, quantity = ?, week = ?, total_amount = ?, total_number_in_box = ?, total_number_of_pallets = ?, order_numbers = ? WHERE id = ?'
+    ).run(String(set_number).trim(), description || null, parseInt(quantity || '0'), week || null, total_amount != null ? parseFloat(total_amount) : null, total_number_in_box != null ? parseInt(total_number_in_box) : null, total_number_of_pallets != null ? parseInt(total_number_of_pallets) : null, order_numbers ? String(order_numbers).trim() : null, id);
+    res.json({ message: 'Planning record updated' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.delete('/api/production/planning/all', (req, res) => {
+  try {
+    db.prepare('DELETE FROM production_planning').run();
+    res.json({ message: 'All planning records deleted' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.delete('/api/production/planning/:id', (req, res) => {
+  try {
+    db.prepare('DELETE FROM production_planning WHERE id = ?').run(req.params.id);
+    res.json({ message: 'Planning record deleted' });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+// ── PRODUCTION DASHBOARD STATS ────────────────────────────────────────────────
+app.get('/api/production/dashboard-stats', (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const todayTotal = (db.prepare('SELECT COALESCE(SUM(quantity),0) as total FROM production_records WHERE date = ?').get(today) as any)?.total || 0;
+    const pendingOrders = (db.prepare("SELECT COUNT(*) as cnt FROM production_orders WHERE is_delivered NOT IN ('yes','eliminated')").get() as any)?.cnt || 0;
+    const monthRecords = db.prepare('SELECT worker_name, worker_id, SUM(quantity) as total FROM production_records WHERE date >= ? GROUP BY worker_id ORDER BY total DESC LIMIT 1').get(thirtyDaysAgo) as any;
+    const planningItems = (db.prepare('SELECT COUNT(*) as cnt FROM production_planning').get() as any)?.cnt || 0;
+    res.json({ todayTotal, pendingOrders, topWorker: monthRecords ? (monthRecords.worker_name || monthRecords.worker_id) : 'N/A', planningItems });
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
 // ─── Vite Integration ──────────────────────────────────────────────────────────────
 
 async function startServer() {

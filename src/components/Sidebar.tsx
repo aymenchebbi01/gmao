@@ -12,7 +12,10 @@ import {
   Calendar,
   HardDrive,
   BarChart3,
-  ShoppingCart
+  ShoppingCart,
+  Layers,
+  Upload,
+  Database
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -78,7 +81,7 @@ export default function Sidebar({
   const currentUser = user;
 
   const menuItems: MenuItem[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'manager'] },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'manager', 'technician'] },
     {
       id: 'machine-mgmt',
       label: 'Machine Management',
@@ -95,7 +98,7 @@ export default function Sidebar({
       id: 'maintenance-mgmt',
       label: 'Maintenance',
       icon: Wrench,
-      roles: ['admin', 'manager'],
+      roles: ['admin', 'manager', 'technician'],
       subItems: [
         { id: 'work-orders-list', label: 'Maintenance Orders' },
         { id: 'intervention-reports', label: 'Intervention Reports' },
@@ -109,11 +112,34 @@ export default function Sidebar({
       roles: ['admin', 'manager', 'technician'],
       subItems: [
         { id: 'inventory', label: 'Stock', roles: ['admin', 'manager', 'technician'] },
-        { id: 'purchase-requests', label: 'Demande d\'Achat', roles: ['technician'] },
+        { id: 'purchase-requests', label: 'Demande d\'Achat', roles: ['admin', 'manager', 'technician'] },
         { id: 'products', label: 'Items Data', roles: ['admin', 'manager', 'technician'] }
       ]
     },
-    { id: 'purchase-requests', label: 'Achats', icon: ShoppingCart, roles: ['admin', 'manager', 'accounting'] },
+    {
+      id: 'production-mgmt',
+      label: 'Production',
+      icon: Layers,
+      roles: ['admin', 'manager', 'technician'],
+      subItems: [
+        { id: 'production-rendement-overview', label: 'Rendement Overview' },
+        { id: 'production-rendement-analysis', label: 'Rendement Analysis' },
+        { id: 'production-orders', label: 'Orders' },
+        { id: 'production-planning', label: 'Planning' },
+      ]
+    },
+    {
+      id: 'data-mgmt',
+      label: 'Data Management',
+      icon: Database,
+      roles: ['admin', 'manager'],
+      subItems: [
+        { id: 'production-lines', label: 'Production Lines' },
+        { id: 'production-employees', label: 'Employees' },
+        { id: 'production-management', label: 'Raw Production Records' },
+      ]
+    },
+    { id: 'production-imports', label: 'Imports Center', icon: Upload, roles: ['admin', 'manager'] },
     {
       id: 'user-mgmt',
       label: 'User Management',

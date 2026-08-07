@@ -11,6 +11,7 @@ import { Machine, WorkOrder, AuditLog } from '../types';
 import { cn, calculateMachineLiveHours } from '../lib/utils';
 import { api } from '../services/api';
 import { useGmaoStore } from '../store/gmaoStore';
+import ProductionDashboardView from './production/ProductionDashboardView';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -746,6 +747,11 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Production Module — Unified Dashboard Section */}
+      <div className="mt-2">
+        <ProductionDashboardView />
       </div>
     </div>
   );

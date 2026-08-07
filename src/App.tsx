@@ -19,6 +19,15 @@ import MobileStockUpdater from './components/MobileStockUpdater';
 import PurchaseRequests from './components/PurchaseRequests';
 import MachineRendement from './components/MachineRendement';
 import BackupManager from './components/BackupManager';
+import ProductionRendementOverview from './components/production/ProductionRendementOverview';
+import ProductionRendementAnalysis from './components/production/ProductionRendementAnalysis';
+import ProductionDashboardView from './components/production/ProductionDashboardView';
+import ProductionOrdersView from './components/production/ProductionOrdersView';
+import ProductionPlanningView from './components/production/ProductionPlanningView';
+import ProductionLinesMgmt from './components/production/ProductionLinesMgmt';
+import ProductionWorkersMgmt from './components/production/ProductionWorkersMgmt';
+import ProductionManagement from './components/production/ProductionManagement';
+import ProductionImportCenter from './components/production/ProductionImportCenter';
 import { Toaster } from 'sonner';
 import { cn, calculateMachineLiveHours } from './lib/utils';
 import { api } from './services/api';
@@ -236,6 +245,18 @@ function AppLayout() {
               <Route path="/users" element={<RequireRole allowed="manager"><UserManagement /></RequireRole>} />
               <Route path="/rendement" element={<MachineRendement />} />
               <Route path="/backups" element={<RequireRole allowed="admin"><BackupManager /></RequireRole>} />
+              
+              {/* Production Module Routes */}
+              <Route path="/production-dashboard" element={<ProductionDashboardView />} />
+              <Route path="/production-rendement-overview" element={<ProductionRendementOverview />} />
+              <Route path="/production-rendement-analysis" element={<ProductionRendementAnalysis />} />
+              <Route path="/production-orders" element={<ProductionOrdersView />} />
+              <Route path="/production-planning" element={<ProductionPlanningView />} />
+              <Route path="/production-lines" element={<ProductionLinesMgmt />} />
+              <Route path="/production-employees" element={<ProductionWorkersMgmt />} />
+              <Route path="/production-management" element={<ProductionManagement />} />
+              <Route path="/production-imports" element={<ProductionImportCenter />} />
+
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </div>

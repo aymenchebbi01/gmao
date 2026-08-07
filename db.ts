@@ -215,6 +215,83 @@ db.exec(`
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
     updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
   );
+
+  -- ── PRODUCTION MODULE (migrated from production101) ──────────────────────────
+
+  CREATE TABLE IF NOT EXISTS production_lines (
+    id TEXT PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    cadence INTEGER NOT NULL,
+    category TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS production_workers (
+    id TEXT PRIMARY KEY,
+    worker_id TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS production_records (
+    id         TEXT PRIMARY KEY,
+    date       TEXT NOT NULL,
+    worker_id  TEXT NOT NULL,
+    worker_name TEXT,
+    set_number TEXT,
+    item_number TEXT,
+    quantity   INTEGER NOT NULL,
+    upload_id  TEXT,
+    machine_name TEXT,
+    hours_worked REAL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS production_user_actions (
+    id         TEXT PRIMARY KEY,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    user_name  TEXT NOT NULL,
+    action     TEXT NOT NULL,
+    worker_id  TEXT,
+    worker_name TEXT,
+    set_number  TEXT,
+    item_number TEXT,
+    quantity    INTEGER,
+    hours_worked REAL,
+    machine_name TEXT,
+    record_date  TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS production_orders (
+    id TEXT PRIMARY KEY,
+    supplier TEXT NOT NULL,
+    order_number TEXT NOT NULL,
+    set_number TEXT NOT NULL,
+    description TEXT,
+    expected_delivery_date TEXT NOT NULL,
+    quantity_expected INTEGER NOT NULL DEFAULT 0,
+    quantity_delivered INTEGER NOT NULL DEFAULT 0,
+    is_delivered TEXT NOT NULL DEFAULT 'in progress',
+    actual_delivered_date TEXT,
+    actual_quantity_delivered INTEGER,
+    comment TEXT,
+    department TEXT,
+    updated_by TEXT,
+    week TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS production_planning (
+    id TEXT PRIMARY KEY,
+    set_number TEXT NOT NULL,
+    description TEXT,
+    quantity INTEGER NOT NULL,
+    week TEXT,
+    total_amount REAL,
+    total_number_in_box INTEGER,
+    total_number_of_pallets INTEGER,
+    order_numbers TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
   // Safe migrations for missing columns

@@ -254,3 +254,82 @@ export interface CalendarEvent {
   daysRemainingOrOverdue?: number;
 }
 
+// ── PRODUCTION MODULE TYPES (migrated from production101) ─────────────────────
+
+/** Production cadence machine (renamed from "Machine" in production101 to avoid
+ *  confusion with the GMAO Machine which is full maintenance equipment). */
+export interface ProductionLine {
+  id: string;
+  name: string;
+  cadence: number;
+  category?: string;
+}
+
+export interface ProductionWorker {
+  id: string;
+  worker_id: string; // matricule
+  name: string;
+}
+
+export interface ProductionRecord {
+  id?: string;
+  worker_id: string;
+  worker_name?: string;
+  set_number: string;
+  item_number: string;
+  quantity: number;
+  date: string; // YYYY-MM-DD
+  upload_id: string;
+  created_at: string;
+  machine_name?: string | null;
+  machine_category?: string | null;
+  hours_worked?: number | null;
+}
+
+export interface ProductionOrder {
+  id: string;
+  supplier: string;
+  order_number: string;
+  set_number: string;
+  description?: string;
+  expected_delivery_date: string;
+  quantity_expected: number;
+  quantity_delivered: number;
+  is_delivered: 'yes' | 'no' | 'eliminated' | 'late' | 'in progress';
+  actual_delivered_date?: string;
+  actual_quantity_delivered?: number;
+  comment?: string;
+  department?: string;
+  updated_by?: string;
+  week?: string;
+}
+
+export interface ProductionPlanning {
+  id: string;
+  set_number: string;
+  description?: string;
+  quantity: number;
+  week?: string;
+  total_amount?: number | null;
+  total_number_in_box?: number | null;
+  total_number_of_pallets?: number | null;
+  order_numbers?: string;
+  created_at?: string;
+}
+
+export interface ProductionAggregatedResult {
+  date: string;
+  worker_id?: string;
+  worker_name?: string;
+  set_number: string;
+  item_number: string;
+  machine_category?: string;
+  quantity: number;
+}
+
+export interface ProductionDashboardStats {
+  todayTotal: number;
+  pendingOrders: number;
+  topWorker: string;
+  planningItems: number;
+}
