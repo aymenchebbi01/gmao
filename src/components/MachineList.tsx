@@ -70,12 +70,17 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
   // Fetch server LAN IP when opening QR Code modal to ensure mobile scanning works
   useEffect(() => {
     if (isQrModalOpen && selectedMachine) {
-      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (
+        window.location.hostname !== 'localhost' &&
+        window.location.hostname !== '127.0.0.1' &&
+        !window.location.hostname.includes('192.168.237.')
+      ) {
         setServerLanUrl(`${window.location.origin}/mobile-status?id=${selectedMachine.id}`);
       } else {
         api.getServerIp()
           .then((res) => {
-            setServerLanUrl(`http://${res.ip}:${res.port}/mobile-status?id=${selectedMachine.id}`);
+            const port = window.location.port || res.port || 5033;
+            setServerLanUrl(`http://${res.ip}:${port}/mobile-status?id=${selectedMachine.id}`);
           })
           .catch((err) => {
             console.error("Failed to fetch server IP:", err);

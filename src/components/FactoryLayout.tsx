@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
 
-const SITES = ['Site A', 'Site C'] as const;
+const SITES = ['Site A', 'Site F'] as const;
 type SiteName = typeof SITES[number];
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Environment, ContactShadows, Sky } from '@react-three/drei';

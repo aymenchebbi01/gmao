@@ -363,10 +363,24 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
     setIsModalOpen(true);
   };
 
+  const handleDeleteReport = async (workOrderId: string) => {
+    if (!confirm('Are you sure you want to delete this intervention report? The maintenance work order will NOT be deleted.')) return;
+    try {
+      await api.deleteInterventionReport(workOrderId);
+      toast.success('Intervention report deleted successfully (Work order preserved)');
+      fetchData();
+    } catch (error) {
+      console.error("Error deleting intervention report:", error);
+      toast.error('Failed to delete intervention report');
+    }
+  };
+
   const handleDeleteWorkOrder = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this maintenance work order?")) return;
     try {
       await api.deleteWorkOrder(id);
       toast.success('Work order deleted successfully');
+      fetchData();
     } catch (error) {
       console.error("Error deleting work order:", error);
       toast.error('Failed to delete work order');
@@ -537,17 +551,16 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
     doc.setTextColor(0);
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
-    doc.text('Issuer (Assigned To)', 55, 42, { align: 'center' });
-    doc.text('Requester (Created By)', 150, 42, { align: 'center' });
+    doc.text('Created By', 55, 42, { align: 'center' });
+    doc.text('Assigned To', 150, 42, { align: 'center' });
     doc.line(10, 44, 200, 44);
     doc.line(105, 36, 105, 64); // Vertical separator
 
     doc.setFont("helvetica", "normal");
-    doc.text(`Name : ${report.issuerName || ''}`, 12, 48);
-    doc.text(`Name : ${report.requesterName || ''}`, 107, 48);
-    doc.text(`Sector : ${report.issuerSector || ''}`, 12, 54);
-    doc.text(`Date : ${report.requestDate || ''}`, 107, 54);
-    doc.text(`Technicians : ${report.technicians || ''}`, 12, 60);
+    doc.text(`Name : ${report.requesterName || ''}`, 12, 48);
+    doc.text(`Sector : ${report.issuerSector || ''}`, 107, 48);
+    doc.text(`Date : ${report.requestDate || ''}`, 12, 54);
+    doc.text(`Technicians : ${report.technicians || ''}`, 107, 54);
     doc.line(10, 64, 200, 64);
 
     // Section: Machine Information
@@ -1311,7 +1324,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                             </button>
                             {isAdmin && (
                               <button
-                                onClick={() => handleDeleteWorkOrder(order.id)}
+                                onClick={() => handleDeleteReport(order.id)}
                                 className="p-2 text-gray-400 hover:text-red-600 transition-colors"
                                 title="Delete Report"
                               >
@@ -1429,7 +1442,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                           ? (() => { const m = machines.find(m => m.id === formData.machineId); return m ? `${m.name} (${m.location})` : 'Select Machine'; })()
                           : 'Select Machine'}
                       </span>
-                      <svg className="ml-auto flex-shrink-0 text-gray-400" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      <svg className="ml-auto flex-shrink-0 text-gray-400" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                     </button>
 
                     {/* Hidden required input for form validation */}

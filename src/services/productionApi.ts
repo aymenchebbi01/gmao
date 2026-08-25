@@ -89,6 +89,27 @@ export const productionWorkerService = {
   async deleteAllWorkers(): Promise<void> {
     await apiFetch(`${API_BASE}/workers/all`, { method: 'DELETE' });
   },
+  async saveWorkersBatch(workers: Omit<ProductionWorker, 'id'>[]): Promise<void> {
+    const payload = workers.map(w => ({
+      id: generateId(),
+      ...w,
+    }));
+    await apiFetch(`${API_BASE}/workers/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workers: payload }),
+    });
+  },
+  downloadTemplate() {
+    const data = [
+      { 'Matricule': 'E101', 'Full Name': 'John Doe' },
+      { 'Matricule': 'E102', 'Full Name': 'Jane Smith' },
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+    XLSX.writeFile(wb, 'employees_template.xlsx');
+  },
 };
 
 // ── Production Records ────────────────────────────────────────────────────────

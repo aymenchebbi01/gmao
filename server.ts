@@ -387,22 +387,47 @@ app.delete('/api/purchase-requests/:id', (req, res) => {
   }
 });
 
-app.get('/api/server-ip', (req, res) => {
+app.get('/api/server-ip', (_req, res) => {
+  if (process.env.SERVER_IP) {
+    return res.json({ ip: process.env.SERVER_IP, port: PORT });
+  }
+
   const interfaces = os.networkInterfaces();
-  let ipAddress = 'localhost';
-  for (const name of Object.keys(interfaces)) {
-    const netInterface = interfaces[name];
-    if (netInterface) {
-      for (const net of netInterface) {
-        if (net.family === 'IPv4' && !net.internal) {
-          ipAddress = net.address;
-          break;
+  const candidates: { name: string; address: string; priority: number }[] = [];
+
+  const ignorePatterns = [
+    /vmware/i, /vmnet/i, /virtualbox/i, /vbox/i, /vethernet/i, /hyper-v/i,
+    /loopback/i, /pseudo/i, /docker/i, /wsl/i, /npcap/i, /pcap/i,
+    /bluetooth/i, /tunnel/i, /tap/i, /tun/i, /wireguard/i, /tailscale/i,
+    /zerotier/i, /vpn/i, /host-only/i
+  ];
+
+  for (const [name, netList] of Object.entries(interfaces)) {
+    if (!netList) continue;
+    const isIgnored = ignorePatterns.some(p => p.test(name));
+    if (isIgnored) continue;
+
+    for (const net of netList) {
+      if (net.family === 'IPv4' && !net.internal) {
+        if (net.address.startsWith('127.') || net.address.startsWith('169.254.') || net.address === '0.0.0.0') {
+          continue;
         }
+
+        let priority = 1;
+        if (/wi-fi|wifi|wlan|wireless/i.test(name)) priority += 20;
+        if (/ethernet|eth|lan|local area/i.test(name)) priority += 15;
+        if (net.address.startsWith('192.168.')) priority += 5;
+        else if (net.address.startsWith('10.')) priority += 4;
+        else if (net.address.startsWith('172.')) priority += 2;
+
+        candidates.push({ name, address: net.address, priority });
       }
     }
-    if (ipAddress !== 'localhost') break;
   }
-  res.json({ ip: ipAddress, port: PORT });
+
+  candidates.sort((a, b) => b.priority - a.priority);
+  const bestIp = candidates.length > 0 ? candidates[0].address : 'localhost';
+  res.json({ ip: bestIp, port: PORT });
 });
 
 // Machines
@@ -464,8 +489,12 @@ app.post('/api/machines', (req, res) => {
 app.put('/api/machines/:id', (req, res) => {
   try {
     const { role } = getCallerIdentity(req);
-    if (role !== 'admin' && role !== 'manager') {
-      return res.status(403).json({ error: 'Forbidden: Manager or Admin role required' });
+    // Allow admin, manager, technician, production, and mobile QR updates
+    if (role !== 'admin' && role !== 'manager' && role !== 'technician' && role !== 'production') {
+      const isMobileUpdater = req.body.status !== undefined || req.body.injectingProduct !== undefined || req.body.currentMoule !== undefined || req.body.currentHours !== undefined || req.body.lastMaintenance !== undefined || req.body.condition !== undefined;
+      if (!isMobileUpdater) {
+        return res.status(403).json({ error: 'Forbidden: Valid role required' });
+      }
     }
     const { id } = req.params;
     const machine = { ...req.body };
@@ -935,6 +964,40 @@ app.put('/api/work-orders/:id', (req, res) => {
       logAction(uWoUserId, uWoUserName, 'Update', 'WorkOrder', id, detailsMsg);
     }
     res.json({ message: 'Work order updated' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// Delete only the intervention report, keeping the work order intact
+app.delete('/api/work-orders/:id/intervention', (req, res) => {
+  try {
+    const { isAdmin } = getCallerIdentity(req);
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admin role required' });
+    }
+    const { id } = req.params;
+    const oldWorkOrder = db.prepare('SELECT * FROM work_orders WHERE id = ?').get(id) as any;
+    if (!oldWorkOrder) {
+      return res.status(404).json({ error: 'Work order not found' });
+    }
+
+    // 1. Delete associated intervention records
+    db.prepare('DELETE FROM intervention_parts WHERE workOrderId = ?').run(id);
+    db.prepare('DELETE FROM intervention_reports WHERE workOrderId = ?').run(id);
+
+    // 2. Clear intervention on work_orders and revert status to pending if completed
+    const newStatus = oldWorkOrder.status === 'completed' ? 'pending' : oldWorkOrder.status;
+    db.prepare(`
+      UPDATE work_orders 
+      SET intervention = NULL, completedAt = NULL, status = ?, updatedAt = ?
+      WHERE id = ?
+    `).run(newStatus, new Date().toISOString(), id);
+
+    const { userId: dUserId, userName: dUserName } = getCallerIdentity(req);
+    logAction(dUserId, dUserName, 'Delete', 'InterventionReport', id, `Deleted Intervention Report for Work Order "${oldWorkOrder.title || id}" (Work order preserved as ${newStatus})`);
+
+    res.json({ message: 'Intervention report deleted successfully. Work order retained.' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -1546,6 +1609,22 @@ app.get('/api/backups/download/:filename', (req, res) => {
   }
 });
 
+// DELETE /api/backups/:filename — delete a specific saved backup
+app.delete('/api/backups/:filename', (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    const filePath = path.join(BACKUPS_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Backup not found' });
+    }
+    fs.unlinkSync(filePath);
+    console.log(`🗑️ [Backup] Deleted ${filename}.`);
+    res.json({ message: `Sauvegarde "${filename}" supprimée avec succès.` });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // POST /api/backups/restore/:filename — restore from a saved backup
 app.post('/api/backups/restore/:filename', async (req, res) => {
   try {
@@ -1765,6 +1844,23 @@ app.get('/api/production/workers', (req, res) => {
   try {
     const rows = db.prepare('SELECT * FROM production_workers ORDER BY worker_id ASC').all();
     res.json(rows);
+  } catch (error) { res.status(500).json({ error: (error as Error).message }); }
+});
+
+app.post('/api/production/workers/batch', (req, res) => {
+  try {
+    const { workers } = req.body as { workers: any[] };
+    if (!workers || workers.length === 0) return res.status(400).json({ error: 'No workers provided' });
+    const insert = db.prepare(
+      'INSERT INTO production_workers (id, worker_id, name) VALUES (?, ?, ?) ON CONFLICT(worker_id) DO UPDATE SET name=excluded.name'
+    );
+    const insertMany = db.transaction((rows: any[]) => {
+      for (const w of rows) {
+        insert.run(w.id || (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)), String(w.worker_id).trim(), String(w.name).trim());
+      }
+    });
+    insertMany(workers);
+    res.status(201).json({ inserted: workers.length });
   } catch (error) { res.status(500).json({ error: (error as Error).message }); }
 });
 

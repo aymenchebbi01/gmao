@@ -9,6 +9,13 @@ import TableFooter from '../common/TableFooter';
 // Register Chart.js components for PDF chart rendering
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend, Title);
 
+
+// Helper to format numbers with standard ASCII space separator to prevent jsPDF unicode space artifacts
+const formatNum = (num: number) => {
+    if (num === undefined || num === null) return '0';
+    return Math.round(num).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+};
+
 const MACHINE_CATEGORIES = ['Tompographie', 'Assemblage', 'Blister', 'Spray', 'Table'];
 
 interface RendementData {
@@ -252,13 +259,13 @@ export default function ProductionRendementAnalysis() {
                 pdf.setTextColor(100, 116, 139);
                 pdf.text("PRODUCTION TOTALE", card2X + 5, kpiY + 5);
 
-                pdf.setFontSize(12);
+                pdf.setFontSize(11);
                 pdf.setTextColor(30, 41, 59);
-                pdf.text(`${totalQty.toLocaleString()} pcs`, card2X + 5, kpiY + 12);
-                pdf.setFontSize(7.5);
+                pdf.text(`${formatNum(totalQty)} pcs`, card2X + 5, kpiY + 11.5);
+                pdf.setFontSize(6.5);
                 pdf.setFont("helvetica", "normal");
                 pdf.setTextColor(148, 163, 184);
-                pdf.text(`Objectif attendu: ${totalExp.toLocaleString()} pcs`, card2X + 5, kpiY + 16);
+                pdf.text(`Objectif attendu: ${formatNum(totalExp)} pcs`, card2X + 5, kpiY + 15.5, { maxWidth: cardWidth - 7 });
 
                 // Card 3: Temps total et fiches
                 const card3X = margin + (cardWidth * 2) + 10;
@@ -271,13 +278,13 @@ export default function ProductionRendementAnalysis() {
                 pdf.setTextColor(100, 116, 139);
                 pdf.text("VOLUME TEMPS / FICHES", card3X + 5, kpiY + 5);
 
-                pdf.setFontSize(12);
+                pdf.setFontSize(11);
                 pdf.setTextColor(30, 41, 59);
-                pdf.text(`${totalHours.toLocaleString()} hrs`, card3X + 5, kpiY + 12);
-                pdf.setFontSize(7.5);
+                pdf.text(`${formatNum(totalHours)} hrs`, card3X + 5, kpiY + 11.5);
+                pdf.setFontSize(6.5);
                 pdf.setFont("helvetica", "normal");
                 pdf.setTextColor(148, 163, 184);
-                pdf.text(`Fiches traitées: ${totalRecords} lignes`, card3X + 5, kpiY + 16);
+                pdf.text(`Fiches traitées: ${totalRecords} lignes`, card3X + 5, kpiY + 15.5, { maxWidth: cardWidth - 7 });
             };
 
             // Draw Table Header
@@ -289,13 +296,13 @@ export default function ProductionRendementAnalysis() {
                 pdf.setFontSize(7.5);
                 pdf.setTextColor(255, 255, 255);
 
-                pdf.text("DATE", margin + 4, startY + 5.5);
-                pdf.text("OPÉRATEUR", margin + 26, startY + 5.5);
-                pdf.text("MACHINE", margin + 74, startY + 5.5);
-                pdf.text("CATÉGORIE", margin + 104, startY + 5.5);
-                pdf.text("HEURES", margin + 130, startY + 5.5);
-                pdf.text("ACTUEL / ATTENDU", margin + 144, startY + 5.5);
-                pdf.text("%", margin + 179, startY + 5.5, { align: "right" });
+                pdf.text("DATE", margin + 3, startY + 5.5);
+                pdf.text("OPÉRATEUR", margin + 22, startY + 5.5);
+                pdf.text("MACHINE", margin + 68, startY + 5.5);
+                pdf.text("CATÉGORIE", margin + 98, startY + 5.5);
+                pdf.text("HEURES", margin + 125, startY + 5.5);
+                pdf.text("ACTUEL / ATTENDU", margin + 140, startY + 5.5);
+                pdf.text("%", margin + 177, startY + 5.5, { align: "right" });
             };
 
             // Draw Footer with Page Number
@@ -609,37 +616,37 @@ export default function ProductionRendementAnalysis() {
                 pdf.setFontSize(8);
 
                 pdf.setFont("helvetica", "normal");
-                pdf.text(row.date, margin + 4, currentY + 5);
+                pdf.text(row.date, margin + 3, currentY + 5);
 
                 pdf.setFont("helvetica", "bold");
-                const cleanWorkerName = row.worker_name.length > 22
-                    ? row.worker_name.substring(0, 20) + ".."
+                const cleanWorkerName = row.worker_name.length > 20
+                    ? row.worker_name.substring(0, 18) + ".."
                     : row.worker_name;
-                pdf.text(cleanWorkerName, margin + 26, currentY + 4.8);
+                pdf.text(cleanWorkerName, margin + 22, currentY + 4.8);
 
                 pdf.setFont("helvetica", "normal");
                 pdf.setFontSize(6.5);
                 pdf.setTextColor(148, 163, 184);
-                pdf.text(`Matricule: ${row.worker_id}`, margin + 26, currentY + 6.8);
+                pdf.text(`Matricule: ${row.worker_id}`, margin + 22, currentY + 6.8);
 
                 pdf.setFont("helvetica", "bold");
                 pdf.setFontSize(8);
                 pdf.setTextColor(37, 99, 235);
-                pdf.text(row.machine_name, margin + 74, currentY + 5);
+                pdf.text(row.machine_name, margin + 68, currentY + 5);
 
                 pdf.setFont("helvetica", "normal");
                 pdf.setTextColor(71, 85, 105);
-                pdf.text(row.machine_category, margin + 104, currentY + 5);
+                pdf.text(row.machine_category, margin + 98, currentY + 5);
 
                 pdf.setFont("helvetica", "bold");
                 pdf.setTextColor(51, 65, 85);
-                pdf.text(`${row.hours_worked} hrs`, margin + 130, currentY + 5);
+                pdf.text(`${row.hours_worked} hrs`, margin + 125, currentY + 5);
 
                 pdf.setFont("helvetica", "normal");
-                pdf.setFontSize(7.5);
-                const actualStr = row.quantity.toLocaleString();
-                const expectedStr = row.machine_rendement.toLocaleString();
-                pdf.text(`${actualStr} / ${expectedStr}`, margin + 144, currentY + 5);
+                pdf.setFontSize(7);
+                const actualStr = formatNum(row.quantity);
+                const expectedStr = formatNum(row.machine_rendement);
+                pdf.text(`${actualStr} / ${expectedStr}`, margin + 140, currentY + 5, { maxWidth: 28 });
 
                 pdf.setFont("helvetica", "bold");
                 pdf.setFontSize(8.5);
@@ -651,7 +658,7 @@ export default function ProductionRendementAnalysis() {
                 } else {
                     pdf.setTextColor(217, 119, 6);
                 }
-                pdf.text(`${rate.toFixed(1)}%`, margin + 179, currentY + 5, { align: "right" });
+                pdf.text(`${rate.toFixed(1)}%`, margin + 177, currentY + 5, { align: "right" });
 
                 currentY += 7.5;
             });

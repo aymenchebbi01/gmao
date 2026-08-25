@@ -1,10 +1,15 @@
 import React, { useState, useRef } from 'react';
-import { Upload, FileSpreadsheet, Download, Trash2, Calendar, Package } from 'lucide-react';
+import { Upload, FileSpreadsheet, Download, Trash2, Calendar, Package, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { productionOrderService, productionPlanningService, generateId } from '../../services/productionApi';
+import { productionOrderService, productionPlanningService, productionWorkerService, generateId } from '../../services/productionApi';
 
 export default function ProductionImportCenter() {
-  const [activeTab, setActiveTab] = useState<'orders' | 'planning'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'planning' | 'employees'>('orders');
+
+  // --- EMPLOYEES IMPORT STATE ---
+  const [employeesPreview, setEmployeesPreview] = useState<any[]>([]);
+  const [employeesFile, setEmployeesFile] = useState<File | null>(null);
+  const employeesFileInputRef = useRef<HTMLInputElement>(null);
 
   // --- ORDERS IMPORT STATE ---
   const [ordersImporting, setOrdersImporting] = useState(false);
@@ -47,6 +52,56 @@ export default function ProductionImportCenter() {
       return new Date(parsed).toISOString().split('T')[0];
     }
     return strVal;
+  };
+
+  // EMPLOYEES IMPLEMENTATION
+  const handleEmployeesTemplate = () => {
+    productionWorkerService.downloadTemplate();
+  };
+
+  const handleEmployeesFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setEmployeesFile(file);
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const data: any[] = XLSX.utils.sheet_to_json(ws);
+
+        const mapped = data.map((r: any) => {
+          const worker_id = String(getColumnValue(r, ['matricule', 'workerid', 'worker_id', 'id']) || '').trim();
+          const name = String(getColumnValue(r, ['fullname', 'full_name', 'name', 'workername', 'worker_name']) || '').trim();
+          return { worker_id, name };
+        }).filter(item => item.worker_id && item.name);
+
+        setEmployeesPreview(mapped);
+      } catch (err) {
+        console.error(err);
+        alert('Could not read the Excel file.');
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  };
+
+  const confirmEmployeesImport = async () => {
+    if (employeesPreview.length === 0) return;
+    setLoading(true);
+    try {
+      await productionWorkerService.saveWorkersBatch(employeesPreview);
+      alert(`Imported ${employeesPreview.length} employees successfully!`);
+      setEmployeesPreview([]);
+      setEmployeesFile(null);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save imported employees.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // ORDERS IMPLEMENTATION
@@ -263,40 +318,45 @@ export default function ProductionImportCenter() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-4 shrink-0">
         <div>
           <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Import Center</h2>
-          <p className="text-xs text-slate-400 mt-1">Upload and integrate order or planning spreadsheets directly into the system</p>
         </div>
 
         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-xs shrink-0">
           <button
             onClick={() => setActiveTab('orders')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
-              activeTab === 'orders' ? 'bg-white text-slate-900 shadow-xs border-slate-200' : 'text-slate-500 hover:text-slate-800'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${activeTab === 'orders' ? 'bg-white text-slate-900 shadow-xs border-slate-200' : 'text-slate-500 hover:text-slate-800'
+              }`}
           >
             <Package className="w-3.5 h-3.5" />
             Orders Import
           </button>
           <button
             onClick={() => setActiveTab('planning')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${
-              activeTab === 'planning' ? 'bg-white text-slate-900 shadow-xs border-slate-200' : 'text-slate-500 hover:text-slate-800'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${activeTab === 'planning' ? 'bg-white text-slate-900 shadow-xs border-slate-200' : 'text-slate-500 hover:text-slate-800'
+              }`}
           >
             <Calendar className="w-3.5 h-3.5" />
             Planning Import
+          </button>
+          <button
+            onClick={() => setActiveTab('employees')}
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${activeTab === 'employees' ? 'bg-white text-slate-900 shadow-xs border-slate-200' : 'text-slate-500 hover:text-slate-800'
+              }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            Employees Import
           </button>
         </div>
       </div>
 
       <input ref={ordersFileInputRef} type="file" accept=".xlsx, .xls" onChange={handleOrdersFileChange} className="hidden" />
       <input ref={planningFileInputRef} type="file" accept=".xlsx, .xls" onChange={handlePlanningFileChange} className="hidden" />
+      <input ref={employeesFileInputRef} type="file" accept=".xlsx, .xls" onChange={handleEmployeesFileChange} className="hidden" />
 
       {activeTab === 'orders' ? (
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold uppercase text-slate-900">Orders Spreadsheet Batch Import</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Extract order numbers, set numbers, suppliers, quantities and expected dates</p>
+              <h3 className="text-sm font-bold uppercase text-slate-900">Orders Import</h3>
             </div>
             <button onClick={handleOrdersTemplate} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline">
               <Download className="w-3.5 h-3.5" /> Download Template
@@ -345,12 +405,58 @@ export default function ProductionImportCenter() {
             </div>
           )}
         </div>
+      ) : activeTab === 'employees' ? (
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold uppercase text-slate-900">Employees Import</h3>
+            </div>
+            <button onClick={handleEmployeesTemplate} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline">
+              <Download className="w-3.5 h-3.5" /> Download Template
+            </button>
+          </div>
+
+          <div onClick={() => employeesFileInputRef.current?.click()} className="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-all">
+            <FileSpreadsheet className="w-10 h-10 text-blue-500 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-slate-700">{employeesFile ? employeesFile.name : 'Click to select Employees Excel file'}</p>
+            <p className="text-xs text-slate-400 mt-1">Accepts .xlsx, .xls (Columns: Matricule, Full Name)</p>
+          </div>
+
+          {employeesPreview.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-700 uppercase">Preview ({employeesPreview.length} employees parsed)</span>
+                <button onClick={confirmEmployeesImport} disabled={loading} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase shadow-xs">
+                  {loading ? 'Saving...' : 'Confirm & Save Employees'}
+                </button>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 font-bold text-slate-500 uppercase border-b">
+                    <tr>
+                      <th className="p-2.5">Matricule</th>
+                      <th className="p-2.5">Full Name</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {employeesPreview.slice(0, 15).map((w, i) => (
+                      <tr key={i}>
+                        <td className="p-2.5 font-mono font-bold">{w.worker_id}</td>
+                        <td className="p-2.5 font-semibold text-slate-800">{w.name}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold uppercase text-slate-900">Planning Spreadsheet Batch Import</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Extract set numbers, target planned quantities, week codes, and pallet numbers</p>
+              <h3 className="text-sm font-bold uppercase text-slate-900">Planning Import</h3>
             </div>
             <button onClick={handlePlanningTemplate} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline">
               <Download className="w-3.5 h-3.5" /> Download Template

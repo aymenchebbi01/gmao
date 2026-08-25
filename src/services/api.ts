@@ -122,6 +122,10 @@ export const api = {
     });
     await handleResponse(res);
   },
+  deleteInterventionReport: async (workOrderId: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/work-orders/${workOrderId}/intervention`, { method: 'DELETE' });
+    await handleResponse(res);
+  },
   deleteWorkOrder: async (id: string): Promise<void> => {
     const res = await fetch(`${API_BASE}/work-orders/${id}`, { method: 'DELETE' });
     await handleResponse(res);

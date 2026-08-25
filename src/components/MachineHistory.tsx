@@ -32,6 +32,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { THERMOPLASTICS_LOGO_BASE64 } from '../constants/logo';
 import { toast } from 'sonner';
+import TableFooter from './ui/TableFooter';
 
 interface MachineHistoryProps {
   machineId: string;
@@ -333,8 +334,16 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
   const [conditionHistory, setConditionHistory] = useState<MachineConditionHistory[]>([]);
   const [machine, setMachine] = useState<Machine | null>(null);
   const [productionHistory, setProductionHistory] = useState<MachineProductionHistory[]>([]);
+  const [prodPage, setProdPage] = useState(1);
+  const [prodPageSize, setProdPageSize] = useState(10);
   const [loading, setLoading] = useState(true);
   const [activeMetric, setActiveMetric] = useState<'mttr' | 'mtbf' | 'availability' | null>(null);
+
+  const prodTotalPages = Math.ceil(productionHistory.length / prodPageSize) || 1;
+  const paginatedProductionHistory = productionHistory.slice(
+    (prodPage - 1) * prodPageSize,
+    prodPage * prodPageSize
+  );
 
   // ── Edit / Delete state – production ──
   const [editingProduction, setEditingProduction] = useState<EditProductionForm | null>(null);
@@ -1078,7 +1087,7 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {productionHistory.map((entry) => (
+                {paginatedProductionHistory.map((entry) => (
                   <tr key={entry.id} className="hover:bg-blue-50/30 transition-colors group">
                     <td className="px-6 py-4">
                       <span className="text-xs font-bold text-emerald-700">{entry.productName || 'N/A'}</span>
@@ -1118,6 +1127,17 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
                 ))}
               </tbody>
             </table>
+            <TableFooter
+              totalItems={productionHistory.length}
+              pageSize={prodPageSize}
+              currentPage={prodPage}
+              totalPages={prodTotalPages}
+              onPageSizeChange={(size) => {
+                setProdPageSize(size);
+                setProdPage(1);
+              }}
+              onPageChange={setProdPage}
+            />
           </div>
         ) : (
           <div className="bg-gray-50 rounded-xl p-6 text-center border border-dashed border-gray-200">

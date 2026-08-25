@@ -8,6 +8,22 @@ import { ProductionRecord, ProductionLine, ProductionOrder, ProductionPlanning }
 // Curated modern color palette for pie charts
 const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#6366f1', '#ec4899', '#8b5cf6', '#14b8a6', '#64748b'];
 
+// Dashboard.tsx color palette
+const C = {
+    blue: '#378ADD',
+    teal: '#1D9E75',
+    red: '#E24B4A',
+    amber: '#EF9F27',
+    gray: '#9ca3af',
+};
+
+// Card styling matching Dashboard.tsx
+const cardStyle: React.CSSProperties = {
+    background: 'var(--color-background-primary)',
+    border: '0.5px solid var(--color-border-tertiary)',
+    borderRadius: 12,
+};
+
 export default function ProductionDashboardView() {
     const [loading, setLoading] = useState(true);
     const [records, setRecords] = useState<ProductionRecord[]>([]);
@@ -19,8 +35,8 @@ export default function ProductionDashboardView() {
     const [filters, setFilters] = useState({
         workerName: '',
         setFilter: '',
-        dateStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        dateEnd: new Date().toISOString().split('T')[0],
+        dateStart: '',
+        dateEnd: '',
     });
 
     const fetchDashboardData = async () => {
@@ -245,187 +261,225 @@ export default function ProductionDashboardView() {
     if (loading && records.length === 0) return <div className="p-12 text-center font-bold text-gray-400 italic">Loading Production Dashboard...</div>;
 
     return (
-        <div className="flex flex-col h-full bg-slate-50 overflow-y-auto font-sans">
-            <div className="flex-1 p-6 lg:p-10 flex flex-col gap-8 w-full max-w-7xl mx-auto">
-                {/* Header & Filters */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div>
-                        <h2 className="text-3xl font-bold tracking-tight text-slate-800">Production Dashboard</h2>
-                        <p className="text-sm text-slate-500 mt-1">Output metrics, worker performance, orders timeline & planning analytics</p>
+        <div className="flex flex-col gap-4 w-full">
+            {/* Header & Filters */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <ChartIcon style={{ width: 16, height: 16, color: C.blue }} />
+                        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>Production Dashboard</span>
                     </div>
+                    <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                        Output metrics, worker performance, orders timeline & planning analytics
+                    </p>
+                </div>
 
-                    <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-xs">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Search employee..."
-                                value={filters.workerName}
-                                onChange={(e) => setFilters({ ...filters, workerName: e.target.value })}
-                                className="pl-9 pr-4 py-1.5 bg-slate-50 border-none rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none w-36 transition-all"
-                            />
+                <div style={{
+                    background: 'var(--color-background-primary)',
+                    border: '0.5px solid var(--color-border-tertiary)',
+                    borderRadius: 12,
+                    padding: '8px 12px',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: 10
+                }}>
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Search employee..."
+                            value={filters.workerName}
+                            onChange={(e) => setFilters({ ...filters, workerName: e.target.value })}
+                            style={{
+                                background: 'var(--color-background-primary)',
+                                border: '0.5px solid var(--color-border-tertiary)',
+                                borderRadius: 8,
+                                fontSize: 12,
+                                padding: '5px 12px 5px 32px',
+                                color: 'var(--color-text-primary)',
+                                outline: 'none',
+                                width: 140
+                            }}
+                        />
+                    </div>
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Search set..."
+                            value={filters.setFilter}
+                            onChange={(e) => setFilters({ ...filters, setFilter: e.target.value })}
+                            style={{
+                                background: 'var(--color-background-primary)',
+                                border: '0.5px solid var(--color-border-tertiary)',
+                                borderRadius: 8,
+                                fontSize: 12,
+                                padding: '5px 12px 5px 32px',
+                                color: 'var(--color-text-primary)',
+                                outline: 'none',
+                                width: 140
+                            }}
+                        />
+                    </div>
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        background: 'var(--color-background-primary)',
+                        border: '0.5px solid var(--color-border-tertiary)',
+                        borderRadius: 8,
+                        padding: '4px 10px'
+                    }}>
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <input
+                            type="date"
+                            value={filters.dateStart}
+                            onChange={(e) => setFilters({ ...filters, dateStart: e.target.value })}
+                            className="bg-transparent border-none text-xs font-medium focus:outline-none text-[var(--color-text-primary)]"
+                        />
+                        <span className="text-slate-400 text-xs">-</span>
+                        <input
+                            type="date"
+                            value={filters.dateEnd}
+                            onChange={(e) => setFilters({ ...filters, dateEnd: e.target.value })}
+                            className="bg-transparent border-none text-xs font-medium focus:outline-none text-[var(--color-text-primary)]"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Section 1: Worker Performance & Daily Trend */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div style={{ ...cardStyle, padding: 20 }}>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Users className="w-5 h-5" style={{ color: C.blue }} />
+                            <h3 style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Top Worker Realization Taux (%)</h3>
                         </div>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                            <input
-                                type="text"
-                                placeholder="Search set..."
-                                value={filters.setFilter}
-                                onChange={(e) => setFilters({ ...filters, setFilter: e.target.value })}
-                                className="pl-9 pr-4 py-1.5 bg-slate-50 border-none rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none w-36 transition-all"
-                            />
-                        </div>
-                        <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
-                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                            <input
-                                type="date"
-                                value={filters.dateStart}
-                                onChange={(e) => setFilters({ ...filters, dateStart: e.target.value })}
-                                className="bg-transparent border-none text-xs font-medium focus:outline-none text-slate-600"
-                            />
-                            <span className="text-slate-300 text-xs">-</span>
-                            <input
-                                type="date"
-                                value={filters.dateEnd}
-                                onChange={(e) => setFilters({ ...filters, dateEnd: e.target.value })}
-                                className="bg-transparent border-none text-xs font-medium focus:outline-none text-slate-600"
-                            />
-                        </div>
+                        <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{workerPerformanceData.length} workers</span>
+                    </div>
+                    <div className="h-72 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={workerPerformanceData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis dataKey="displayName" tick={{ fill: '#64748b', fontSize: 10 }} interval={0} angle={-45} textAnchor="end" />
+                                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} domain={[0, 150]} />
+                                <Tooltip formatter={(value: any) => [`${value}%`, 'Taux de réalisation']} />
+                                <Bar dataKey="rendement" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
 
-                {/* Section 1: Worker Performance & Daily Trend */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-xs">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-2">
-                                <Users className="w-5 h-5 text-blue-600" />
-                                <h3 className="text-base font-bold text-slate-800">Top Worker Realization Taux (%)</h3>
-                            </div>
-                            <span className="text-xs font-semibold text-slate-400">{workerPerformanceData.length} workers</span>
-                        </div>
-                        <div className="h-72 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={workerPerformanceData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="displayName" tick={{ fill: '#64748b', fontSize: 10 }} interval={0} angle={-45} textAnchor="end" />
-                                    <YAxis tick={{ fill: '#64748b', fontSize: 11 }} domain={[0, 150]} />
-                                    <Tooltip formatter={(value: any) => [`${value}%`, 'Taux de réalisation']} />
-                                    <Bar dataKey="rendement" fill="#3b82f6" radius={[6, 6, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                <div style={{ ...cardStyle, padding: 20 }}>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Activity className="w-5 h-5" style={{ color: C.teal }} />
+                            <h3 style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Daily Production Volume (Target vs Actual)</h3>
                         </div>
                     </div>
+                    <div className="h-72 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={dailyProductionData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 10 }} />
+                                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="Objectif Attendu" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="Production Réelle" fill="#10b981" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
 
-                    <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-xs">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-2">
-                                <Activity className="w-5 h-5 text-emerald-600" />
-                                <h3 className="text-base font-bold text-slate-800">Daily Production Volume (Target vs Actual)</h3>
-                            </div>
+            {/* Section 2: Orders Expected vs Delivered & Status Distribution */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2" style={{ ...cardStyle, padding: 20 }}>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Package className="w-5 h-5" style={{ color: C.blue }} />
+                            <h3 style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Orders: Expected vs Delivered by Set</h3>
                         </div>
-                        <div className="h-72 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={dailyProductionData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 10 }} />
-                                    <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Bar dataKey="Objectif Attendu" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="Production Réelle" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
+                    </div>
+                    <div className="h-72 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={setQuantityData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis dataKey="set_number" tick={{ fill: '#64748b', fontSize: 10 }} interval={0} angle={-30} textAnchor="end" />
+                                <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
+                                <Tooltip />
+                                <Legend />
+                                <Bar dataKey="Quantity Expected" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="Quantity Delivered" fill="#10b981" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
 
-                {/* Section 2: Orders Expected vs Delivered & Status Distribution */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 bg-white border border-slate-200 p-6 rounded-3xl shadow-xs">
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-2">
-                                <Package className="w-5 h-5 text-indigo-600" />
-                                <h3 className="text-base font-bold text-slate-800">Orders: Expected vs Delivered by Set</h3>
-                            </div>
-                        </div>
-                        <div className="h-72 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={setQuantityData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="set_number" tick={{ fill: '#64748b', fontSize: 10 }} interval={0} angle={-30} textAnchor="end" />
-                                    <YAxis tick={{ fill: '#64748b', fontSize: 11 }} />
-                                    <Tooltip />
-                                    <Legend />
-                                    <Bar dataKey="Quantity Expected" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="Quantity Delivered" fill="#10b981" radius={[4, 4, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
+                <div style={{ ...cardStyle, padding: 20 }}>
+                    <div className="flex items-center gap-2 mb-4">
+                        <PieIcon className="w-5 h-5" style={{ color: C.amber }} />
+                        <h3 style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Order Delivery Status</h3>
                     </div>
+                    <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}>
+                                    {statusDistributionData.map((_, index) => (
+                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            </div>
 
-                    <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-xs">
-                        <div className="flex items-center gap-2 mb-6">
-                            <PieIcon className="w-5 h-5 text-amber-600" />
-                            <h3 className="text-base font-bold text-slate-800">Order Delivery Status</h3>
-                        </div>
-                        <div className="h-64 w-full">
+            {/* Section 3: Delay Causes & Planning Distribution */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div style={{ ...cardStyle, padding: 20 }}>
+                    <div className="flex items-center gap-2 mb-4">
+                        <AlertTriangle className="w-5 h-5" style={{ color: C.red }} />
+                        <h3 style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Delay & Issue Comments Breakdown</h3>
+                    </div>
+                    <div className="h-64 w-full">
+                        {delayCausesData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                    <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}>
-                                        {statusDistributionData.map((_, index) => (
+                                    <Pie data={delayCausesData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, value }) => `${name}: ${value}`}>
+                                        {delayCausesData.map((_, index) => (
                                             <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                         ))}
                                     </Pie>
                                     <Tooltip />
                                 </PieChart>
                             </ResponsiveContainer>
-                        </div>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">No order comments registered.</div>
+                        )}
                     </div>
                 </div>
 
-                {/* Section 3: Delay Causes & Planning Distribution */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-xs">
-                        <div className="flex items-center gap-2 mb-6">
-                            <AlertTriangle className="w-5 h-5 text-red-600" />
-                            <h3 className="text-base font-bold text-slate-800">Delay & Issue Comments Breakdown</h3>
-                        </div>
-                        <div className="h-64 w-full">
-                            {delayCausesData.length > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie data={delayCausesData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, value }) => `${name}: ${value}`}>
-                                            {delayCausesData.map((_, index) => (
-                                                <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            ) : (
-                                <div className="h-full flex items-center justify-center text-slate-400 text-xs italic">No order comments registered.</div>
-                            )}
-                        </div>
+                <div style={{ ...cardStyle, padding: 20 }}>
+                    <div className="flex items-center gap-2 mb-4">
+                        <Calendar className="w-5 h-5" style={{ color: C.blue }} />
+                        <h3 style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Planned vs Unplanned Orders</h3>
                     </div>
-
-                    <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-xs">
-                        <div className="flex items-center gap-2 mb-6">
-                            <Calendar className="w-5 h-5 text-blue-600" />
-                            <h3 className="text-base font-bold text-slate-800">Planned vs Unplanned Orders</h3>
-                        </div>
-                        <div className="h-64 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={planningDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, value }) => `${name}: ${value}`}>
-                                        {planningDistributionData.map((_, index) => (
-                                            <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#f59e0b'} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
+                    <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie data={planningDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, value }) => `${name}: ${value}`}>
+                                    {planningDistributionData.map((_, index) => (
+                                        <Cell key={`cell-${index}`} fill={index === 0 ? '#10b981' : '#f59e0b'} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
             </div>

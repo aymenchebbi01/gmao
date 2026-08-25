@@ -47,7 +47,7 @@ function LoginRoute() {
 
   if (user) {
     const from = (location.state as any)?.from;
-    const fallbackPath = from ? `${from.pathname}${from.search || ''}` : '/dashboard';
+    const fallbackPath = from ? `${from.pathname}${from.search || ''}` : (user?.role === 'production' ? '/production-dashboard' : (user?.role === 'accounting' ? '/purchase-requests' : '/dashboard'));
     return <Navigate to={fallbackPath} replace />;
   }
 
@@ -57,9 +57,13 @@ function LoginRoute() {
 function RequireRole({ children, allowed }: { children: React.ReactNode, allowed: string | string[] }) {
   const { user } = useAuth();
   const allowedRoles = Array.isArray(allowed) ? allowed : [allowed];
-  
+
   const effectiveRoles = [...allowedRoles];
   if (effectiveRoles.includes('technician')) {
+    if (!effectiveRoles.includes('manager')) effectiveRoles.push('manager');
+    if (!effectiveRoles.includes('admin')) effectiveRoles.push('admin');
+  }
+  if (effectiveRoles.includes('production')) {
     if (!effectiveRoles.includes('manager')) effectiveRoles.push('manager');
     if (!effectiveRoles.includes('admin')) effectiveRoles.push('admin');
   }
@@ -68,9 +72,20 @@ function RequireRole({ children, allowed }: { children: React.ReactNode, allowed
   }
 
   if (!user || !effectiveRoles.includes(user.role)) {
-    return <div className="p-8 text-center text-gray-500">Access Denied</div>;
+    return <div className="p-8 text-center text-gray-500 font-bold">Access Denied</div>;
   }
   return <>{children}</>;
+}
+
+function DefaultRedirect() {
+  const { user } = useAuth();
+  if (user?.role === 'production') {
+    return <Navigate to="/production-dashboard" replace />;
+  }
+  if (user?.role === 'accounting') {
+    return <Navigate to="/purchase-requests" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
 }
 
 function MobileStatusWrapper() {
@@ -140,7 +155,7 @@ function AppContent() {
   return (
     <Routes>
       <Route path="/login" element={<LoginRoute />} />
-      
+
       {/* Mobile status and stock routes without Sidebar and Top Header */}
       <Route
         path="/mobile-status"
@@ -189,7 +204,7 @@ function AppLayout() {
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Toaster position="top-right" richColors />
-      
+
       <Sidebar
         isCollapsed={isSidebarCollapsed}
         setIsCollapsed={setIsSidebarCollapsed}
@@ -199,9 +214,6 @@ function AppLayout() {
         {/* Top Header */}
         <header className="h-16 bg-white/90 backdrop-blur-md border-b border-gray-200/80 flex items-center justify-between px-4 sm:px-8 flex-shrink-0 z-10 shadow-xs">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-100 hidden sm:inline-block font-inter">
-              GMAO Thermoplastics
-            </span>
           </div>
 
           <div className="flex items-center space-x-3 sm:space-x-4">
@@ -222,14 +234,14 @@ function AppLayout() {
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 lg:py-5">
           <div className={cn(
             "mx-auto transition-all duration-500",
             activePath === 'layout' ? "max-w-[1600px] w-full" : "max-w-7xl"
           )}>
             <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard setActiveTab={setActiveTab} />} />
+              <Route path="/" element={<DefaultRedirect />} />
+              <Route path="/dashboard" element={<RequireRole allowed={['admin', 'manager', 'technician']}><Dashboard setActiveTab={setActiveTab} /></RequireRole>} />
               <Route path="/layout" element={<FactoryLayout setActiveTab={setActiveTab} setHistoryMachineId={setHistoryMachineId} />} />
               <Route path="/machines" element={<MachineList historyMachineId={historyMachineId} onHistoryClose={() => setHistoryMachineId(null)} />} />
               <Route path="/consultation" element={<MachineConsultation />} />
@@ -245,9 +257,9 @@ function AppLayout() {
               <Route path="/users" element={<RequireRole allowed="manager"><UserManagement /></RequireRole>} />
               <Route path="/rendement" element={<MachineRendement />} />
               <Route path="/backups" element={<RequireRole allowed="admin"><BackupManager /></RequireRole>} />
-              
+
               {/* Production Module Routes */}
-              <Route path="/production-dashboard" element={<ProductionDashboardView />} />
+              <Route path="/production-dashboard" element={<RequireRole allowed={['admin', 'manager', 'production']}><ProductionDashboardView /></RequireRole>} />
               <Route path="/production-rendement-overview" element={<ProductionRendementOverview />} />
               <Route path="/production-rendement-analysis" element={<ProductionRendementAnalysis />} />
               <Route path="/production-orders" element={<ProductionOrdersView />} />
@@ -257,7 +269,7 @@ function AppLayout() {
               <Route path="/production-management" element={<ProductionManagement />} />
               <Route path="/production-imports" element={<ProductionImportCenter />} />
 
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<DefaultRedirect />} />
             </Routes>
           </div>
         </div>

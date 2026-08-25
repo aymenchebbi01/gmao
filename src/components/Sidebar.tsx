@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   LayoutDashboard,
+  LineChart,
   Settings,
   Wrench,
   Package,
@@ -81,7 +82,17 @@ export default function Sidebar({
   const currentUser = user;
 
   const menuItems: MenuItem[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'manager', 'technician'] },
+    {
+      id: 'dashboard-mgmt',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      roles: ['admin', 'manager', 'technician', 'production'],
+      subItems: [
+        { id: 'dashboard', label: 'Maintenance Dashboard', roles: ['admin', 'manager', 'technician'] },
+        { id: 'production-dashboard', label: 'Production Dashboard', roles: ['admin', 'manager', 'production'] },
+        { id: 'analytics', label: 'Analytics', roles: ['admin', 'manager'] }
+      ]
+    },
     {
       id: 'machine-mgmt',
       label: 'Machine Management',
@@ -91,7 +102,6 @@ export default function Sidebar({
         { id: 'layout', label: 'Factory Layout' },
         { id: 'machines', label: 'Machines' },
         { id: 'consultation', label: 'Consultation' },
-        { id: 'rendement', label: 'Rendement' },
       ]
     },
     {
@@ -105,48 +115,45 @@ export default function Sidebar({
         { id: 'calendar', label: 'Calendar' }
       ]
     },
-    {
-      id: 'stock-mgmt',
-      label: 'Stock Management',
-      icon: Package,
-      roles: ['admin', 'manager', 'technician'],
-      subItems: [
-        { id: 'inventory', label: 'Stock', roles: ['admin', 'manager', 'technician'] },
-        { id: 'purchase-requests', label: 'Demande d\'Achat', roles: ['admin', 'manager', 'technician'] },
-        { id: 'products', label: 'Items Data', roles: ['admin', 'manager', 'technician'] }
-      ]
-    },
+
+    { id: 'inventory', label: 'Stock', icon: Package, roles: ['admin', 'manager', 'technician'] },
+
     {
       id: 'production-mgmt',
-      label: 'Production',
+      label: 'Rendement',
       icon: Layers,
-      roles: ['admin', 'manager', 'technician'],
+      roles: ['admin', 'manager', 'production', 'technician'],
       subItems: [
+        { id: 'rendement', label: 'Rendement Machines' },
         { id: 'production-rendement-overview', label: 'Rendement Overview' },
         { id: 'production-rendement-analysis', label: 'Rendement Analysis' },
         { id: 'production-orders', label: 'Orders' },
         { id: 'production-planning', label: 'Planning' },
       ]
     },
+
+    { id: 'purchase-requests', label: "Demande d'Achat", icon: ShoppingCart, roles: ['admin', 'manager', 'technician', 'accounting'] },
+    { id: 'production-imports', label: 'Import', icon: Upload, roles: ['admin', 'manager', 'production'] },
+
     {
       id: 'data-mgmt',
       label: 'Data Management',
       icon: Database,
-      roles: ['admin', 'manager'],
+      roles: ['admin', 'manager', 'production', 'technician'],
       subItems: [
-        { id: 'production-lines', label: 'Production Lines' },
-        { id: 'production-employees', label: 'Employees' },
-        { id: 'production-management', label: 'Raw Production Records' },
+        { id: 'products', label: 'Items Data', roles: ['admin', 'manager', 'technician', 'production'] },
+        { id: 'production-lines', label: 'Production Lines', roles: ['admin', 'manager', 'production'] },
+        { id: 'production-employees', label: 'Employees', roles: ['admin', 'manager', 'production'] },
+        { id: 'production-management', label: 'Production Records', roles: ['admin', 'manager', 'production'] },
       ]
     },
-    { id: 'production-imports', label: 'Imports Center', icon: Upload, roles: ['admin', 'manager'] },
+
     {
       id: 'user-mgmt',
       label: 'User Management',
       icon: Users,
       roles: ['admin'],
       subItems: [
-        { id: 'analytics', label: 'Analytics' },
         { id: 'audit-logs', label: 'Audit Logs' },
         { id: 'users', label: 'Users' },
         { id: 'backups', label: 'Sauvegardes DB' },
@@ -298,7 +305,7 @@ export default function Sidebar({
 
         {/* User Profile */}
         <div className={cn(
-          "p-4 border-t border-gray-200 transition-all duration-300 mt-auto",
+          "p-4 border-t border-gray-200 transition-all duration-300 mt-auto pt-6",
           isCollapsed ? "items-center" : ""
         )}>
           <div className={cn(

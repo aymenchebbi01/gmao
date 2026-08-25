@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'manager' | 'technician' | 'accounting';
+export type UserRole = 'admin' | 'manager' | 'technician' | 'accounting' | 'production';
 
 export interface UserProfile {
   uid: string;
@@ -59,6 +59,8 @@ export interface MachineProductionHistory {
   startDate: string;
   endDate?: string;
 }
+
+export type Product = ProductionProduct;
 
 export interface ProductionProduct {
   id: string;

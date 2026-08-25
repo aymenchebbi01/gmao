@@ -11,7 +11,6 @@ import { Machine, WorkOrder, AuditLog } from '../types';
 import { cn, calculateMachineLiveHours } from '../lib/utils';
 import { api } from '../services/api';
 import { useGmaoStore } from '../store/gmaoStore';
-import ProductionDashboardView from './production/ProductionDashboardView';
 
 // ─── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -278,7 +277,8 @@ function parseAuditLog(
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
-  const [period, setPeriod] = useState<'week' | 'month' | 'year'>('week');
+  const [dateStart, setDateStart] = useState('');
+  const [dateEnd, setDateEnd] = useState('');
   const [machines, setMachines] = useState<Machine[]>([]);
   // stable lookup map: machineId → machine name
   const machineNameMapRef = useRef<Record<string, string>>({});
@@ -338,9 +338,18 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
     } catch (e) { /* silent */ }
   }, []);
 
-  const buildChartData = useCallback((allOrders: WorkOrder[], p: typeof period) => {
-    const buckets = p === 'week' ? last7DaysBuckets() : last30DaysBuckets();
-    setChartData(bucketOrders(allOrders, buckets));
+  const buildChartData = useCallback((allOrders: WorkOrder[], ds: string, de: string) => {
+    // Filter orders by date range (empty = no filter)
+    const filtered = allOrders.filter(o => {
+      if (!o.createdAt) return true;
+      const d = o.createdAt.split('T')[0];
+      if (ds && d < ds) return false;
+      if (de && d > de) return false;
+      return true;
+    });
+    // Build day-by-day buckets covering the selected range (or last 30 days as default view)
+    const buckets = last30DaysBuckets();
+    setChartData(bucketOrders(filtered, buckets));
   }, []);
 
   // Poll audit log → derive human-readable notifications
@@ -405,8 +414,8 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
   }, [fetchMachines, fetchOrders, pollAuditLog]);
 
   useEffect(() => {
-    buildChartData(orders, period);
-  }, [orders, period, buildChartData]);
+    buildChartData(orders, dateStart, dateEnd);
+  }, [orders, dateStart, dateEnd, buildChartData]);
 
   useEffect(() => {
     const t1 = setInterval(fetchMachines, 30_000);
@@ -450,22 +459,47 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
           <Settings size={16} color="var(--color-text-secondary)" />
           <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>Maintenance dashboard</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {(['week', 'month', 'year'] as const).map(p => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>From</span>
+          <input
+            type="date"
+            value={dateStart}
+            onChange={e => setDateStart(e.target.value)}
+            style={{
+              fontSize: 12, padding: '5px 10px', borderRadius: 8,
+              border: '0.5px solid var(--color-border-tertiary)',
+              background: 'var(--color-background-primary)',
+              color: 'var(--color-text-primary)',
+              outline: 'none', cursor: 'pointer',
+            }}
+          />
+          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>To</span>
+          <input
+            type="date"
+            value={dateEnd}
+            onChange={e => setDateEnd(e.target.value)}
+            style={{
+              fontSize: 12, padding: '5px 10px', borderRadius: 8,
+              border: '0.5px solid var(--color-border-tertiary)',
+              background: 'var(--color-background-primary)',
+              color: 'var(--color-text-primary)',
+              outline: 'none', cursor: 'pointer',
+            }}
+          />
+          {(dateStart || dateEnd) && (
             <button
-              key={p}
-              onClick={() => setPeriod(p)}
+              onClick={() => { setDateStart(''); setDateEnd(''); }}
               style={{
-                fontSize: 12, fontWeight: 500, padding: '5px 14px', borderRadius: 20,
+                fontSize: 11, padding: '5px 10px', borderRadius: 8,
                 border: '0.5px solid var(--color-border-tertiary)',
-                background: period === p ? '#1a1a2e' : 'transparent',
-                color: period === p ? '#fff' : 'var(--color-text-secondary)',
-                cursor: 'pointer', transition: 'all 0.15s',
+                background: 'transparent',
+                color: 'var(--color-text-muted)',
+                cursor: 'pointer',
               }}
             >
-              {p === 'week' ? 'This week' : p === 'month' ? 'This month' : 'This year'}
+              Clear
             </button>
-          ))}
+          )}
           <div style={{ position: 'relative' }}>
             <button style={{
               width: 32, height: 32, borderRadius: 8,
@@ -549,7 +583,11 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
         <div style={{ ...card, padding: '20px 20px 16px' }}>
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 4 }}>Interventions</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Last {period === 'week' ? '7 days' : '30 days'}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+              {dateStart || dateEnd
+                ? `${dateStart || '…'} → ${dateEnd || '…'}`
+                : 'All time'}
+            </div>
           </div>
           <div style={{ height: 180 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -747,11 +785,6 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Production Module — Unified Dashboard Section */}
-      <div className="mt-2">
-        <ProductionDashboardView />
       </div>
     </div>
   );

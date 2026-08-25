@@ -3,8 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Database, Download, Upload, RotateCcw, Plus,
   CheckCircle2, AlertTriangle, Clock, HardDrive, Shield,
-  RefreshCw, CloudDownload, FolderOpen, X, AlertCircle
+  RefreshCw, CloudDownload, FolderOpen, X, AlertCircle, Trash2
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -137,6 +138,7 @@ function ConfirmDialog({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function BackupManager() {
+  const { isAdmin } = useAuth();
   const [backups, setBackups] = useState<BackupFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [creatingBackup, setCreatingBackup] = useState(false);
@@ -144,7 +146,8 @@ export default function BackupManager() {
   const [restoring, setRestoring] = useState<string | null>(null);
   const [uploadRestoring, setUploadRestoring] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [confirm, setConfirm] = useState<{ type: 'restore'; filename: string } | null>(null);
+  const [confirm, setConfirm] = useState<{ type: 'restore' | 'delete'; filename: string } | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -170,6 +173,22 @@ export default function BackupManager() {
   }, [addToast]);
 
   useEffect(() => { fetchBackups(); }, [fetchBackups]);
+
+  // ── Delete a backup ───────────────────────────────────────────────────────
+  async function handleDeleteBackup(filename: string) {
+    setDeleting(filename);
+    try {
+      const res = await fetch(`/api/backups/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      addToast('success', data.message || `Sauvegarde "${filename}" supprimée avec succès.`);
+      await fetchBackups();
+    } catch (e: any) {
+      addToast('error', e.message || 'Échec de la suppression de la sauvegarde.');
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   // ── Download live DB ──────────────────────────────────────────────────────
   async function handleDownloadLive() {
@@ -497,13 +516,28 @@ export default function BackupManager() {
                             {!isSafetyBackup(b.filename) && (
                               <button
                                 onClick={() => setConfirm({ type: 'restore', filename: b.filename })}
-                                disabled={isCurrentlyRestoring || uploadRestoring}
+                                disabled={isCurrentlyRestoring || uploadRestoring || deleting === b.filename}
                                 title="Restaurer"
                                 className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
                               >
                                 {isCurrentlyRestoring
                                   ? <RefreshCw className="w-4 h-4 animate-spin text-amber-500" />
                                   : <RotateCcw className="w-4 h-4" />}
+                              </button>
+                            )}
+                            {/* Delete (Admin only) */}
+                            {isAdmin && (
+                              <button
+                                onClick={() => setConfirm({ type: 'delete', filename: b.filename })}
+                                disabled={deleting === b.filename || isCurrentlyRestoring}
+                                title="Supprimer la sauvegarde (Admin)"
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                              >
+                                {deleting === b.filename ? (
+                                  <RefreshCw className="w-4 h-4 animate-spin text-red-500" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
                               </button>
                             )}
                           </div>

@@ -229,6 +229,7 @@ export default function UserManagement() {
                 onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
               >
                 <option value="technician">Technician</option>
+                <option value="production">Production</option>
                 <option value="manager">Manager</option>
                 <option value="accounting">Accounting</option>
                 <option value="admin">Administrator</option>
