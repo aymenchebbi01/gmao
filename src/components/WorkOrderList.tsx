@@ -224,6 +224,45 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
   const [selectedPartId, setSelectedPartId] = useState('');
   const [partQuantity, setPartQuantity] = useState(1);
 
+  const formatForDateTimeInput = (dateStr?: string) => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        return format(d, "yyyy-MM-dd'T'HH:mm");
+      }
+    } catch (e) {
+      // fallback
+    }
+    return dateStr.length > 16 ? dateStr.slice(0, 16) : dateStr;
+  };
+
+  const getInterventionStartEnd = (report?: any) => {
+    let startVal = formatForDateTimeInput(report?.startTime);
+    let endVal = formatForDateTimeInput(report?.endTime);
+
+    if (report?.durationMinutes) {
+      if (endVal && startVal) {
+        const diff = differenceInMinutes(new Date(endVal), new Date(startVal));
+        if (Math.abs(diff - report.durationMinutes) > 2) {
+          const endD = new Date(endVal);
+          const startD = new Date(endD.getTime() - report.durationMinutes * 60 * 1000);
+          startVal = format(startD, "yyyy-MM-dd'T'HH:mm");
+        }
+      } else if (endVal && !startVal) {
+        const endD = new Date(endVal);
+        const startD = new Date(endD.getTime() - report.durationMinutes * 60 * 1000);
+        startVal = format(startD, "yyyy-MM-dd'T'HH:mm");
+      } else if (!endVal && !startVal) {
+        const nowD = new Date();
+        const startD = new Date(nowD.getTime() - report.durationMinutes * 60 * 1000);
+        startVal = format(startD, "yyyy-MM-dd'T'HH:mm");
+        endVal = format(nowD, "yyyy-MM-dd'T'HH:mm");
+      }
+    }
+    return { startTime: startVal, endTime: endVal };
+  };
+
   // Auto-calculate intervention time from start and end times
   useEffect(() => {
     if (interventionData.startTime && interventionData.endTime) {
@@ -1199,6 +1238,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                             onClick={() => {
                               setSelectedOrder(order);
                               const report = order.intervention;
+                              const { startTime, endTime } = getInterventionStartEnd(report);
                               setInterventionData({
                                 issuerName: report?.issuerName || order.issuerName || order.assignedName || '',
                                 issuerSector: report?.issuerSector || order.issuerSector || '',
@@ -1222,8 +1262,8 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                                 actions: report?.actions || '',
                                 difficulties: report?.difficulties || '',
                                 partsUsed: report?.partsUsed || [],
-                                startTime: report?.startTime || '',
-                                endTime: report?.endTime || '',
+                                startTime: startTime,
+                                endTime: endTime,
                                 comments: report?.comments || '',
                               });
                               setIsEditingReport(order.status === 'completed');
@@ -1287,6 +1327,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                               onClick={() => {
                                 setSelectedOrder(order);
                                 const report = order.intervention;
+                                const { startTime, endTime } = getInterventionStartEnd(report);
                                 setInterventionData({
                                   issuerName: report?.issuerName || order.issuerName || '',
                                   issuerSector: report?.issuerSector || order.issuerSector || '',
@@ -1310,8 +1351,8 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                                   actions: report?.actions || '',
                                   difficulties: report?.difficulties || '',
                                   partsUsed: report?.partsUsed || [],
-                                  startTime: report?.startTime || '',
-                                  endTime: report?.endTime || '',
+                                  startTime: startTime,
+                                  endTime: endTime,
                                   comments: report?.comments || '',
                                 });
                                 setIsEditingReport(order.status === 'completed');

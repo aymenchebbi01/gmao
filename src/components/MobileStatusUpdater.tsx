@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { cn, calculateMachineLiveHours } from '../lib/utils';
+import { format, differenceInMinutes } from 'date-fns';
 import { FAILURE_CAUSE_CATEGORIES } from './WorkOrderList';
 
 interface Props {
@@ -44,7 +45,14 @@ export default function MobileStatusUpdater({ machineId }: Props) {
   const [techsName, setTechsName] = useState(user?.displayName || user?.username || '');
   const [actionsTaken, setActionsTaken] = useState('');
   const [difficulties, setDifficulties] = useState('');
-  const [duration, setDuration] = useState(30);
+  const [startTime, setStartTime] = useState(() => {
+    const d = new Date(Date.now() - 30 * 60 * 1000);
+    return format(d, "yyyy-MM-dd'T'HH:mm");
+  });
+  const [endTime, setEndTime] = useState(() => {
+    return format(new Date(), "yyyy-MM-dd'T'HH:mm");
+  });
+  const [calculatedTime, setCalculatedTime] = useState('30min');
   const [failureCategory, setFailureCategory] = useState<string>('mechanical');
   const [failureCause, setFailureCause] = useState<string>('mech_lubrication');
   const [relatedCause, setRelatedCause] = useState<string>('');
@@ -56,6 +64,25 @@ export default function MobileStatusUpdater({ machineId }: Props) {
   });
   const [maintenanceType, setMaintenanceType] = useState<'corrective' | 'preventive'>('corrective');
   const [finalMachineStatus, setFinalMachineStatus] = useState<'operational' | 'idle' | 'down'>('operational');
+
+  // Auto-calculate intervention time from startTime and endTime
+  useEffect(() => {
+    if (startTime && endTime) {
+      const start = new Date(startTime);
+      const end = new Date(endTime);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        const diff = differenceInMinutes(end, start);
+        if (diff >= 0) {
+          const h = Math.floor(diff / 60);
+          const m = diff % 60;
+          const timeStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
+          setCalculatedTime(timeStr);
+        } else {
+          setCalculatedTime('Invalid (End before Start)');
+        }
+      }
+    }
+  }, [startTime, endTime]);
 
   // Spare parts state for mobile reports
   const [spareParts, setSpareParts] = useState<SparePart[]>([]);
@@ -250,11 +277,20 @@ export default function MobileStatusUpdater({ machineId }: Props) {
       const userLabel = user?.displayName || user?.username || 'Mobile User';
       const nowStr = new Date().toISOString();
 
+      const startD = new Date(startTime);
+      const endD = new Date(endTime);
+      const diff = (!isNaN(startD.getTime()) && !isNaN(endD.getTime())) 
+        ? Math.max(1, differenceInMinutes(endD, startD)) 
+        : 30;
+      const h = Math.floor(diff / 60);
+      const m = diff % 60;
+      const interventionTimeFormatted = h > 0 ? `${h}h ${m}min` : `${m}min`;
+
       const intervention: any = {
         issuerName: activeWorkOrder.issuerName || userLabel,
         issuerSector: activeWorkOrder.issuerSector || 'Maintenance',
         requesterName: activeWorkOrder.requesterName || userLabel,
-        requestDate: activeWorkOrder.requestDate || activeWorkOrder.createdAt,
+        requestDate: activeWorkOrder.requestDate || (activeWorkOrder.createdAt ? format(new Date(activeWorkOrder.createdAt), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')),
         technicians: techsName,
         location: machine.location,
         malfunctionDescription: activeWorkOrder.description || machine.statusReason || '',
@@ -268,13 +304,13 @@ export default function MobileStatusUpdater({ machineId }: Props) {
         failureCategory: failureCategory,
         failureCause: failureCause,
         relatedCause: relatedCause,
-        interventionTime: duration + ' min',
+        interventionTime: interventionTimeFormatted,
         actions: actionsTaken,
         difficulties: difficulties,
         partsUsed: partsUsed,
-        startTime: activeWorkOrder.createdAt,
-        endTime: nowStr,
-        durationMinutes: duration,
+        startTime: startTime,
+        endTime: endTime,
+        durationMinutes: diff,
         comments: 'Completed via Mobile QR Scanner',
         completedAt: nowStr,
         currentHours: machine.currentHours
@@ -720,33 +756,46 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                    Duration (Minutes) *
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 font-bold"
-                    value={duration}
-                    onChange={(e) => setDuration(parseInt(e.target.value) || 1)}
-                  />
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                  Intervention Time {calculatedTime && <span className="text-blue-600 ml-1.5 font-bold">(Calculated: {calculatedTime})</span>}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="block text-[9px] text-gray-400 font-semibold mb-0.5">Start Time</span>
+                    <input
+                      type="datetime-local"
+                      required
+                      className="w-full px-2.5 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 text-xs font-medium"
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <span className="block text-[9px] text-gray-400 font-semibold mb-0.5">End Time</span>
+                    <input
+                      type="datetime-local"
+                      required
+                      className="w-full px-2.5 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 text-xs font-medium"
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                    Maintenance Type
-                  </label>
-                  <select
-                    value={maintenanceType}
-                    onChange={(e) => setMaintenanceType(e.target.value as 'corrective' | 'preventive')}
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 font-bold"
-                  >
-                    <option value="corrective">Corrective</option>
-                    <option value="preventive">Preventive</option>
-                  </select>
-                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                  Maintenance Type
+                </label>
+                <select
+                  value={maintenanceType}
+                  onChange={(e) => setMaintenanceType(e.target.value as 'corrective' | 'preventive')}
+                  className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 font-bold"
+                >
+                  <option value="corrective">Corrective</option>
+                  <option value="preventive">Preventive</option>
+                </select>
               </div>
 
               {/* Categorized Failure Cause Selection */}
