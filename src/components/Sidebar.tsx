@@ -127,6 +127,15 @@ export default function Sidebar({
         { id: 'rendement', label: 'Rendement Machines' },
         { id: 'production-rendement-overview', label: 'Rendement Overview' },
         { id: 'production-rendement-analysis', label: 'Rendement Analysis' },
+      ]
+    },
+
+    {
+      id: 'production-of-mgmt',
+      label: 'OF Follow-up',
+      icon: Layers,
+      roles: ['admin', 'manager', 'production', 'technician'],
+      subItems: [
         { id: 'production-orders', label: 'Orders' },
         { id: 'production-planning', label: 'Planning' },
       ]

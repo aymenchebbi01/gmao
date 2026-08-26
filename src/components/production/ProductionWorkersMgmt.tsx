@@ -21,8 +21,11 @@ import TableFooter from '../ui/TableFooter';
 import Modal from '../ui/Modal';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProductionWorkersMgmt() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [workers, setWorkers] = useState<ProductionWorker[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -207,7 +210,7 @@ export default function ProductionWorkersMgmt() {
             <FileSpreadsheet size={18} />
             Import Excel
           </button>
-          {!confirmDeleteAll ? (
+          {isAdmin && (!confirmDeleteAll ? (
             <button
               onClick={() => setConfirmDeleteAll(true)}
               className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl hover:bg-red-100 transition-all font-inter"
@@ -231,7 +234,7 @@ export default function ProductionWorkersMgmt() {
                 No
               </button>
             </div>
-          )}
+          ))}
 
           <button
             onClick={openCreateModal}

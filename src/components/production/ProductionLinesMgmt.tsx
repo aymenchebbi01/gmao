@@ -20,10 +20,13 @@ import TableFooter from '../ui/TableFooter';
 import Modal from '../ui/Modal';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 const MACHINE_CATEGORIES = ['Tompographie', 'Assemblage', 'Blister', 'Spray', 'Table'];
 
 export default function ProductionLinesMgmt() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [machines, setMachines] = useState<ProductionLine[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -216,7 +219,7 @@ export default function ProductionLinesMgmt() {
             Import Excel
           </button>
 
-          {!confirmDeleteAll ? (
+          {isAdmin && (!confirmDeleteAll ? (
             <button
               onClick={() => setConfirmDeleteAll(true)}
               className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl hover:bg-red-100 transition-all font-inter"
@@ -240,7 +243,7 @@ export default function ProductionLinesMgmt() {
                 No
               </button>
             </div>
-          )}
+          ))}
 
           <button
             onClick={openCreateModal}

@@ -18,8 +18,11 @@ import TableFooter from '../ui/TableFooter';
 import Modal from '../ui/Modal';
 import { toast } from 'sonner';
 import { cn } from '../../lib/utils';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ProductionManagement() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<ProductionRecord[]>([]);
   const [editingRecord, setEditingRecord] = useState<ProductionRecord | null>(null);
@@ -138,7 +141,7 @@ export default function ProductionManagement() {
         </div>
 
         <div className="flex items-center gap-3">
-          {!confirmDeleteAll ? (
+          {isAdmin && (!confirmDeleteAll ? (
             <button
               onClick={() => setConfirmDeleteAll(true)}
               className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl hover:bg-red-100 transition-all font-inter"
@@ -162,7 +165,7 @@ export default function ProductionManagement() {
                 Cancel
               </button>
             </div>
-          )}
+          ))}
 
           <button
             onClick={fetchData}
