@@ -683,7 +683,48 @@ export default function ProductionRendementAnalysis() {
 
     return (
         <div className="flex h-full flex-col bg-slate-50 overflow-hidden print-friendly-wrapper">
-            {/* Top Filter Panel - HIDDEN ON PRINT */}
+
+            {/* 1 — Rendement Summary Card (Moyenne + Total Records + PDF) */}
+            <div className="w-full bg-white border-b border-gray-200 px-6 py-5 shrink-0 z-10 relative shadow-sm print:shadow-none print:border-none">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <div className="flex items-center gap-6">
+                        <img
+                            src="/logo.png"
+                            alt="Company Logo"
+                            className="h-14 w-auto object-contain"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                        <h2 className="text-2xl font-bold tracking-tight text-slate-800">Rendement</h2>
+                    </div>
+                    <div className="flex items-center gap-2 print:hidden">
+                        <button
+                            onClick={handlePdfDownload}
+                            disabled={loadingPdf}
+                            className="flex items-center justify-center gap-1.5 bg-rose-50 text-rose-700 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider hover:bg-rose-100 transition-all border border-rose-200 disabled:opacity-50 shadow-sm"
+                        >
+                            <Download className="w-3.5 h-3.5" /> {loadingPdf ? '...' : 'PDF'}
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-8 border-t border-gray-100 mt-4 pt-4">
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Moyenne (Avg)</span>
+                        <span className={`text-3xl font-bold font-mono ${overallAvg >= 100 ? 'text-emerald-500' : overallAvg > 85 ? 'text-blue-500' : 'text-amber-500'}`}>
+                            {overallAvg.toFixed(1)}%
+                        </span>
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Records</span>
+                        <span className="text-2xl font-bold text-slate-700">{calculatedData.length}</span>
+                    </div>
+                    <div className="hidden print:block ml-auto text-right">
+                        <span className="text-xs font-mono text-slate-400">Generated: {new Date().toLocaleDateString()}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* 2 — Search / Filter Panel - HIDDEN ON PRINT */}
             <div className="w-full bg-white border-b border-gray-200 p-4 shrink-0 z-10 relative print:hidden shadow-sm">
                 <div className="flex items-center gap-2 mb-3 px-1">
                     <Search className="w-4 h-4 text-slate-400" />
@@ -752,54 +793,9 @@ export default function ProductionRendementAnalysis() {
                 </div>
             </div>
 
-            {/* Main Content Area - THE PRINTABLE REPORT */}
-            <section className="flex-1 flex flex-col p-6 lg:p-8 overflow-auto bg-slate-50 print:p-0 print:bg-white print:block">
-                <div id="report-content" className="flex flex-col flex-1 w-full max-w-full">
-
-                    {/* Report Header for Print */}
-                    <div className="mb-6 p-6 bg-white border border-gray-100 rounded-xl shadow-sm print:shadow-none print:border-none print:p-0 print:mb-6">
-                        <div className="flex flex-col sm:flex-row justify-between items-start mb-6 gap-4">
-                            <div className="flex items-center gap-6">
-                                <img
-                                    src="/logo.png"
-                                    alt="Company Logo"
-                                    className="h-16 w-auto object-contain"
-                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                />
-                                <div>
-                                    <h2 className="text-3xl font-bold tracking-tight text-slate-800">Rendement</h2>
-                                </div>
-                            </div>
-                            <div className="flex flex-col gap-3 items-end">
-                                <div className="flex flex-wrap items-center gap-2 print:hidden">
-                                    <button
-                                        onClick={handlePdfDownload}
-                                        disabled={loadingPdf}
-                                        className="flex items-center justify-center gap-1.5 bg-rose-50 text-rose-700 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider hover:bg-rose-100 transition-all border border-rose-200 disabled:opacity-50 shadow-sm"
-                                    >
-                                        <Download className="w-3.5 h-3.5" /> {loadingPdf ? '...' : 'PDF'}
-                                    </button>
-                                </div>
-                                <div className="text-right hidden print:block">
-                                    <span className="text-xs font-mono text-slate-400">Generated: {new Date().toLocaleDateString()}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-8 border-t border-gray-100 pt-6">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Moyenne (Avg)</span>
-                                <span className={`text-3xl font-bold font-mono ${overallAvg >= 100 ? 'text-emerald-500' : overallAvg > 85 ? 'text-blue-500' : 'text-amber-500'}`}>
-                                    {overallAvg.toFixed(1)}%
-                                </span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Records</span>
-                                <span className="text-2xl font-bold text-slate-700">{calculatedData.length}</span>
-                            </div>
-                        </div>
-                    </div>
-
+            {/* 3 — Data Table */}
+            <section className="flex-1 flex flex-col py-4 overflow-auto bg-slate-50 print:p-0 print:bg-white print:block">
+                <div id="report-content" className="flex flex-col flex-1 w-full max-w-full px--1">
                     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col shadow-sm print:border-none print:shadow-none">
                         <div className="grid grid-cols-8 bg-gray-50 border-b border-gray-200 px-6 py-4 print:bg-slate-100 print:text-black">
                             <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Date</span>

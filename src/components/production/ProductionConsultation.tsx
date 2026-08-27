@@ -120,8 +120,6 @@ export default function ProductionConsultation({ role = 'admin', externalFilters
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-xs">
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <TableIcon className="w-4 h-4 text-blue-600" />
-            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Aggregated Summary Feed</span>
           </div>
 
           <button onClick={handleExport} className="flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-blue-600 bg-slate-50 px-3 py-1.5 rounded-xl border border-gray-200 transition-all">
@@ -156,7 +154,7 @@ export default function ProductionConsultation({ role = 'admin', externalFilters
               ))}
               {paginatedAggregated.length === 0 && (
                 <tr>
-                  <td colSpan={isAdmin ? 7 : 5} className="p-8 text-center text-slate-400 italic">No aggregated records found.</td>
+                  <td colSpan={isAdmin ? 7 : 5} className="p-8 text-center text-slate-400 italic">No records found.</td>
                 </tr>
               )}
             </tbody>

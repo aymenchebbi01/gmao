@@ -72,7 +72,7 @@ export default function ProductionDetailed({ externalFilters, searchSignal, hide
         {showTitle && (
           <div className="flex items-center gap-2">
             <List className="w-4 h-4 text-blue-600" />
-            <h2 className="text-lg font-bold tracking-tight text-slate-800">Detailed Production Entries</h2>
+            <h2 className="text-lg font-bold tracking-tight text-slate-800">Detailed Production</h2>
           </div>
         )}
 

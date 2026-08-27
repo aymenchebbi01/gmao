@@ -57,8 +57,8 @@ export default function ProductionRendementOverview({ role = 'admin', displayNam
           <button
             onClick={() => setShowAddForm(!showAddForm)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-xs ${showAddForm
-                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'
+              ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+              : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200'
               }`}
           >
             {showAddForm ? (
@@ -76,7 +76,7 @@ export default function ProductionRendementOverview({ role = 'admin', displayNam
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6">
+      <div className="flex-1 overflow-y-auto py-1 px--2 space-y-4">
         {showAddForm ? (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -88,7 +88,7 @@ export default function ProductionRendementOverview({ role = 'admin', displayNam
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-                  Add New Production Output Record
+                  Add New Production
                 </h3>
               </div>
               <button onClick={() => setShowAddForm(false)} className="text-slate-400 hover:text-slate-600 p-1">

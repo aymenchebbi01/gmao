@@ -16,7 +16,8 @@ import {
   ShoppingCart,
   Layers,
   Upload,
-  Database
+  Database,
+  FileText
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -133,8 +134,8 @@ export default function Sidebar({
     {
       id: 'production-of-mgmt',
       label: 'OF Follow-up',
-      icon: Layers,
-      roles: ['admin', 'manager', 'production', 'technician'],
+      icon: FileText,
+      roles: ['admin', 'manager', 'production'],
       subItems: [
         { id: 'production-orders', label: 'Orders' },
         { id: 'production-planning', label: 'Planning' },

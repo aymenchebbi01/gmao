@@ -317,7 +317,7 @@ export default function ProductionImportCenter() {
     <div className="max-w-6xl mx-auto p-6 lg:p-10 font-sans h-full flex flex-col text-slate-800 space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-4 shrink-0">
         <div>
-          <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Import Center</h2>
+          <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Production Import</h2>
         </div>
 
         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-xs shrink-0">
