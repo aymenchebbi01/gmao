@@ -157,11 +157,7 @@ function SearchableSelect<T>({
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-/** Target qty = (qtyProduced × 8h-in-seconds) / cycleTime */
-function calcTarget(product: ProductionProduct): number {
-    if (!product.cycleTime || product.cycleTime === 0) return 0;
-    return Math.round((product.qtyProduced * 8 * 3600) / product.cycleTime);
-}
+
 
 function calcEfficiency(qty: number, target: number): number {
     if (!target || target === 0) return 0;
@@ -259,18 +255,16 @@ export default function MachineRendement() {
         [products, form.item]
     );
 
-    // When item changes, recalculate target & efficiencies
-    useEffect(() => {
-        if (!selectedProduct) return;
-        const tgt = calcTarget(selectedProduct);
+    // ── recalc efficiencies whenever target quantity changes ──────────────────
+    const handleTargetQtyChange = (value: number) => {
         setForm(f => ({
             ...f,
-            targetQty: tgt,
-            efficiencyShift1: calcEfficiency(f.qtyShift1, tgt),
-            efficiencyShift2: calcEfficiency(f.qtyShift2, tgt),
-            efficiencyShift3: calcEfficiency(f.qtyShift3, tgt),
+            targetQty: value,
+            efficiencyShift1: calcEfficiency(f.qtyShift1, value),
+            efficiencyShift2: calcEfficiency(f.qtyShift2, value),
+            efficiencyShift3: calcEfficiency(f.qtyShift3, value),
         }));
-    }, [selectedProduct]);
+    };
 
     // ── recalc efficiencies whenever qty changes ──────────────────────────────
 
@@ -1127,21 +1121,20 @@ export default function MachineRendement() {
                                 </div>
                             </div>
 
-                            {/* Target Qty (read-only) */}
+                            {/* Target Qty (manual input) */}
                             <div>
                                 <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">
-                                    Target Qty to Produce <span className="normal-case font-normal text-gray-400">(auto-calculated)</span>
+                                    Target Qty to Produce
                                 </label>
-                                <div className="flex items-center gap-3 px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-xl">
-                                    <Target size={16} className="text-blue-500 flex-shrink-0" />
-                                    <span className="text-lg font-bold text-blue-700 tabular-nums">
-                                        {form.targetQty.toLocaleString()}
-                                    </span>
-                                    {selectedProduct && (
-                                        <span className="text-xs text-blue-400 ml-auto">
-                                            = ({selectedProduct.qtyProduced.toLocaleString()} × 28800) ÷ {selectedProduct.cycleTime}s
-                                        </span>
-                                    )}
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        placeholder="Enter target quantity..."
+                                        className="w-full px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all font-bold tabular-nums text-slate-800"
+                                        value={form.targetQty || ''}
+                                        onChange={e => handleTargetQtyChange(Number(e.target.value))}
+                                    />
                                 </div>
                             </div>
 

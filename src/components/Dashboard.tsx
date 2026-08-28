@@ -500,27 +500,6 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
               Clear
             </button>
           )}
-          <div style={{ position: 'relative' }}>
-            <button style={{
-              width: 32, height: 32, borderRadius: 8,
-              border: '0.5px solid var(--color-border-tertiary)',
-              background: 'var(--color-background-primary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'var(--color-text-secondary)',
-            }}>
-              <Bell size={15} />
-            </button>
-            {unreadCount > 0 && (
-              <span style={{
-                position: 'absolute', top: -4, right: -4,
-                background: C.red, color: '#fff',
-                fontSize: 9, fontWeight: 700,
-                borderRadius: '50%', minWidth: 16, height: 16,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '0 3px',
-              }}>{unreadCount > 99 ? '99+' : unreadCount}</span>
-            )}
-          </div>
         </div>
       </div>
 
@@ -543,7 +522,7 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
       )}
 
       {/* ── KPI Grid ───────────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }} className="max-sm:grid-cols-2 max-xs:grid-cols-1">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }} className="max-sm:grid-cols-2 max-xs:grid-cols-1">
         <KpiCard
           label="Total machines"
           value={total}
@@ -567,17 +546,10 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
           icon={<Clipboard size={14} />}
           delta={{ text: `${orders.filter(o => o.status === 'completed').length} completed`, direction: 'neutral', positive: true }}
         />
-        <KpiCard
-          label="MTTR avg"
-          value={`${avgMttr}h`}
-          accentColor={C.teal}
-          icon={<Clock size={14} />}
-          delta={{ text: 'Mean time to repair', direction: 'neutral', positive: true }}
-        />
       </div>
 
       {/* ── Mid Grid ───────────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }} className="max-lg:grid-cols-1">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }} className="max-lg:grid-cols-1">
 
         {/* Col 1 — Interventions bar chart */}
         <div style={{ ...card, padding: '20px 20px 16px' }}>
@@ -626,49 +598,10 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
             ]}
           />
         </div>
-
-        {/* Col 3 — PM hours remaining */}
-        <div style={{ ...card, padding: '20px' }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 16 }}>PM hours remaining</div>
-          {pmMachines.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center', paddingTop: 24 }}>No PM thresholds set</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 260, overflowY: 'auto' }}>
-              {pmMachines.slice(0, 10).map(({ machine, remaining }) => {
-                const isOverdue = remaining <= 0;
-                const isWarning = !isOverdue && remaining <= 50;
-                const barColor = isOverdue ? C.red : isWarning ? C.amber : C.teal;
-                const maxHours = machine.nextMaintenanceHours || 1;
-                const barPct = isOverdue ? 100 : Math.max(0, Math.min(100, ((maxHours - remaining) / maxHours) * 100));
-                return (
-                  <div key={machine.id} style={{ width: '100%' }}>
-                    {/* Name + value on one line above the bar */}
-                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 5, gap: 6 }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 500, color: 'var(--color-text-primary)',
-                        flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        minWidth: 0,
-                      }}>
-                        {machine.name}
-                      </span>
-                      <span style={{ fontSize: 10, fontWeight: 500, color: isOverdue ? C.red : 'var(--color-text-muted)', flexShrink: 0 }}>
-                        {isOverdue ? 'Overdue' : `${Math.round(remaining)}h left`}
-                      </span>
-                    </div>
-                    {/* Full-width bar below */}
-                    <div style={{ height: 4, borderRadius: 99, background: 'var(--color-border-tertiary)', overflow: 'hidden', width: '100%' }}>
-                      <div style={{ height: '100%', width: `${barPct}%`, background: barColor, borderRadius: 99, transition: 'width 0.4s ease' }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ── Bottom Grid ────────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, minWidth: 0 }} className="max-lg:grid-cols-1">
+      <div style={{ width: '100%', minWidth: 0 }}>
 
         {/* Work orders table */}
         <div style={{ ...card, padding: '20px', overflow: 'hidden', minWidth: 0 }}>
@@ -752,37 +685,6 @@ export default function Dashboard({ setActiveTab }: { setActiveTab: (tab: string
                 )}
               </tbody>
             </table>
-          </div>
-        </div>
-
-        {/* Notifications panel */}
-        <div style={{ ...card, padding: '20px', display: 'flex', flexDirection: 'column', height: 480, minWidth: 0, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Notifications</span>
-              {unreadCount > 0 && (
-                <span style={{ fontSize: 10, fontWeight: 700, background: C.red, color: '#fff', borderRadius: 99, padding: '1px 6px' }}>{unreadCount}</span>
-              )}
-            </div>
-            {unreadCount > 0 && (
-              <button onClick={markAllRead} style={{ fontSize: 11, color: C.blue, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
-                Mark all read
-              </button>
-            )}
-          </div>
-          <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {notifications.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '24px 0', fontSize: 12, color: 'var(--color-text-muted)' }}>No notifications</div>
-            )}
-            {notifications.slice(0, 10).map(n => (
-              <NotifItem
-                key={n.id}
-                n={n}
-                onCreateWO={() => setActiveTab('work-orders-list')}
-                onSchedulePM={() => setActiveTab('calendar')}
-                onGoToPurchaseRequests={() => setActiveTab('purchase-requests')}
-              />
-            ))}
           </div>
         </div>
       </div>

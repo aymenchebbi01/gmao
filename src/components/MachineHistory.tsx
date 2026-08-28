@@ -46,6 +46,9 @@ interface EditProductionForm {
   mouleName: string;
   startDate: string;
   endDate: string;
+  qtyProduced?: number | string;
+  qtyGood?: number | string;
+  qtyBad?: number | string;
 }
 
 interface EditConditionForm {
@@ -196,6 +199,62 @@ function EditProductionModal({
               />
             </div>
           </div>
+
+          {/* Quantities */}
+          <div className="grid grid-cols-3 gap-3 pt-1 border-t border-gray-100">
+            <div>
+              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">Qty Produced</label>
+              <input
+                type="number"
+                min="0"
+                value={form.qtyProduced ?? ''}
+                onChange={e => onChange({ ...form, qtyProduced: e.target.value })}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 hover:bg-white transition-all font-mono"
+                placeholder="Total"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1.5">Good Qty</label>
+              <input
+                type="number"
+                min="0"
+                value={form.qtyGood ?? ''}
+                onChange={e => onChange({ ...form, qtyGood: e.target.value })}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 hover:bg-white transition-all font-mono text-emerald-700"
+                placeholder="Good"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-rose-600 uppercase tracking-wider mb-1.5">Bad Qty (Scrap)</label>
+              <input
+                type="number"
+                min="0"
+                value={form.qtyBad ?? ''}
+                onChange={e => onChange({ ...form, qtyBad: e.target.value })}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 hover:bg-white transition-all font-mono text-rose-700"
+                placeholder="Bad"
+              />
+            </div>
+          </div>
+
+          {/* Mismatch non-blocking warning */}
+          {(() => {
+            const prodNum = form.qtyProduced !== '' && form.qtyProduced !== undefined && form.qtyProduced !== null ? Number(form.qtyProduced) : null;
+            const goodNum = form.qtyGood !== '' && form.qtyGood !== undefined && form.qtyGood !== null ? Number(form.qtyGood) : null;
+            const badNum = form.qtyBad !== '' && form.qtyBad !== undefined && form.qtyBad !== null ? Number(form.qtyBad) : null;
+            const hasAll = prodNum !== null && goodNum !== null && badNum !== null && !isNaN(prodNum) && !isNaN(goodNum) && !isNaN(badNum);
+            const mismatch = hasAll && (goodNum + badNum !== prodNum);
+
+            if (!mismatch) return null;
+            return (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs">
+                <AlertTriangle size={15} className="shrink-0 text-amber-600" />
+                <span>
+                  <strong>Note:</strong> Good Qty ({goodNum}) + Bad Qty ({badNum}) = {goodNum + badNum}, which does not match Qty Produced ({prodNum}).
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Footer */}
@@ -632,7 +691,10 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
       productName: entry.productName || '',
       mouleName: entry.mouleName || '',
       startDate: entry.startDate || '',
-      endDate: entry.endDate || ''
+      endDate: entry.endDate || '',
+      qtyProduced: entry.qtyProduced !== undefined && entry.qtyProduced !== null ? entry.qtyProduced : '',
+      qtyGood: entry.qtyGood !== undefined && entry.qtyGood !== null ? entry.qtyGood : '',
+      qtyBad: entry.qtyBad !== undefined && entry.qtyBad !== null ? entry.qtyBad : ''
     });
   };
 
@@ -640,15 +702,32 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
     if (!editingProduction) return;
     setProductionSaving(true);
     try {
+      const parseVal = (v: any) => (v !== '' && v !== undefined && v !== null && !isNaN(Number(v))) ? Number(v) : null;
+      const cleanQtyProduced = parseVal(editingProduction.qtyProduced);
+      const cleanQtyGood = parseVal(editingProduction.qtyGood);
+      const cleanQtyBad = parseVal(editingProduction.qtyBad);
+
       await api.updateMachineProductionHistory(editingProduction.id, {
         productName: editingProduction.productName,
         mouleName: editingProduction.mouleName,
         startDate: editingProduction.startDate,
-        endDate: editingProduction.endDate || null
+        endDate: editingProduction.endDate || null,
+        qtyProduced: cleanQtyProduced,
+        qtyGood: cleanQtyGood,
+        qtyBad: cleanQtyBad
       });
       setProductionHistory(prev =>
         prev.map(e => e.id === editingProduction.id
-          ? { ...e, productName: editingProduction.productName, mouleName: editingProduction.mouleName, startDate: editingProduction.startDate, endDate: editingProduction.endDate || undefined }
+          ? {
+              ...e,
+              productName: editingProduction.productName,
+              mouleName: editingProduction.mouleName,
+              startDate: editingProduction.startDate,
+              endDate: editingProduction.endDate || undefined,
+              qtyProduced: cleanQtyProduced ?? undefined,
+              qtyGood: cleanQtyGood ?? undefined,
+              qtyBad: cleanQtyBad ?? undefined
+            }
           : e
         )
       );
@@ -1081,6 +1160,9 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
                   <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Mold (Moule)</th>
                   <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Start Date</th>
                   <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">End Date</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Qty Produced</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Good Qty</th>
+                  <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Bad Qty</th>
                   {isAdmin && (
                     <th className="px-6 py-3 text-[10px] font-bold text-amber-500 uppercase tracking-wider text-right">Actions</th>
                   )}
@@ -1102,6 +1184,15 @@ export default function MachineHistory({ machineId, machineName }: MachineHistor
                       {entry.endDate ? format(new Date(entry.endDate), 'MMM d, yyyy HH:mm') : (
                         <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-[10px] font-bold uppercase">Current</span>
                       )}
+                    </td>
+                    <td className="px-6 py-4 text-xs font-mono font-medium text-slate-700">
+                      {entry.qtyProduced !== undefined && entry.qtyProduced !== null ? entry.qtyProduced.toLocaleString() : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-xs font-mono font-bold text-emerald-600">
+                      {entry.qtyGood !== undefined && entry.qtyGood !== null ? entry.qtyGood.toLocaleString() : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-xs font-mono font-bold text-rose-600">
+                      {entry.qtyBad !== undefined && entry.qtyBad !== null ? entry.qtyBad.toLocaleString() : '—'}
                     </td>
                     {isAdmin && (
                       <td className="px-6 py-4 text-right">

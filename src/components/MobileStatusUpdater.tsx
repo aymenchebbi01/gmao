@@ -13,7 +13,10 @@ import {
   Layers, 
   Box, 
   MapPin, 
-  Activity
+  Activity,
+  Save,
+  Hash,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,6 +40,9 @@ export default function MobileStatusUpdater({ machineId }: Props) {
   const [productInput, setProductInput] = useState('');
   const [mouleInput, setMouleInput] = useState('');
   const [conditionInput, setConditionInput] = useState('Good');
+  const [qtyProducedInput, setQtyProducedInput] = useState('');
+  const [qtyGoodInput, setQtyGoodInput] = useState('');
+  const [qtyBadInput, setQtyBadInput] = useState('');
   const [reasonInput, setReasonInput] = useState('');
   const [pendingStatus, setPendingStatus] = useState<Machine['status'] | null>(null);
 
@@ -101,11 +107,12 @@ export default function MobileStatusUpdater({ machineId }: Props) {
 
     const fetchMachine = async () => {
       try {
-        const [machines, orders, allParts, allProducts] = await Promise.all([
+        const [machines, orders, allParts, allProducts, prodHistory] = await Promise.all([
           api.getMachines(),
           api.getWorkOrders(),
           api.getSpareParts(),
-          api.getProducts().catch(() => [])
+          api.getProducts().catch(() => []),
+          api.getMachineProductionHistory(machineId).catch(() => [])
         ]);
         const found = machines.find(m => m.id === machineId);
         if (found) {
@@ -118,6 +125,16 @@ export default function MobileStatusUpdater({ machineId }: Props) {
           setSpareParts(allParts || []);
           setProductsList(allProducts || []);
           setLiveHours(calculateMachineLiveHours(found));
+
+          // Populate current quantities from active production history entry if available
+          if (prodHistory && prodHistory.length > 0) {
+            const activeEntry = prodHistory.find((p: any) => p.endDate === null) || prodHistory[0];
+            if (activeEntry) {
+              setQtyProducedInput(activeEntry.qtyProduced != null ? String(activeEntry.qtyProduced) : '');
+              setQtyGoodInput(activeEntry.qtyGood != null ? String(activeEntry.qtyGood) : '');
+              setQtyBadInput(activeEntry.qtyBad != null ? String(activeEntry.qtyBad) : '');
+            }
+          }
 
           // Find if there is an active work order (pending or in-progress) for this machine
           const activeOrder = orders.find(o => o.machineId === machineId && (o.status === 'in-progress' || o.status === 'pending'));
@@ -227,11 +244,18 @@ export default function MobileStatusUpdater({ machineId }: Props) {
         injectingProduct: productInput,
         currentMoule: mouleInput,
         condition: conditionInput,
-        statusReason: (newStatus === 'operational' || newStatus === 'idle') ? '' : reasonInput
+        statusReason: (newStatus === 'operational' || newStatus === 'idle') ? '' : reasonInput,
+        qtyProduced: qtyProducedInput !== '' ? Number(qtyProducedInput) : null,
+        qtyGood: qtyGoodInput !== '' ? Number(qtyGoodInput) : null,
+        qtyBad: qtyBadInput !== '' ? Number(qtyBadInput) : null,
       };
 
       if (newStatus === 'operational' && oldStatus !== 'operational') {
         updatePayload.operationalStartTime = new Date().toISOString();
+        updatePayload.downStartTime = null;
+      } else if ((newStatus === 'down' || newStatus === 'maintenance') && (oldStatus !== 'down' && oldStatus !== 'maintenance')) {
+        updatePayload.downStartTime = new Date().toISOString();
+        updatePayload.operationalStartTime = null;
       }
 
       await api.updateMachine(machine.id, updatePayload);
@@ -256,6 +280,47 @@ export default function MobileStatusUpdater({ machineId }: Props) {
     } catch (error) {
       console.error(error);
       toast.error('Failed to update machine');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleSaveSetup = async () => {
+    if (!machine) return;
+    setUpdating(true);
+    try {
+      const userLabel = user?.displayName || user?.username || 'Mobile User';
+      const updatePayload: any = {
+        injectingProduct: productInput,
+        currentMoule: mouleInput,
+        condition: conditionInput,
+        qtyProduced: qtyProducedInput !== '' ? Number(qtyProducedInput) : null,
+        qtyGood: qtyGoodInput !== '' ? Number(qtyGoodInput) : null,
+        qtyBad: qtyBadInput !== '' ? Number(qtyBadInput) : null,
+      };
+
+      await api.updateMachine(machine.id, updatePayload);
+
+      setMachine({
+        ...machine,
+        injectingProduct: productInput,
+        currentMoule: mouleInput,
+        condition: conditionInput
+      });
+
+      try {
+        await api.logMachineAction(
+          'UPDATE_SETUP',
+          machine.id,
+          'User "' + userLabel + '" updated setup for Machine \'' + machine.name + '\' -> Product: \'' + productInput + '\', Moule: \'' + mouleInput + '\', Qty: ' + (qtyProducedInput || 'N/A')
+        );
+      } catch (e) {}
+
+      toast.success('Product, mold setup & quantities saved successfully');
+      setView('details');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to save setup');
     } finally {
       setUpdating(false);
     }
@@ -616,6 +681,85 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                   <option value="Critical">Critical</option>
                 </select>
               </div>
+
+              {/* Quantities Section */}
+              <div className="pt-2 border-t border-gray-100 space-y-2.5">
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  <Hash size={13} className="text-blue-600" />
+                  <span>Production Quantities</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                      Produced (Total)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={qtyProducedInput}
+                      onChange={(e) => setQtyProducedInput(e.target.value)}
+                      className="w-full px-2.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono font-bold text-gray-800 outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-emerald-600 uppercase tracking-wider mb-1">
+                      Good Qty
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={qtyGoodInput}
+                      onChange={(e) => setQtyGoodInput(e.target.value)}
+                      className="w-full px-2.5 py-2 bg-emerald-50/50 border border-emerald-200 rounded-xl text-xs font-mono font-bold text-emerald-800 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-rose-600 uppercase tracking-wider mb-1">
+                      Bad (Scrap)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      value={qtyBadInput}
+                      onChange={(e) => setQtyBadInput(e.target.value)}
+                      className="w-full px-2.5 py-2 bg-rose-50/50 border border-rose-200 rounded-xl text-xs font-mono font-bold text-rose-800 outline-none focus:ring-2 focus:ring-rose-500/20"
+                    />
+                  </div>
+                </div>
+
+                {/* Non-blocking Qty Mismatch Warning */}
+                {qtyProducedInput !== '' && (qtyGoodInput !== '' || qtyBadInput !== '') && 
+                 (Number(qtyGoodInput || 0) + Number(qtyBadInput || 0) !== Number(qtyProducedInput)) && (
+                  <div className="flex items-start gap-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-800 font-medium leading-tight">
+                    <AlertTriangle size={12} className="text-amber-600 shrink-0 mt-0.5" />
+                    <span>
+                      Note: Good ({qtyGoodInput || 0}) + Bad ({qtyBadInput || 0}) = {Number(qtyGoodInput || 0) + Number(qtyBadInput || 0)} ≠ Total ({qtyProducedInput})
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Dedicated Save Setup & Quantities Button */}
+              <button
+                type="button"
+                onClick={handleSaveSetup}
+                disabled={updating}
+                className="w-full mt-2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-95 flex items-center justify-center gap-2 text-xs"
+              >
+                {updating ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                Save Product, Mold & Quantities
+              </button>
+            </div>
+
+            {/* Separator */}
+            <div className="flex items-center gap-2 my-2">
+              <div className="flex-1 h-px bg-gray-200" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">or change status</span>
+              <div className="flex-1 h-px bg-gray-200" />
             </div>
 
             {/* Status Selectors */}

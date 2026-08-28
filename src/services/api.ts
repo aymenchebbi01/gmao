@@ -84,7 +84,11 @@ export const api = {
     const res = await fetch(`${API_BASE}/machines/${id}/production-history`);
     return handleResponse(res);
   },
-  updateMachineProductionHistory: async (id: number, data: { productName: string; mouleName: string; startDate: string; endDate: string | null }): Promise<void> => {
+  getAllProductionHistory: async (): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/production-history`);
+    return handleResponse(res);
+  },
+  updateMachineProductionHistory: async (id: number, data: { productName: string; mouleName: string; startDate: string; endDate: string | null; qtyProduced?: number | null; qtyGood?: number | null; qtyBad?: number | null }): Promise<void> => {
     const res = await fetch(`${API_BASE}/machine-production-history/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

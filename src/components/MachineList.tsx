@@ -258,6 +258,15 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
 
         // Handle status change logic for hours
         if (oldMachine) {
+          const isNowDown = formData.status === 'down' || formData.status === 'maintenance';
+          const wasDown = oldMachine.status === 'down' || oldMachine.status === 'maintenance';
+
+          if (isNowDown && !wasDown) {
+            finalUpdateData.downStartTime = new Date().toISOString();
+          } else if (!isNowDown && wasDown) {
+            finalUpdateData.downStartTime = null;
+          }
+
           if (oldMachine.status === 'operational' && formData.status !== 'operational') {
             // Stopping operational session
             const liveHours = calculateLiveHours(oldMachine);

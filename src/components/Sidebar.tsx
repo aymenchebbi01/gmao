@@ -103,6 +103,7 @@ export default function Sidebar({
         { id: 'layout', label: 'Factory Layout' },
         { id: 'machines', label: 'Machines' },
         { id: 'consultation', label: 'Consultation' },
+        { id: 'production-mold-history', label: 'Production History' },
       ]
     },
     {
@@ -113,6 +114,7 @@ export default function Sidebar({
       subItems: [
         { id: 'work-orders-list', label: 'Maintenance Orders' },
         { id: 'intervention-reports', label: 'Intervention Reports' },
+        { id: 'downtime-analysis', label: 'Downtime Analysis' },
         { id: 'calendar', label: 'Calendar' }
       ]
     },

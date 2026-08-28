@@ -44,6 +44,7 @@ export interface Machine {
   preventivePlan: PreventiveTask[];
   injectingProduct?: string;
   currentMoule?: string;
+  downStartTime?: string;
   updatedAt?: string;
   position3d?: {
     position: [number, number, number];
@@ -58,6 +59,9 @@ export interface MachineProductionHistory {
   mouleName: string;
   startDate: string;
   endDate?: string;
+  qtyProduced?: number;
+  qtyGood?: number;
+  qtyBad?: number;
 }
 
 export type Product = ProductionProduct;

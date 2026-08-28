@@ -50,6 +50,7 @@ db.exec(`
     injectingProduct TEXT,
     manualUrl TEXT,
     imageUrl TEXT,
+    downStartTime TEXT,
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
     updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
   );
@@ -175,6 +176,18 @@ db.exec(`
     newCondition TEXT NOT NULL,
     timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (machineId) REFERENCES machines(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS machine_production_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    machineId TEXT NOT NULL,
+    productName TEXT,
+    mouleName TEXT,
+    startDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+    endDate DATETIME,
+    qtyProduced INTEGER,
+    qtyGood INTEGER,
+    qtyBad INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS machine_rendement (
@@ -320,7 +333,11 @@ const migrations = [
   { table: 'machine_rendement', column: 'actualCavitiesRunning', type: 'INTEGER DEFAULT 0' },
   { table: 'machine_rendement', column: 'trs', type: 'REAL DEFAULT 0' },
   { table: 'machine_rendement', column: 'comment', type: 'TEXT DEFAULT \'\'' },
-  { table: 'machine_rendement', column: 'priceMarket', type: 'TEXT DEFAULT \'TN\'' }
+  { table: 'machine_rendement', column: 'priceMarket', type: 'TEXT DEFAULT \'TN\'' },
+  { table: 'machine_production_history', column: 'qtyProduced', type: 'INTEGER' },
+  { table: 'machine_production_history', column: 'qtyGood', type: 'INTEGER' },
+  { table: 'machine_production_history', column: 'qtyBad', type: 'INTEGER' },
+  { table: 'machines', column: 'downStartTime', type: 'TEXT' }
 ];
 
   for (const m of migrations) {

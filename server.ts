@@ -69,7 +69,10 @@ try {
       productName TEXT,
       mouleName TEXT,
       startDate DATETIME DEFAULT CURRENT_TIMESTAMP,
-      endDate DATETIME
+      endDate DATETIME,
+      qtyProduced INTEGER,
+      qtyGood INTEGER,
+      qtyBad INTEGER
     )
   `).run();
 
@@ -512,20 +515,62 @@ app.put('/api/machines/:id', (req, res) => {
       }
     }
 
-    // Log production change (Product or Mold)
-    if (machine.injectingProduct !== undefined || machine.currentMoule !== undefined) {
+    // Extract production quantities before updating machines table
+    const qtyProduced = machine.qtyProduced !== undefined ? (machine.qtyProduced === '' || machine.qtyProduced === null ? null : Number(machine.qtyProduced)) : undefined;
+    const qtyGood = machine.qtyGood !== undefined ? (machine.qtyGood === '' || machine.qtyGood === null ? null : Number(machine.qtyGood)) : undefined;
+    const qtyBad = machine.qtyBad !== undefined ? (machine.qtyBad === '' || machine.qtyBad === null ? null : Number(machine.qtyBad)) : undefined;
+    delete machine.qtyProduced;
+    delete machine.qtyGood;
+    delete machine.qtyBad;
+    delete machine.prevQtyProduced;
+    delete machine.prevQtyGood;
+    delete machine.prevQtyBad;
+
+    // Log production change (Product or Mold) and/or update quantities
+    if (machine.injectingProduct !== undefined || machine.currentMoule !== undefined || qtyProduced !== undefined || qtyGood !== undefined || qtyBad !== undefined) {
       const newProduct = machine.injectingProduct !== undefined ? machine.injectingProduct : (oldMachine ? oldMachine.injectingProduct : undefined);
       const newMoule = machine.currentMoule !== undefined ? machine.currentMoule : (oldMachine ? oldMachine.currentMoule : undefined);
 
       if (oldMachine && (oldMachine.injectingProduct !== newProduct || oldMachine.currentMoule !== newMoule)) {
-        // End the previous history entry
-        db.prepare('UPDATE machine_production_history SET endDate = ? WHERE machineId = ? AND endDate IS NULL').run(new Date().toISOString(), id);
+        // End the previous history entry and record final quantities produced
+        db.prepare(`
+          UPDATE machine_production_history
+          SET endDate = ?,
+              qtyProduced = COALESCE(?, qtyProduced),
+              qtyGood = COALESCE(?, qtyGood),
+              qtyBad = COALESCE(?, qtyBad)
+          WHERE machineId = ? AND endDate IS NULL
+        `).run(new Date().toISOString(), qtyProduced ?? null, qtyGood ?? null, qtyBad ?? null, id);
 
         // Start a new history entry
         db.prepare(`
           INSERT INTO machine_production_history (machineId, productName, mouleName, startDate)
           VALUES (?, ?, ?, ?)
         `).run(id, newProduct || '', newMoule || '', new Date().toISOString());
+      } else if (qtyProduced !== undefined || qtyGood !== undefined || qtyBad !== undefined) {
+        // Update current active production record's quantities
+        db.prepare(`
+          UPDATE machine_production_history
+          SET qtyProduced = ?,
+              qtyGood = ?,
+              qtyBad = ?
+          WHERE machineId = ? AND endDate IS NULL
+        `).run(qtyProduced ?? null, qtyGood ?? null, qtyBad ?? null, id);
+      }
+    }
+
+    // Log status / downtime start
+    if (machine.status !== undefined) {
+      if (machine.status === 'down' || machine.status === 'maintenance') {
+        if (!machine.downStartTime) {
+          if (!oldMachine || (oldMachine.status !== 'down' && oldMachine.status !== 'maintenance') || !oldMachine.downStartTime) {
+            machine.downStartTime = new Date().toISOString();
+          }
+        }
+      } else if (machine.status === 'operational' || machine.status === 'idle' || machine.status === 'retired') {
+        if (machine.downStartTime === undefined) {
+          machine.downStartTime = null;
+        }
       }
     }
 
@@ -684,10 +729,31 @@ app.get('/api/machines/:id/production-history', (req, res) => {
   }
 });
 
+// Global production history (all machines) - for the Production & Mold History page
+app.get('/api/production-history', (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT
+        mph.id, mph.machineId, mph.productName, mph.mouleName,
+        mph.startDate, mph.endDate, mph.qtyProduced, mph.qtyGood, mph.qtyBad,
+        m.name AS machineName,
+        m.siteNumber,
+        m.location,
+        m.status AS machineStatus
+      FROM machine_production_history mph
+      LEFT JOIN machines m ON m.id = mph.machineId
+      ORDER BY mph.startDate DESC
+    `).all();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 app.put('/api/machine-production-history/:id', (req, res) => {
   try {
     const { id } = req.params;
-    const { productName, mouleName, startDate, endDate } = req.body;
+    const { productName, mouleName, startDate, endDate, qtyProduced, qtyGood, qtyBad } = req.body;
 
     let isAdmin = false;
     let userId = 'System';
@@ -715,11 +781,21 @@ app.put('/api/machine-production-history/:id', (req, res) => {
       return res.status(404).json({ error: 'Production history entry not found' });
     }
 
+    const parseNumOrNull = (val: any) => {
+      if (val === undefined || val === null || val === '') return null;
+      const parsed = Number(val);
+      return isNaN(parsed) ? null : parsed;
+    };
+
+    const cleanQtyProduced = parseNumOrNull(qtyProduced);
+    const cleanQtyGood = parseNumOrNull(qtyGood);
+    const cleanQtyBad = parseNumOrNull(qtyBad);
+
     db.prepare(`
       UPDATE machine_production_history
-      SET productName = ?, mouleName = ?, startDate = ?, endDate = ?
+      SET productName = ?, mouleName = ?, startDate = ?, endDate = ?, qtyProduced = ?, qtyGood = ?, qtyBad = ?
       WHERE id = ?
-    `).run(productName, mouleName, startDate, endDate, id);
+    `).run(productName, mouleName, startDate, endDate, cleanQtyProduced, cleanQtyGood, cleanQtyBad, id);
 
     logAction(
       userId === 'System' ? undefined : userId,
