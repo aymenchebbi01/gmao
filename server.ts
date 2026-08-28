@@ -12,6 +12,12 @@ import fs from 'fs';
 import db, { DB_PATH, reloadDb } from './db.js';
 import os from 'os';
 import { sendPurchaseRequestNotification } from './email.js';
+import {
+  initWhatsApp,
+  getWhatsAppStatus,
+  sendMachineDownAlert,
+  sendWorkOrderCreatedAlert
+} from './whatsappService.js';
 
 
 dotenv.config();
@@ -604,6 +610,22 @@ app.put('/api/machines/:id', (req, res) => {
     if (detailsMsg) {
       logAction(userId === 'System' ? undefined : userId, userName, 'Update', 'Machine', id, detailsMsg);
     }
+
+    // WhatsApp Machine Breakdown Alert
+    if (machine.status === 'down' || machine.status === 'maintenance') {
+      if (!oldMachine || oldMachine.status !== machine.status || machine.statusReason) {
+        sendMachineDownAlert({
+          machineName: oldMachine?.name || machine.name || id,
+          serialNumber: oldMachine?.serialNumber || machine.serialNumber,
+          location: oldMachine?.location || machine.location,
+          siteNumber: oldMachine?.siteNumber || machine.siteNumber,
+          reason: machine.statusReason || oldMachine?.statusReason,
+          reportedBy: userName,
+          status: machine.status
+        }).catch(err => console.error("WhatsApp machine down alert error:", err));
+      }
+    }
+
     res.json({ message: 'Machine updated' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -962,6 +984,19 @@ app.post('/api/work-orders', (req, res) => {
     db.prepare(`INSERT INTO work_orders (${columns}) VALUES (${placeholders})`).run(...values);
     const { userId: cWoUserId, userName: cWoUserName } = getCallerIdentity(req);
     logAction(cWoUserId, cWoUserName, 'Create', 'WorkOrder', workOrder.id, `Created Work Order "${workOrder.title}"`);
+
+    // WhatsApp Work Order Alert
+    sendWorkOrderCreatedAlert({
+      workOrderId: workOrder.id,
+      title: workOrder.title,
+      machineName: workOrder.machineName,
+      priority: workOrder.priority,
+      type: workOrder.type,
+      requesterName: workOrder.requesterName || workOrder.createdByName || cWoUserName,
+      description: workOrder.description || workOrder.malfunctionDescription,
+      location: workOrder.location
+    }).catch(err => console.error("WhatsApp work order alert error:", err));
+
     res.status(201).json({ message: 'Work order created' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
@@ -2218,6 +2253,83 @@ app.delete('/api/production/planning/:id', (req, res) => {
   } catch (error) { res.status(500).json({ error: (error as Error).message }); }
 });
 
+// ── WHATSAPP INTEGRATION ROUTES ───────────────────────────────────────────────
+app.get('/api/whatsapp/status', (req, res) => {
+  res.json(getWhatsAppStatus());
+});
+
+app.get('/api/whatsapp/qr', (req, res) => {
+  const status = getWhatsAppStatus();
+  if (status.isConnected) {
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>WhatsApp Connected - GMAO</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f0fdf4; color: #166534;">
+          <div style="background: white; padding: 40px; border-radius: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; max-width: 420px;">
+            <div style="font-size: 48px; margin-bottom: 12px;">✅</div>
+            <h2 style="margin: 0 0 8px 0; color: #15803d;">WhatsApp Connecté !</h2>
+            <p style="color: #4b5563; font-size: 14px; margin-bottom: 20px;">Le serveur GMAO est connecté et envoie automatiquement les alertes dans votre groupe.</p>
+            <div style="background: #f3f4f6; padding: 14px 18px; border-radius: 14px; font-size: 13px; color: #374151; word-break: break-all; text-align: left;">
+              <div style="margin-bottom: 6px;"><b>Groupe cible :</b> ${status.targetGroupName || 'Groupe WhatsApp'}</div>
+              <div><b>ID Groupe (JID) :</b> <span style="font-family: monospace; font-size: 11px; color: #1f2937;">${status.targetGroupId || 'Connecté'}</span></div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+
+  if (status.qrCodeDataUrl) {
+    return res.send(`
+      <!DOCTYPE html>
+      <html>
+        <head><title>Scan WhatsApp QR - GMAO</title><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="refresh" content="5"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f9fafb; color: #111827;">
+          <div style="background: white; padding: 36px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: center; max-width: 440px;">
+            <div style="font-size: 36px; margin-bottom: 8px;">📱</div>
+            <h2 style="margin: 0 0 6px 0; font-size: 20px;">Associer WhatsApp à la GMAO</h2>
+            <p style="color: #6b7280; font-size: 13px; margin: 0 0 20px 0;">Ouvrez WhatsApp sur votre téléphone > <b>Appareils connectés</b> > <b>Connecter un appareil</b> et scannez ce QR Code.</p>
+            <div style="display: inline-block; padding: 16px; background: #ffffff; border: 2px dashed #e5e7eb; border-radius: 16px;">
+              <img src="${status.qrCodeDataUrl}" style="width: 260px; height: 260px; display: block;" alt="WhatsApp QR Code" />
+            </div>
+            <p style="color: #9ca3af; font-size: 11px; margin-top: 16px;">Cette page s'actualise automatiquement dès que vous scannez.</p>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+
+  return res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head><title>WhatsApp Initialisation - GMAO</title><meta charset="utf-8"><meta http-equiv="refresh" content="3"></head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f9fafb;">
+        <div style="text-align: center; color: #6b7280;">
+          <p style="font-size: 16px; font-weight: bold;">Génération du QR Code WhatsApp en cours...</p>
+          <p style="font-size: 12px;">Veuillez patienter quelques secondes...</p>
+        </div>
+      </body>
+    </html>
+  `);
+});
+
+app.post('/api/whatsapp/test', async (req, res) => {
+  try {
+    const { sendWhatsAppMessage } = await import('./whatsappService.js');
+    const success = await sendWhatsAppMessage(
+      `🔔 *TEST DE CONNEXION GMAO*\n━━━━━━━━━━━━━━━━━━━━\nLe serveur GMAO Thermoplastics est correctement connecté et configuré pour envoyer les alertes de pannes et ordres de travail dans ce groupe.\n⏰ ${new Date().toLocaleString('fr-FR')}`
+    );
+    if (success) {
+      res.json({ message: 'Message de test envoyé avec succès dans le groupe WhatsApp !' });
+    } else {
+      res.status(400).json({ error: 'WhatsApp non connecté ou groupe non accessible.' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // ── PRODUCTION DASHBOARD STATS ────────────────────────────────────────────────
 app.get('/api/production/dashboard-stats', (req, res) => {
   try {
@@ -2236,7 +2348,18 @@ app.get('/api/production/dashboard-stats', (req, res) => {
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        watch: {
+          ignored: [
+            '**/whatsapp_auth/**',
+            '**/uploads/**',
+            '**/backups/**',
+            '**/*.db',
+            '**/*.db-*',
+          ],
+        },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -2266,6 +2389,9 @@ async function startServer() {
 
   // Start the auto-backup scheduler after server is up
   scheduleAutoBackup();
+
+  // Start WhatsApp Client
+  initWhatsApp();
 }
 
 startServer();

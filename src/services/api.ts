@@ -393,4 +393,14 @@ export const api = {
     const res = await fetch(`${API_BASE}/server-ip`);
     return handleResponse(res);
   },
+
+  // WhatsApp Integration
+  getWhatsAppStatus: async (): Promise<{ isConnected: boolean; qrCodeDataUrl: string | null; targetGroupId: string | null; targetGroupName: string | null; inviteCode: string }> => {
+    const res = await fetch(`${API_BASE}/whatsapp/status`);
+    return handleResponse(res);
+  },
+  sendWhatsAppTest: async (): Promise<{ message: string }> => {
+    const res = await fetch(`${API_BASE}/whatsapp/test`, { method: 'POST' });
+    return handleResponse(res);
+  },
 };

@@ -3,9 +3,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   Database, Download, Upload, RotateCcw, Plus,
   CheckCircle2, AlertTriangle, Clock, HardDrive, Shield,
-  RefreshCw, CloudDownload, FolderOpen, X, AlertCircle, Trash2
+  RefreshCw, CloudDownload, FolderOpen, X, AlertCircle, Trash2,
+  MessageSquare, Send, QrCode, ExternalLink, Smartphone
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../services/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -172,7 +174,37 @@ export default function BackupManager() {
     }
   }, [addToast]);
 
-  useEffect(() => { fetchBackups(); }, [fetchBackups]);
+  // ── WhatsApp Alert Gateway Status ──────────────────────────────────────────
+  const [waStatus, setWaStatus] = useState<{ isConnected: boolean; qrCodeDataUrl: string | null; targetGroupId: string | null; targetGroupName: string | null; inviteCode: string } | null>(null);
+  const [waTesting, setWaTesting] = useState(false);
+
+  const fetchWhatsAppStatus = useCallback(async () => {
+    try {
+      const data = await api.getWhatsAppStatus();
+      setWaStatus(data);
+    } catch (e) {
+      console.error('Failed to fetch WhatsApp status', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBackups();
+    fetchWhatsAppStatus();
+    const interval = setInterval(fetchWhatsAppStatus, 5000);
+    return () => clearInterval(interval);
+  }, [fetchBackups, fetchWhatsAppStatus]);
+
+  const handleTestWhatsApp = async () => {
+    setWaTesting(true);
+    try {
+      const res = await api.sendWhatsAppTest();
+      addToast('success', res.message || 'Message de test envoyé sur WhatsApp !');
+    } catch (err: any) {
+      addToast('error', err.message || 'Échec de l\'envoi du message WhatsApp.');
+    } finally {
+      setWaTesting(false);
+    }
+  };
 
   // ── Delete a backup ───────────────────────────────────────────────────────
   async function handleDeleteBackup(filename: string) {
@@ -359,6 +391,110 @@ export default function BackupManager() {
             </div>
           </motion.div>
         </div>
+
+        {/* WhatsApp Alert Gateway Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
+          className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-6"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-slate-900">Alertes WhatsApp (Groupe)</h3>
+                  {waStatus?.isConnected ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Connecté
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                      <span className="w-2 h-2 rounded-full bg-amber-500" />
+                      En attente de scan QR
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Envoi automatique des alertes en cas d'arrêt machine ou de création d'ordre de travail
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {waStatus?.isConnected && (
+                <button
+                  onClick={handleTestWhatsApp}
+                  disabled={waTesting}
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all disabled:opacity-50"
+                >
+                  {waTesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  Envoyer Test Alert
+                </button>
+              )}
+              <button
+                onClick={fetchWhatsAppStatus}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors"
+                title="Actualiser le statut"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            {waStatus?.isConnected ? (
+              <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-emerald-900">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Groupe lié : <b>{waStatus.targetGroupName || 'Groupe WhatsApp'}</b></span>
+                  </div>
+                  <p className="text-[11px] font-mono text-emerald-700/80 ml-6">
+                    ID : {waStatus.targetGroupId || 'Connecté'}
+                  </p>
+                </div>
+                <a
+                  href={`https://chat.whatsapp.com/${waStatus.inviteCode || 'Hoz4wT17uRFDljP0ivZdXn'}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-emerald-200 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 transition-colors"
+                >
+                  <ExternalLink size={12} />
+                  Ouvrir le groupe WhatsApp
+                </a>
+              </div>
+            ) : waStatus?.qrCodeDataUrl ? (
+              <div className="flex flex-col md:flex-row items-center gap-6 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm shrink-0">
+                  <img src={waStatus.qrCodeDataUrl} alt="WhatsApp QR Code" className="w-44 h-44 block" />
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-slate-800 font-bold text-sm">
+                    <Smartphone className="w-4 h-4 text-blue-600" />
+                    <span>Comment connecter votre compte WhatsApp :</span>
+                  </div>
+                  <ol className="text-xs text-slate-600 space-y-1.5 list-decimal list-inside">
+                    <li>Ouvrez <b>WhatsApp</b> sur votre smartphone</li>
+                    <li>Allez dans <b>Appareils connectés</b> (Linked Devices)</li>
+                    <li>Appuyez sur <b>Connecter un appareil</b></li>
+                    <li>Scannez le QR Code affiché à gauche</li>
+                  </ol>
+                  <p className="text-[11px] text-slate-400 italic">
+                    Une fois scanné, la GMAO rejoindra automatiquement le groupe et commencera à diffuser les alertes.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center p-6 bg-slate-50 rounded-xl text-xs text-slate-400 gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
+                <span>Génération du QR Code WhatsApp en cours...</span>
+              </div>
+            )}
+          </div>
+        </motion.div>
 
         {/* Action buttons row */}
         <motion.div
