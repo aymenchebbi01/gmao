@@ -36,7 +36,7 @@ export default function MobileStatusUpdater({ machineId }: Props) {
   const [updating, setUpdating] = useState(false);
   const hasScanLogged = useRef(false);
 
-  const [view, setView] = useState<'details' | 'status' | 'report'>('details');
+  const [view, setView] = useState<'details' | 'status' | 'setup' | 'report'>('details');
   const [productInput, setProductInput] = useState('');
   const [mouleInput, setMouleInput] = useState('');
   const [conditionInput, setConditionInput] = useState('Good');
@@ -241,13 +241,7 @@ export default function MobileStatusUpdater({ machineId }: Props) {
 
       const updatePayload: any = {
         status: newStatus,
-        injectingProduct: productInput,
-        currentMoule: mouleInput,
-        condition: conditionInput,
         statusReason: (newStatus === 'operational' || newStatus === 'idle') ? '' : reasonInput,
-        qtyProduced: qtyProducedInput !== '' ? Number(qtyProducedInput) : null,
-        qtyGood: qtyGoodInput !== '' ? Number(qtyGoodInput) : null,
-        qtyBad: qtyBadInput !== '' ? Number(qtyBadInput) : null,
       };
 
       if (newStatus === 'operational' && oldStatus !== 'operational') {
@@ -270,12 +264,13 @@ export default function MobileStatusUpdater({ machineId }: Props) {
         await api.logMachineAction(
           'CHANGE_STATUS',
           machine.id,
-          'User "' + userLabel + '" updated Machine \'' + machine.name + '\' -> Status: ' + newStatus + ', Product: \'' + productInput + '\', Moule: \'' + mouleInput + '\', Condition: \'' + conditionInput + '\''
+          'User "' + userLabel + '" updated Machine \'' + machine.name + '\' -> Status: ' + newStatus + (reasonInput ? ', Reason: \'' + reasonInput + '\'' : '')
         );
       } catch (e) {}
 
-      toast.success('Machine status & setup updated successfully');
+      toast.success('Machine status updated to ' + newStatus.toUpperCase());
       if (newStatus === 'operational' || newStatus === 'idle') setReasonInput('');
+      setPendingStatus(null);
       setView('details');
     } catch (error) {
       console.error(error);
@@ -597,11 +592,22 @@ export default function MobileStatusUpdater({ machineId }: Props) {
             {/* Action Buttons */}
             <div className="space-y-3 pt-2">
               <button
-                onClick={() => setView('status')}
+                onClick={() => {
+                  setPendingStatus(null);
+                  setView('status');
+                }}
                 className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl shadow-lg shadow-blue-500/25 transition-all active:scale-95 flex items-center justify-center gap-2 text-sm"
               >
                 <Activity size={18} />
-                Update Status & Setup
+                Change Machine Status
+              </button>
+
+              <button
+                onClick={() => setView('setup')}
+                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-500/25 transition-all active:scale-95 flex items-center justify-center gap-2 text-sm"
+              >
+                <Layers size={18} />
+                Production Setup &amp; Quantities
               </button>
 
               {activeWorkOrder && (
@@ -618,7 +624,135 @@ export default function MobileStatusUpdater({ machineId }: Props) {
         ) : view === 'status' ? (
           <div className="space-y-5">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Update Machine Status</h2>
+              <div>
+                <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Change Machine Status</h2>
+                <p className="text-[10px] text-gray-500">Current: <span className="font-bold uppercase text-blue-600">{machine.status}</span></p>
+              </div>
+              <button onClick={() => setView('details')} className="text-blue-600 text-xs font-bold hover:underline">
+                Cancel
+              </button>
+            </div>
+
+            {/* Status Selectors */}
+            <div className="grid grid-cols-1 gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingStatus('operational');
+                  handleStatusChange('operational');
+                }}
+                disabled={updating}
+                className={cn(
+                  "flex items-center p-3.5 rounded-2xl border-2 transition-all text-left",
+                  machine.status === 'operational'
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-800 font-bold"
+                    : "border-gray-100 bg-white hover:border-emerald-200 text-gray-700"
+                )}
+              >
+                <div className="p-2 rounded-xl mr-3 bg-emerald-100 text-emerald-600">
+                  <CheckCircle2 size={22} />
+                </div>
+                <div className="flex-1">
+                  <span className="block text-sm font-bold">Operational</span>
+                  <span className="block text-[11px] text-gray-500">Machine is running in production</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPendingStatus('down')}
+                disabled={updating}
+                className={cn(
+                  "flex items-center p-3.5 rounded-2xl border-2 transition-all text-left",
+                  machine.status === 'down' || pendingStatus === 'down'
+                    ? "border-rose-500 bg-rose-50 text-rose-800 font-bold"
+                    : "border-gray-100 bg-white hover:border-rose-200 text-gray-700"
+                )}
+              >
+                <div className="p-2 rounded-xl mr-3 bg-rose-100 text-rose-600">
+                  <AlertCircle size={22} />
+                </div>
+                <div className="flex-1">
+                  <span className="block text-sm font-bold">Down (Breakdown)</span>
+                  <span className="block text-[11px] text-gray-500">Machine stopped due to malfunction</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPendingStatus('maintenance')}
+                disabled={updating}
+                className={cn(
+                  "flex items-center p-3.5 rounded-2xl border-2 transition-all text-left",
+                  machine.status === 'maintenance' || pendingStatus === 'maintenance'
+                    ? "border-amber-500 bg-amber-50 text-amber-800 font-bold"
+                    : "border-gray-100 bg-white hover:border-amber-200 text-gray-700"
+                )}
+              >
+                <div className="p-2 rounded-xl mr-3 bg-amber-100 text-amber-600">
+                  <Wrench size={22} />
+                </div>
+                <div className="flex-1">
+                  <span className="block text-sm font-bold">Maintenance</span>
+                  <span className="block text-[11px] text-gray-500">Scheduled or ongoing repair</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingStatus('idle');
+                  handleStatusChange('idle');
+                }}
+                disabled={updating}
+                className={cn(
+                  "flex items-center p-3.5 rounded-2xl border-2 transition-all text-left",
+                  machine.status === 'idle'
+                    ? "border-purple-500 bg-purple-50 text-purple-800 font-bold"
+                    : "border-gray-100 bg-white hover:border-purple-200 text-gray-700"
+                )}
+              >
+                <div className="p-2 rounded-xl mr-3 bg-purple-100 text-purple-600">
+                  <Clock size={22} />
+                </div>
+                <div className="flex-1">
+                  <span className="block text-sm font-bold">Idle / Standby</span>
+                  <span className="block text-[11px] text-gray-500">Turned off or awaiting mold/orders</span>
+                </div>
+              </button>
+            </div>
+
+            {/* Downtime Reason Box */}
+            {(pendingStatus === 'down' || pendingStatus === 'maintenance') && (
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-3">
+                <label className="block text-[11px] font-bold text-rose-800 uppercase tracking-wider">
+                  Reason for {pendingStatus} *
+                </label>
+                <textarea
+                  placeholder="Describe the issue or reason for downtime..."
+                  className="w-full px-3.5 py-2.5 bg-white border border-rose-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-rose-500/20 resize-none min-h-[80px]"
+                  value={reasonInput}
+                  onChange={(e) => setReasonInput(e.target.value)}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => handleStatusChange(pendingStatus!)}
+                  disabled={updating || !reasonInput.trim()}
+                  className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-md shadow-rose-500/20 transition-all active:scale-95 disabled:opacity-50 text-xs"
+                >
+                  {updating ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Confirm ' + pendingStatus + ' Status'}
+                </button>
+              </div>
+            )}
+          </div>
+        ) : view === 'setup' ? (
+          <div className="space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Production Setup &amp; Quantities</h2>
+                <p className="text-[10px] text-gray-500">Injected product, mold &amp; shift quantities</p>
+              </div>
               <button onClick={() => setView('details')} className="text-blue-600 text-xs font-bold hover:underline">
                 Cancel
               </button>
@@ -748,132 +882,12 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                 type="button"
                 onClick={handleSaveSetup}
                 disabled={updating}
-                className="w-full mt-2 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md shadow-blue-500/20 transition-all active:scale-95 flex items-center justify-center gap-2 text-xs"
+                className="w-full mt-2 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all active:scale-95 flex items-center justify-center gap-2 text-xs"
               >
                 {updating ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-                Save Product, Mold & Quantities
+                Save Product, Mold &amp; Quantities
               </button>
             </div>
-
-            {/* Separator */}
-            <div className="flex items-center gap-2 my-2">
-              <div className="flex-1 h-px bg-gray-200" />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">or change status</span>
-              <div className="flex-1 h-px bg-gray-200" />
-            </div>
-
-            {/* Status Selectors */}
-            <div className="grid grid-cols-1 gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setPendingStatus('operational');
-                  handleStatusChange('operational');
-                }}
-                disabled={updating}
-                className={cn(
-                  "flex items-center p-3.5 rounded-2xl border-2 transition-all text-left",
-                  machine.status === 'operational'
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-800 font-bold"
-                    : "border-gray-100 bg-white hover:border-emerald-200 text-gray-700"
-                )}
-              >
-                <div className="p-2 rounded-xl mr-3 bg-emerald-100 text-emerald-600">
-                  <CheckCircle2 size={22} />
-                </div>
-                <div className="flex-1">
-                  <span className="block text-sm font-bold">Operational</span>
-                  <span className="block text-[11px] text-gray-500">Machine is running in production</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPendingStatus('down')}
-                disabled={updating}
-                className={cn(
-                  "flex items-center p-3.5 rounded-2xl border-2 transition-all text-left",
-                  machine.status === 'down' || pendingStatus === 'down'
-                    ? "border-rose-500 bg-rose-50 text-rose-800 font-bold"
-                    : "border-gray-100 bg-white hover:border-rose-200 text-gray-700"
-                )}
-              >
-                <div className="p-2 rounded-xl mr-3 bg-rose-100 text-rose-600">
-                  <AlertCircle size={22} />
-                </div>
-                <div className="flex-1">
-                  <span className="block text-sm font-bold">Down (Breakdown)</span>
-                  <span className="block text-[11px] text-gray-500">Machine stopped due to malfunction</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPendingStatus('maintenance')}
-                disabled={updating}
-                className={cn(
-                  "flex items-center p-3.5 rounded-2xl border-2 transition-all text-left",
-                  machine.status === 'maintenance' || pendingStatus === 'maintenance'
-                    ? "border-amber-500 bg-amber-50 text-amber-800 font-bold"
-                    : "border-gray-100 bg-white hover:border-amber-200 text-gray-700"
-                )}
-              >
-                <div className="p-2 rounded-xl mr-3 bg-amber-100 text-amber-600">
-                  <Wrench size={22} />
-                </div>
-                <div className="flex-1">
-                  <span className="block text-sm font-bold">Maintenance</span>
-                  <span className="block text-[11px] text-gray-500">Scheduled or ongoing repair</span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setPendingStatus('idle');
-                  handleStatusChange('idle');
-                }}
-                disabled={updating}
-                className={cn(
-                  "flex items-center p-3.5 rounded-2xl border-2 transition-all text-left",
-                  machine.status === 'idle'
-                    ? "border-purple-500 bg-purple-50 text-purple-800 font-bold"
-                    : "border-gray-100 bg-white hover:border-purple-200 text-gray-700"
-                )}
-              >
-                <div className="p-2 rounded-xl mr-3 bg-purple-100 text-purple-600">
-                  <Clock size={22} />
-                </div>
-                <div className="flex-1">
-                  <span className="block text-sm font-bold">Idle / Standby</span>
-                  <span className="block text-[11px] text-gray-500">Turned off or awaiting mold/orders</span>
-                </div>
-              </button>
-            </div>
-
-            {/* Downtime Reason Box */}
-            {(pendingStatus === 'down' || pendingStatus === 'maintenance') && (
-              <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-3">
-                <label className="block text-[11px] font-bold text-rose-800 uppercase tracking-wider">
-                  Reason for {pendingStatus} *
-                </label>
-                <textarea
-                  placeholder="Describe the issue or reason for downtime..."
-                  className="w-full px-3.5 py-2.5 bg-white border border-rose-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-rose-500/20 resize-none min-h-[80px]"
-                  value={reasonInput}
-                  onChange={(e) => setReasonInput(e.target.value)}
-                  autoFocus
-                />
-                <button
-                  type="button"
-                  onClick={() => handleStatusChange(pendingStatus!)}
-                  disabled={updating || !reasonInput.trim()}
-                  className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-md shadow-rose-500/20 transition-all active:scale-95 disabled:opacity-50 text-xs"
-                >
-                  {updating ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Confirm ' + pendingStatus + ' Status'}
-                </button>
-              </div>
-            )}
           </div>
         ) : (
           /* Intervention Report Filing View */
