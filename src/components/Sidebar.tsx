@@ -103,7 +103,7 @@ export default function Sidebar({
         { id: 'layout', label: 'Factory Layout' },
         { id: 'machines', label: 'Machines' },
         { id: 'consultation', label: 'Consultation' },
-        { id: 'production-mold-history', label: 'Production History' },
+        { id: 'production-mold-history', label: 'Moule History' },
       ]
     },
     {
@@ -128,7 +128,7 @@ export default function Sidebar({
       roles: ['admin', 'manager', 'production', 'technician'],
       subItems: [
         { id: 'rendement', label: 'Rendement Machines' },
-        { id: 'production-rendement-overview', label: 'Rendement Overview' },
+        { id: 'production-rendement-overview', label: 'Rendement Site C' },
         { id: 'production-rendement-analysis', label: 'Rendement Analysis' },
       ]
     },
