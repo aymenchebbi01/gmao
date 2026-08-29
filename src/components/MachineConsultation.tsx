@@ -304,7 +304,7 @@ export default function MachineConsultation() {
                             ) : (
                                 <Save size={16} />
                             )}
-                            Save Changes
+                            Save
                         </button>
                     </div>
                 </div>

@@ -69,8 +69,8 @@ export default function ProductionPlanningView() {
     }, [planning]);
 
     const getOrderQty = (orderNum: string, setNum: string) => {
-        const order = orders.find(o => 
-            o.order_number.toLowerCase().trim() === orderNum.toLowerCase().trim() && 
+        const order = orders.find(o =>
+            o.order_number.toLowerCase().trim() === orderNum.toLowerCase().trim() &&
             o.set_number.toLowerCase().trim() === setNum.toLowerCase().trim()
         );
         return order ? order.quantity_expected : null;
@@ -96,7 +96,7 @@ export default function ProductionPlanningView() {
 
     const getAggregatedDeliveryStatus = (setNumber: string, orderNumbersStr?: string): 'yes' | 'no' | 'eliminated' | 'late' | 'in progress' | 'not ordered' => {
         const targetSet = setNumber.toLowerCase().trim();
-        const linkedOrderNumbers = orderNumbersStr 
+        const linkedOrderNumbers = orderNumbersStr
             ? orderNumbersStr.split(',').map(s => s.toLowerCase().trim()).filter(Boolean)
             : [];
 
@@ -483,13 +483,13 @@ export default function ProductionPlanningView() {
 
                                                     <div>
                                                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Linked Order Numbers</label>
-                                                        
+
                                                         <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px] items-center">
                                                             {editOrderNumbers.map((ordNum, idx) => {
                                                                 const qty = getOrderQty(ordNum, editFormData.set_number);
                                                                 return (
-                                                                    <span 
-                                                                        key={idx} 
+                                                                    <span
+                                                                        key={idx}
                                                                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100 shadow-sm"
                                                                     >
                                                                         {ordNum}{qty !== null ? ` (Qty: ${qty})` : ''}
@@ -649,7 +649,7 @@ export default function ProductionPlanningView() {
                                             type="submit"
                                             className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm transition-colors"
                                         >
-                                            Save Changes
+                                            Save
                                         </button>
                                     </div>
                                 </form>

@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../services/api';
 import { Machine, SparePart, InterventionPart, ProductionProduct } from '../types';
-import { 
-  CheckCircle2, 
-  AlertCircle, 
-  Clock, 
-  Wrench, 
-  HardDrive, 
-  Loader2, 
-  X, 
-  Plus, 
-  Layers, 
-  Box, 
-  MapPin, 
+import {
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Wrench,
+  HardDrive,
+  Loader2,
+  X,
+  Plus,
+  Layers,
+  Box,
+  MapPin,
   Activity,
   Save,
   Hash,
@@ -266,7 +266,7 @@ export default function MobileStatusUpdater({ machineId }: Props) {
           machine.id,
           'User "' + userLabel + '" updated Machine \'' + machine.name + '\' -> Status: ' + newStatus + (reasonInput ? ', Reason: \'' + reasonInput + '\'' : '')
         );
-      } catch (e) {}
+      } catch (e) { }
 
       toast.success('Machine status updated to ' + newStatus.toUpperCase());
       if (newStatus === 'operational' || newStatus === 'idle') setReasonInput('');
@@ -309,9 +309,9 @@ export default function MobileStatusUpdater({ machineId }: Props) {
           machine.id,
           'User "' + userLabel + '" updated setup for Machine \'' + machine.name + '\' -> Product: \'' + productInput + '\', Moule: \'' + mouleInput + '\', Qty: ' + (qtyProducedInput || 'N/A')
         );
-      } catch (e) {}
+      } catch (e) { }
 
-      toast.success('Product, mold setup & quantities saved successfully');
+      toast.success('saved successfully');
       setView('details');
     } catch (error) {
       console.error(error);
@@ -339,8 +339,8 @@ export default function MobileStatusUpdater({ machineId }: Props) {
 
       const startD = new Date(startTime);
       const endD = new Date(endTime);
-      const diff = (!isNaN(startD.getTime()) && !isNaN(endD.getTime())) 
-        ? Math.max(1, differenceInMinutes(endD, startD)) 
+      const diff = (!isNaN(startD.getTime()) && !isNaN(endD.getTime()))
+        ? Math.max(1, differenceInMinutes(endD, startD))
         : 30;
       const h = Math.floor(diff / 60);
       const m = diff % 60;
@@ -422,7 +422,7 @@ export default function MobileStatusUpdater({ machineId }: Props) {
           machine.id,
           'User "' + userLabel + '" resolved Work Order \'' + activeWorkOrder.id + '\' for Machine \'' + machine.name + '\'. Machine set to \'' + finalMachineStatus + '\'.'
         );
-      } catch (e) {}
+      } catch (e) { }
 
       toast.success('Intervention report filed & work order completed!');
 
@@ -482,8 +482,8 @@ export default function MobileStatusUpdater({ machineId }: Props) {
             <span className={cn(
               "w-3 h-3 rounded-full animate-pulse",
               machine.status === 'operational' ? "bg-emerald-400" :
-              machine.status === 'down' ? "bg-rose-400" :
-              machine.status === 'maintenance' ? "bg-amber-400" : "bg-purple-400"
+                machine.status === 'down' ? "bg-rose-400" :
+                  machine.status === 'maintenance' ? "bg-amber-400" : "bg-purple-400"
             )} />
             <span className="text-[11px] font-extrabold uppercase tracking-widest text-blue-200">
               {machine.status}
@@ -573,7 +573,7 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                   <span className={cn(
                     "font-bold mt-0.5 block",
                     machine.condition === 'Excellent' || machine.condition === 'Good' ? "text-emerald-600" :
-                    machine.condition === 'Fair' ? "text-amber-600" : "text-rose-600"
+                      machine.condition === 'Fair' ? "text-amber-600" : "text-rose-600"
                   )}>
                     {machine.condition || 'Good'}
                   </span>
@@ -751,7 +751,6 @@ export default function MobileStatusUpdater({ machineId }: Props) {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">Production Setup &amp; Quantities</h2>
-                <p className="text-[10px] text-gray-500">Injected product, mold &amp; shift quantities</p>
               </div>
               <button onClick={() => setView('details')} className="text-blue-600 text-xs font-bold hover:underline">
                 Cancel
@@ -852,7 +851,7 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                   </div>
                   <div>
                     <label className="block text-[9px] font-bold text-rose-600 uppercase tracking-wider mb-1">
-                      Bad (Scrap)
+                      Bad
                     </label>
                     <input
                       type="number"
@@ -866,15 +865,15 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                 </div>
 
                 {/* Non-blocking Qty Mismatch Warning */}
-                {qtyProducedInput !== '' && (qtyGoodInput !== '' || qtyBadInput !== '') && 
-                 (Number(qtyGoodInput || 0) + Number(qtyBadInput || 0) !== Number(qtyProducedInput)) && (
-                  <div className="flex items-start gap-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-800 font-medium leading-tight">
-                    <AlertTriangle size={12} className="text-amber-600 shrink-0 mt-0.5" />
-                    <span>
-                      Note: Good ({qtyGoodInput || 0}) + Bad ({qtyBadInput || 0}) = {Number(qtyGoodInput || 0) + Number(qtyBadInput || 0)} ≠ Total ({qtyProducedInput})
-                    </span>
-                  </div>
-                )}
+                {qtyProducedInput !== '' && (qtyGoodInput !== '' || qtyBadInput !== '') &&
+                  (Number(qtyGoodInput || 0) + Number(qtyBadInput || 0) !== Number(qtyProducedInput)) && (
+                    <div className="flex items-start gap-1.5 p-2 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-800 font-medium leading-tight">
+                      <AlertTriangle size={12} className="text-amber-600 shrink-0 mt-0.5" />
+                      <span>
+                        Note: Good ({qtyGoodInput || 0}) + Bad ({qtyBadInput || 0}) = {Number(qtyGoodInput || 0) + Number(qtyBadInput || 0)} ≠ Total ({qtyProducedInput})
+                      </span>
+                    </div>
+                  )}
               </div>
 
               {/* Dedicated Save Setup & Quantities Button */}
@@ -885,7 +884,7 @@ export default function MobileStatusUpdater({ machineId }: Props) {
                 className="w-full mt-2 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md shadow-indigo-500/20 transition-all active:scale-95 flex items-center justify-center gap-2 text-xs"
               >
                 {updating ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-                Save Product, Mold &amp; Quantities
+                Save
               </button>
             </div>
           </div>
@@ -1032,7 +1031,7 @@ export default function MobileStatusUpdater({ machineId }: Props) {
               {/* Spare Parts Used */}
               <div>
                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                  Spare Parts Used
+                  Stock Used
                 </label>
                 {partsUsed.map((p, idx) => (
                   <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg mb-1.5 text-xs">
@@ -1113,7 +1112,7 @@ export default function MobileStatusUpdater({ machineId }: Props) {
               className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl shadow-lg shadow-emerald-500/25 transition-all active:scale-95 flex items-center justify-center gap-2 text-sm disabled:opacity-50"
             >
               {updating ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
-              Submit Intervention Report
+              Save
             </button>
           </form>
         )}

@@ -484,7 +484,7 @@ export default function ProductionLinesMgmt() {
               type="submit"
               className="px-5 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 font-inter"
             >
-              Save Line
+              Save
             </button>
           </div>
         </form>

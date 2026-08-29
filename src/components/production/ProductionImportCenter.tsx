@@ -374,7 +374,7 @@ export default function ProductionImportCenter() {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 uppercase">Preview ({ordersPreview.length} orders parsed)</span>
                 <button onClick={confirmOrdersImport} disabled={loading} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase shadow-xs">
-                  {loading ? 'Saving...' : 'Confirm & Save Orders'}
+                  {loading ? 'Saving...' : 'Confirm & Save'}
                 </button>
               </div>
 
@@ -427,7 +427,7 @@ export default function ProductionImportCenter() {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 uppercase">Preview ({employeesPreview.length} employees parsed)</span>
                 <button onClick={confirmEmployeesImport} disabled={loading} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase shadow-xs">
-                  {loading ? 'Saving...' : 'Confirm & Save Employees'}
+                  {loading ? 'Saving...' : 'Confirm & Save'}
                 </button>
               </div>
 
@@ -474,7 +474,7 @@ export default function ProductionImportCenter() {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 uppercase">Preview ({planningPreview.length} items parsed)</span>
                 <button onClick={confirmPlanningImport} disabled={loading} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase shadow-xs">
-                  {loading ? 'Saving...' : 'Confirm & Save Planning'}
+                  {loading ? 'Saving...' : 'Confirm & Save'}
                 </button>
               </div>
 

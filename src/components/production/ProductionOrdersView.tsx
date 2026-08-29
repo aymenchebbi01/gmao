@@ -311,8 +311,8 @@ export default function ProductionOrdersView() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 shrink-0">
                     <div>
                         <h2 className="text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-3">
-                            {isEditModalOpen && selectedOrder 
-                                ? 'Edit Order Details' 
+                            {isEditModalOpen && selectedOrder
+                                ? 'Edit Order Details'
                                 : isAddModalOpen
                                     ? 'Add Manual Order'
                                     : 'Orders Consultation'}
@@ -401,7 +401,7 @@ export default function ProductionOrdersView() {
                                 <form onSubmit={handleEditSubmit} className="flex-1 flex flex-col overflow-hidden">
                                     <div className="flex-1 overflow-y-auto p-6 lg:p-8">
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-                                            
+
                                             {/* Left Column: Order Specifications */}
                                             <div className="bg-slate-50/40 border border-slate-100 rounded-2xl p-6 flex flex-col gap-5">
                                                 <div className="border-b border-slate-100 pb-3 flex items-center gap-2">
@@ -410,7 +410,7 @@ export default function ProductionOrdersView() {
                                                     </div>
                                                     <h4 className="text-sm font-bold text-slate-800">Order Specifications</h4>
                                                 </div>
-                                                
+
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                     <div>
                                                         <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Supplier *</label>
@@ -478,11 +478,10 @@ export default function ProductionOrdersView() {
                                                             value={getPlanWeekForSet(editFormData.set_number) || editFormData.week}
                                                             onChange={e => setEditFormData({ ...editFormData, week: e.target.value })}
                                                             placeholder={getPlanWeekForSet(editFormData.set_number) ? '' : "e.g. W22"}
-                                                            className={`w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none transition-all ${
-                                                                getPlanWeekForSet(editFormData.set_number)
+                                                            className={`w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none transition-all ${getPlanWeekForSet(editFormData.set_number)
                                                                     ? 'bg-slate-100 text-slate-500 cursor-not-allowed font-semibold'
                                                                     : 'bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
-                                                            }`}
+                                                                }`}
                                                         />
                                                     </div>
                                                 </div>
@@ -613,7 +612,7 @@ export default function ProductionOrdersView() {
                                             type="submit"
                                             className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-sm transition-colors"
                                         >
-                                            Save Changes
+                                            Save
                                         </button>
                                     </div>
                                 </form>
@@ -725,11 +724,10 @@ export default function ProductionOrdersView() {
                                                         value={getPlanWeekForSet(addFormData.set_number) || addFormData.week}
                                                         onChange={e => setAddFormData({ ...addFormData, week: e.target.value })}
                                                         placeholder={getPlanWeekForSet(addFormData.set_number) ? '' : "e.g. W22"}
-                                                        className={`w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none transition-all ${
-                                                            getPlanWeekForSet(addFormData.set_number)
+                                                        className={`w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none transition-all ${getPlanWeekForSet(addFormData.set_number)
                                                                 ? 'bg-slate-100 text-slate-500 cursor-not-allowed font-semibold'
                                                                 : 'bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
-                                                        }`}
+                                                            }`}
                                                     />
                                                 </div>
                                             </div>
