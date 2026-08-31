@@ -1832,7 +1832,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                       )}
                     </div>
                     <p className="text-xs text-gray-500 mb-3">
-                      Étape 1 : Choisissez la catégorie de la défaillance / Step 1: Select the cause category
+                      Step 1: Select the cause category
                     </p>
 
                     {/* Step 1: Category Selection */}
@@ -1878,7 +1878,7 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                     return (
                       <div className="space-y-3 pt-3 border-t border-gray-200/60 animate-in fade-in slide-in-from-top-1 duration-200">
                         <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          Étape 2 : Sélectionnez la cause précise / Step 2: Select specific cause ({currentCatObj.labelFr}) *
+                          Step 2: Select specific cause ({currentCatObj.labelFr}) *
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                           {currentCatObj.causes.map((cause) => {
@@ -1913,12 +1913,12 @@ export default function WorkOrderList({ view = 'list' }: WorkOrderListProps) {
                         {(interventionData.failureCategory === 'other' || interventionData.failureCause === 'other_custom') && (
                           <div className="pt-2">
                             <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                              Préciser la cause / Specify cause details *
+                              Specify cause details *
                             </label>
                             <input
                               type="text"
                               required
-                              placeholder="Veuillez détailler la cause exacte / Please describe the exact cause..."
+                              placeholder="Please describe the exact cause..."
                               className="w-full px-4 py-2.5 bg-white border border-blue-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
                               value={interventionData.relatedCause}
                               onChange={(e) => setInterventionData({ ...interventionData, relatedCause: e.target.value })}

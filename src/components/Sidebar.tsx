@@ -103,6 +103,7 @@ export default function Sidebar({
         { id: 'layout', label: 'Factory Layout' },
         { id: 'machines', label: 'Machines' },
         { id: 'consultation', label: 'Consultation' },
+        { id: 'shift-history', label: 'Shift History' },
         { id: 'production-mold-history', label: 'Moule History' },
       ]
     },
@@ -115,6 +116,7 @@ export default function Sidebar({
         { id: 'work-orders-list', label: 'Maintenance Orders' },
         { id: 'intervention-reports', label: 'Intervention Reports' },
         { id: 'downtime-analysis', label: 'Downtime Analysis' },
+        { id: 'shift-history', label: 'Shift History' },
         { id: 'calendar', label: 'Calendar' }
       ]
     },

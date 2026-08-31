@@ -36,6 +36,10 @@ export default function ProductManagement() {
     const [pageSize, setPageSize] = useState(15);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Import Preview State
+    const [importPreview, setImportPreview] = useState<ProductionProduct[] | null>(null);
+    const [importSaving, setImportSaving] = useState(false);
+
     const [formData, setFormData] = useState<Partial<ProductionProduct>>({
         item: '',
         description: '',
@@ -197,9 +201,8 @@ export default function ProductManagement() {
                     return;
                 }
 
-                await api.saveProducts(mappedProducts as ProductionProduct[]);
-                toast.success(`${mappedProducts.length} products imported successfully`);
-                fetchProducts();
+                // Show preview modal before committing to database
+                setImportPreview(mappedProducts as ProductionProduct[]);
                 if (fileInputRef.current) fileInputRef.current.value = '';
             } catch (error) {
                 toast.error('Error parsing Excel file');
@@ -207,6 +210,22 @@ export default function ProductManagement() {
             }
         };
         reader.readAsBinaryString(file);
+    };
+
+    const handleConfirmImport = async () => {
+        if (!importPreview || importPreview.length === 0) return;
+        setImportSaving(true);
+        try {
+            await api.saveProducts(importPreview);
+            toast.success(`${importPreview.length} products imported successfully`);
+            setImportPreview(null);
+            fetchProducts();
+        } catch (error) {
+            toast.error('Error saving imported products');
+            console.error(error);
+        } finally {
+            setImportSaving(false);
+        }
     };
 
     const filteredItems = products.filter(p =>
@@ -531,6 +550,88 @@ export default function ProductManagement() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Excel Import Review Modal */}
+            {importPreview && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+                    <div className="bg-white rounded-3xl p-6 w-full max-w-4xl shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between pb-4 border-b border-gray-100 shrink-0">
+                            <div>
+                                <h3 className="text-lg font-black text-gray-900 font-inter">
+                                    Review Imported Products ({importPreview.length} items parsed)
+                                </h3>
+                                <p className="text-xs text-gray-500 font-inter mt-0.5">
+                                    Please review the parsed product details below before confirming and saving to the database.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setImportPreview(null)}
+                                className="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-50"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="overflow-y-auto flex-1 my-4 border border-gray-100 rounded-2xl">
+                            <table className="w-full text-left text-xs font-inter">
+                                <thead className="bg-slate-50 text-slate-500 font-bold uppercase sticky top-0 border-b border-gray-100">
+                                    <tr>
+                                        <th className="px-4 py-3">Item / Code</th>
+                                        <th className="px-4 py-3">Description</th>
+                                        <th className="px-4 py-3">Color</th>
+                                        <th className="px-4 py-3 text-right">Cycle (s)</th>
+                                        <th className="px-4 py-3 text-right">Produced</th>
+                                        <th className="px-4 py-3 text-right">Price TN (TND)</th>
+                                        <th className="px-4 py-3 text-right">Price MT (€)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {importPreview.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-slate-50/50">
+                                            <td className="px-4 py-2.5 font-bold font-mono text-slate-900">{item.item}</td>
+                                            <td className="px-4 py-2.5 text-slate-700 max-w-[200px] truncate">{item.description || '—'}</td>
+                                            <td className="px-4 py-2.5 text-slate-600">{item.color || '—'}</td>
+                                            <td className="px-4 py-2.5 text-right font-mono text-blue-600">{item.cycleTime || 0}s</td>
+                                            <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-800">{(item.qtyProduced || 0).toLocaleString()}</td>
+                                            <td className="px-4 py-2.5 text-right font-mono font-bold text-emerald-600">{(item.priceTN || 0).toFixed(3)}</td>
+                                            <td className="px-4 py-2.5 text-right font-mono font-bold text-amber-600">{(item.priceMalta || 0).toFixed(3)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-gray-100 shrink-0">
+                            <span className="text-xs text-gray-500 font-medium">
+                                Ready to import <strong className="text-slate-900">{importPreview.length}</strong> valid items.
+                            </span>
+                            <div className="flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setImportPreview(null)}
+                                    disabled={importSaving}
+                                    className="px-4 py-2 text-xs font-bold text-gray-600 hover:text-gray-800 bg-gray-100 hover:bg-gray-200 rounded-xl transition-all"
+                                >
+                                    Cancel &amp; Discard
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmImport}
+                                    disabled={importSaving}
+                                    className="flex items-center gap-2 px-6 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-lg shadow-blue-500/20 disabled:opacity-60"
+                                >
+                                    {importSaving ? (
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <Save size={14} />
+                                    )}
+                                    Confirm &amp; Commit to Database
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}

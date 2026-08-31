@@ -12,6 +12,7 @@ import {
 import { api } from '../services/api';
 import { Machine, WorkOrder } from '../types';
 import { FAILURE_CAUSE_CATEGORIES } from './WorkOrderList';
+import TableFooter from './ui/TableFooter';
 
 // ─── Theme Colors ─────────────────────────────────────────────────────────────
 const C = {
@@ -278,6 +279,10 @@ export default function DowntimeAnalysis() {
   const [selectedMachineId, setSelectedMachineId] = useState<string>('');
   const [machineSearch, setMachineSearch] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+
+  // Table Pagination State
+  const [tablePage, setTablePage] = useState<number>(1);
+  const [tablePageSize, setTablePageSize] = useState<number>(10);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
@@ -816,10 +821,12 @@ export default function DowntimeAnalysis() {
                       </td>
                     </tr>
                   ) : (
-                    overallAnalysis.causesList.map((row, idx) => (
+                    overallAnalysis.causesList
+                      .slice((tablePage - 1) * tablePageSize, tablePage * tablePageSize)
+                      .map((row, idx) => (
                       <tr key={row.causeId} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-5 py-3.5 text-center font-bold text-slate-400">
-                          {idx + 1}
+                          {(tablePage - 1) * tablePageSize + idx + 1}
                         </td>
                         <td className="px-5 py-3.5">
                           <span className="font-bold text-slate-900">{row.name}</span>
@@ -889,6 +896,19 @@ export default function DowntimeAnalysis() {
                 </tbody>
               </table>
             </div>
+
+            {/* Standard Table Footer */}
+            <TableFooter
+              totalItems={overallAnalysis.causesList.length}
+              pageSize={tablePageSize}
+              currentPage={tablePage}
+              totalPages={Math.max(1, Math.ceil(overallAnalysis.causesList.length / tablePageSize))}
+              onPageSizeChange={size => {
+                setTablePageSize(size);
+                setTablePage(1);
+              }}
+              onPageChange={page => setTablePage(page)}
+            />
           </div>
         </div>
       )}

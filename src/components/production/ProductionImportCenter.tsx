@@ -370,33 +370,61 @@ export default function ProductionImportCenter() {
           </div>
 
           {ordersPreview.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 uppercase">Preview ({ordersPreview.length} orders parsed)</span>
-                <button onClick={confirmOrdersImport} disabled={loading} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase shadow-xs">
-                  {loading ? 'Saving...' : 'Confirm & Save'}
-                </button>
+            <div className="space-y-4 border border-blue-100 bg-blue-50/20 p-5 rounded-2xl animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-100">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Review Parsed Orders ({ordersPreview.length} records)
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    File: <span className="font-semibold text-slate-700">{ordersFile?.name}</span>. Please review the orders before committing to the database.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrdersPreview([]);
+                      setOrdersFile(null);
+                    }}
+                    disabled={loading}
+                    className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all"
+                  >
+                    Cancel / Discard
+                  </button>
+                  <button
+                    onClick={confirmOrdersImport}
+                    disabled={loading}
+                    className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+                  >
+                    {loading ? 'Saving...' : 'Confirm & Save Orders'}
+                  </button>
+                </div>
               </div>
 
-              <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl">
+              <div className="max-h-72 overflow-y-auto border border-gray-200 rounded-xl bg-white">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 font-bold text-slate-500 uppercase border-b">
+                  <thead className="bg-slate-50 font-bold text-slate-500 uppercase sticky top-0 border-b border-gray-100">
                     <tr>
                       <th className="p-2.5">Order #</th>
                       <th className="p-2.5">Supplier</th>
                       <th className="p-2.5">Set</th>
+                      <th className="p-2.5">Description</th>
                       <th className="p-2.5">Expected Date</th>
+                      <th className="p-2.5">Week</th>
                       <th className="p-2.5 text-right">Expected Qty</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {ordersPreview.slice(0, 10).map((o, i) => (
-                      <tr key={i}>
-                        <td className="p-2.5 font-mono font-bold">{o.order_number}</td>
-                        <td className="p-2.5">{o.supplier}</td>
-                        <td className="p-2.5">{o.set_number}</td>
-                        <td className="p-2.5">{o.expected_delivery_date}</td>
-                        <td className="p-2.5 text-right font-mono font-bold">{o.quantity_expected}</td>
+                  <tbody className="divide-y divide-gray-100">
+                    {ordersPreview.map((o, i) => (
+                      <tr key={i} className="hover:bg-slate-50/50">
+                        <td className="p-2.5 font-mono font-bold text-blue-700">{o.order_number}</td>
+                        <td className="p-2.5 text-slate-800">{o.supplier}</td>
+                        <td className="p-2.5 font-semibold text-slate-700">{o.set_number}</td>
+                        <td className="p-2.5 text-slate-600 max-w-[200px] truncate">{o.description || '—'}</td>
+                        <td className="p-2.5 text-slate-600">{o.expected_delivery_date}</td>
+                        <td className="p-2.5 font-mono text-slate-600">{o.week || '—'}</td>
+                        <td className="p-2.5 text-right font-mono font-bold text-slate-900">{o.quantity_expected?.toLocaleString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -423,26 +451,50 @@ export default function ProductionImportCenter() {
           </div>
 
           {employeesPreview.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 uppercase">Preview ({employeesPreview.length} employees parsed)</span>
-                <button onClick={confirmEmployeesImport} disabled={loading} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase shadow-xs">
-                  {loading ? 'Saving...' : 'Confirm & Save'}
-                </button>
+            <div className="space-y-4 border border-blue-100 bg-blue-50/20 p-5 rounded-2xl animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-100">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Review Parsed Employees ({employeesPreview.length} records)
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    File: <span className="font-semibold text-slate-700">{employeesFile?.name}</span>. Review employees before saving to database.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmployeesPreview([]);
+                      setEmployeesFile(null);
+                    }}
+                    disabled={loading}
+                    className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all"
+                  >
+                    Cancel / Discard
+                  </button>
+                  <button
+                    onClick={confirmEmployeesImport}
+                    disabled={loading}
+                    className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+                  >
+                    {loading ? 'Saving...' : 'Confirm & Save Employees'}
+                  </button>
+                </div>
               </div>
 
-              <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl">
+              <div className="max-h-72 overflow-y-auto border border-gray-200 rounded-xl bg-white">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 font-bold text-slate-500 uppercase border-b">
+                  <thead className="bg-slate-50 font-bold text-slate-500 uppercase sticky top-0 border-b border-gray-100">
                     <tr>
                       <th className="p-2.5">Matricule</th>
                       <th className="p-2.5">Full Name</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {employeesPreview.slice(0, 15).map((w, i) => (
-                      <tr key={i}>
-                        <td className="p-2.5 font-mono font-bold">{w.worker_id}</td>
+                  <tbody className="divide-y divide-gray-100">
+                    {employeesPreview.map((w, i) => (
+                      <tr key={i} className="hover:bg-slate-50/50">
+                        <td className="p-2.5 font-mono font-bold text-blue-700">{w.worker_id}</td>
                         <td className="p-2.5 font-semibold text-slate-800">{w.name}</td>
                       </tr>
                     ))}
@@ -470,31 +522,61 @@ export default function ProductionImportCenter() {
           </div>
 
           {planningPreview.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 uppercase">Preview ({planningPreview.length} items parsed)</span>
-                <button onClick={confirmPlanningImport} disabled={loading} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase shadow-xs">
-                  {loading ? 'Saving...' : 'Confirm & Save'}
-                </button>
+            <div className="space-y-4 border border-blue-100 bg-blue-50/20 p-5 rounded-2xl animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-100">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Review Parsed Planning Items ({planningPreview.length} records)
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    File: <span className="font-semibold text-slate-700">{planningFile?.name}</span>. Review planning records before saving.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPlanningPreview([]);
+                      setPlanningFile(null);
+                    }}
+                    disabled={loading}
+                    className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all"
+                  >
+                    Cancel / Discard
+                  </button>
+                  <button
+                    onClick={confirmPlanningImport}
+                    disabled={loading}
+                    className="flex items-center gap-1.5 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold uppercase shadow-sm shadow-blue-500/20 transition-all disabled:opacity-50"
+                  >
+                    {loading ? 'Saving...' : 'Confirm & Save Planning'}
+                  </button>
+                </div>
               </div>
 
-              <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl">
+              <div className="max-h-72 overflow-y-auto border border-gray-200 rounded-xl bg-white">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 font-bold text-slate-500 uppercase border-b">
+                  <thead className="bg-slate-50 font-bold text-slate-500 uppercase sticky top-0 border-b border-gray-100">
                     <tr>
                       <th className="p-2.5">Set</th>
                       <th className="p-2.5">Week</th>
                       <th className="p-2.5">Description</th>
                       <th className="p-2.5 text-right">Target Qty</th>
+                      <th className="p-2.5 text-right">Total Amount</th>
+                      <th className="p-2.5 text-right">In Box</th>
+                      <th className="p-2.5 text-right">Pallets</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {planningPreview.slice(0, 10).map((p, i) => (
-                      <tr key={i}>
-                        <td className="p-2.5 font-bold">{p.set_number}</td>
-                        <td className="p-2.5">{p.week}</td>
-                        <td className="p-2.5">{p.description}</td>
-                        <td className="p-2.5 text-right font-mono font-bold">{p.quantity}</td>
+                  <tbody className="divide-y divide-gray-100">
+                    {planningPreview.map((p, i) => (
+                      <tr key={i} className="hover:bg-slate-50/50">
+                        <td className="p-2.5 font-bold text-blue-700">{p.set_number}</td>
+                        <td className="p-2.5 font-mono text-slate-600">{p.week || '—'}</td>
+                        <td className="p-2.5 text-slate-700 max-w-[200px] truncate">{p.description || '—'}</td>
+                        <td className="p-2.5 text-right font-mono font-bold text-slate-900">{p.quantity?.toLocaleString()}</td>
+                        <td className="p-2.5 text-right font-mono text-emerald-600">{p.total_amount != null ? p.total_amount.toFixed(2) : '—'}</td>
+                        <td className="p-2.5 text-right font-mono text-slate-600">{p.total_number_in_box != null ? p.total_number_in_box : '—'}</td>
+                        <td className="p-2.5 text-right font-mono text-slate-600">{p.total_number_of_pallets != null ? p.total_number_of_pallets : '—'}</td>
                       </tr>
                     ))}
                   </tbody>

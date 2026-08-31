@@ -22,6 +22,7 @@ import BackupManager from './components/BackupManager';
 import ProductionRendementOverview from './components/production/ProductionRendementOverview';
 import ProductionRendementAnalysis from './components/production/ProductionRendementAnalysis';
 import DowntimeAnalysis from './components/DowntimeAnalysis';
+import ShiftHistory from './components/ShiftHistory';
 import ProductionMoldHistory from './components/ProductionMoldHistory';
 import ProductionDashboardView from './components/production/ProductionDashboardView';
 import ProductionOrdersView from './components/production/ProductionOrdersView';
@@ -252,6 +253,7 @@ function AppLayout() {
               <Route path="/work-orders-list" element={<WorkOrderList view="list" />} />
               <Route path="/intervention-reports" element={<WorkOrderList view="reports" />} />
               <Route path="/downtime-analysis" element={<RequireRole allowed={['admin', 'manager', 'technician']}><DowntimeAnalysis /></RequireRole>} />
+              <Route path="/shift-history" element={<RequireRole allowed={['admin', 'manager', 'technician']}><ShiftHistory /></RequireRole>} />
               <Route path="/production-mold-history" element={<ProductionMoldHistory />} />
               <Route path="/inventory" element={<Inventory />} />
               <Route path="/purchase-requests" element={<PurchaseRequests />} />

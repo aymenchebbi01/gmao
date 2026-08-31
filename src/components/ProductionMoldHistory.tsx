@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
+import TableFooter from './ui/TableFooter';
 
 interface ProductionHistoryEntry {
   id: number;
@@ -302,6 +303,10 @@ export default function ProductionMoldHistory() {
   const [sortField, setSortField] = useState<SortField>('startDate');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(13);
+
   // Edit and Delete States
   const [editingProduction, setEditingProduction] = useState<EditProductionForm | null>(null);
   const [deletingProductionId, setDeletingProductionId] = useState<number | null>(null);
@@ -349,6 +354,16 @@ export default function ProductionMoldHistory() {
     });
     return r;
   }, [rows, search, sortField, sortDir]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -555,7 +570,7 @@ export default function ProductionMoldHistory() {
                   </td>
                 </tr>
               ) : (
-                filtered.map(row => {
+                paginatedRows.map(row => {
                   return (
                     <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-4 py-3.5">
@@ -631,14 +646,18 @@ export default function ProductionMoldHistory() {
           </table>
         </div>
 
-        {/* Table Footer Summary */}
-        {filtered.length > 0 && (
-          <div className="px-4 py-3 bg-slate-50/60 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Showing {filtered.length} records
-            </span>
-          </div>
-        )}
+        {/* Table Footer with Pagination */}
+        <TableFooter
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageSizeChange={size => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+          onPageChange={page => setCurrentPage(page)}
+        />
       </div>
     </div>
   );

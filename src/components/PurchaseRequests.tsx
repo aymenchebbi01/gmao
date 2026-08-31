@@ -22,6 +22,7 @@ import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import { THERMOPLASTICS_LOGO_BASE64 } from '../constants/logo';
 import { useAuth } from '../contexts/AuthContext';
+import TableFooter from './ui/TableFooter';
 
 export interface PurchaseItem {
     id: string;
@@ -67,7 +68,7 @@ export default function PurchaseRequests() {
     const [historySearch, setHistorySearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
-    const PAGE_SIZE = 10;
+    const [pageSize, setPageSize] = useState(10);
 
     // Admin Edit modal state
     const [editingRequest, setEditingRequest] = useState<any | null>(null);
@@ -460,8 +461,8 @@ export default function PurchaseRequests() {
         return matchesSearch && matchesStatus;
     });
 
-    const totalPages = Math.ceil(filteredHistory.length / PAGE_SIZE) || 1;
-    const paginatedHistory = filteredHistory.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    const totalPages = Math.ceil(filteredHistory.length / pageSize) || 1;
+    const paginatedHistory = filteredHistory.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
     const statusCounts = {
         total: history.length,
@@ -755,56 +756,18 @@ export default function PurchaseRequests() {
                         </table>
                     </div>
 
-                    {/* Pagination Footer */}
-                    {totalPages > 1 && (
-                        <div className="px-6 py-4 border-t border-gray-50 flex items-center justify-between">
-                            <p className="text-xs text-gray-400">
-                                {filteredHistory.length} résultat{filteredHistory.length > 1 ? 's' : ''} — Page {currentPage} / {totalPages}
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => handlePageChange(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    ← Précédent
-                                </button>
-                                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
-                                    .reduce((acc: (number | string)[], p, idx, arr) => {
-                                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
-                                        acc.push(p);
-                                        return acc;
-                                    }, [])
-                                    .map((p, idx) =>
-                                        p === '...' ? (
-                                            <span key={`ellipsis-${idx}`} className="px-1 text-gray-400 text-xs">…</span>
-                                        ) : (
-                                            <button
-                                                key={p}
-                                                onClick={() => handlePageChange(p as number)}
-                                                className={cn(
-                                                    "w-8 h-8 text-xs font-medium rounded-lg transition-colors",
-                                                    currentPage === p
-                                                        ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
-                                                        : 'text-gray-600 hover:bg-gray-100'
-                                                )}
-                                            >
-                                                {p}
-                                            </button>
-                                        )
-                                    )
-                                }
-                                <button
-                                    onClick={() => handlePageChange(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                    Suivant →
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                    {/* Standard Table Footer */}
+                    <TableFooter
+                        totalItems={filteredHistory.length}
+                        pageSize={pageSize}
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        onPageSizeChange={size => {
+                            setPageSize(size);
+                            setCurrentPage(1);
+                        }}
+                        onPageChange={handlePageChange}
+                    />
                 </div>
             </div>
 

@@ -321,11 +321,22 @@ export default function BackupManager() {
       <AnimatePresence>
         {confirm && (
           <ConfirmDialog
-            title="Confirmer la restauration"
-            message={`Vous êtes sur le point de restaurer "${confirm.filename}". Toutes les données actuelles seront remplacées. Une sauvegarde de sécurité sera créée automatiquement avant la restauration.`}
-            confirmLabel="Restaurer"
-            danger
-            onConfirm={() => { handleRestore(confirm.filename); setConfirm(null); }}
+            title={confirm.type === 'delete' ? 'Confirmer la suppression' : 'Confirmer la restauration'}
+            message={
+              confirm.type === 'delete'
+                ? `Êtes-vous sûr de vouloir supprimer définitivement le fichier de sauvegarde "${confirm.filename}" ? Cette action est irréversible.`
+                : `Vous êtes sur le point de restaurer "${confirm.filename}". Toutes les données actuelles seront remplacées. Une sauvegarde de sécurité sera créée automatiquement avant la restauration.`
+            }
+            confirmLabel={confirm.type === 'delete' ? 'Supprimer' : 'Restaurer'}
+            danger={confirm.type === 'delete'}
+            onConfirm={() => {
+              if (confirm.type === 'delete') {
+                handleDeleteBackup(confirm.filename);
+              } else {
+                handleRestore(confirm.filename);
+              }
+              setConfirm(null);
+            }}
             onCancel={() => setConfirm(null)}
           />
         )}
