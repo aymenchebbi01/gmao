@@ -41,6 +41,9 @@ export async function initWhatsApp() {
 
     sock.ev.on('creds.update', saveCreds);
 
+    let reconnectDelay = 4000;   // starts at 4 s, doubles each attempt
+    const MAX_RECONNECT_DELAY = 60000; // cap at 60 s
+
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
@@ -61,25 +64,43 @@ export async function initWhatsApp() {
         isConnected = false;
         qrCodeDataUrl = null;
         const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        console.log(`⚠️ WhatsApp connection closed (status: ${statusCode}). Reconnecting: ${shouldReconnect}`);
 
-        if (shouldReconnect) {
-          setTimeout(() => {
-            isInitializing = false;
-            initWhatsApp();
-          }, 4000);
-        } else {
-          console.log('WhatsApp logged out. Clear whatsapp_auth folder to scan again.');
+        // 440 = connectionReplaced — another session took over this device slot.
+        // Reconnecting immediately just creates an infinite session-replacement
+        // fight. Stop here and let the existing session (phone/browser) stay.
+        if (statusCode === DisconnectReason.connectionReplaced) {
+          console.log('⚠️ WhatsApp session replaced by another client (status: 440). NOT reconnecting to avoid conflict. Restart the server to try again.');
           isInitializing = false;
+          return;
         }
+
+        // 401 = loggedOut — credentials no longer valid, clear auth so next
+        // initWhatsApp() starts fresh and shows a new QR code.
+        if (statusCode === DisconnectReason.loggedOut) {
+          console.log('WhatsApp logged out. Clearing auth folder — scan QR again.');
+          try { fs.rmSync(AUTH_FOLDER, { recursive: true, force: true }); } catch (_) {}
+          isInitializing = false;
+          return;
+        }
+
+        // For all other close reasons (network drop, timeout, etc.) reconnect
+        // with exponential backoff.
+        console.log(`⚠️ WhatsApp connection closed (status: ${statusCode}). Reconnecting in ${reconnectDelay / 1000}s…`);
+        setTimeout(() => {
+          isInitializing = false;
+          reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
+          initWhatsApp();
+        }, reconnectDelay);
+
       } else if (connection === 'open') {
         isConnected = true;
         qrCodeDataUrl = null;
+        reconnectDelay = 4000; // reset backoff on successful connection
         console.log('✅ WhatsApp successfully connected!');
 
-        // Join/Resolve the group invite link
-        if (INVITE_CODE && sock) {
+        // Only resolve the group ONCE — skip on every subsequent reconnect
+        // if we already have the JID stored.
+        if (INVITE_CODE && sock && !targetGroupId) {
           try {
             console.log(`Connecting to WhatsApp Group via invite code: ${INVITE_CODE}...`);
             try {
@@ -88,30 +109,37 @@ export async function initWhatsApp() {
                 targetGroupId = res;
                 console.log(`✅ Joined WhatsApp group! JID: ${targetGroupId}`);
               }
-            } catch (joinErr: any) {
-              const info = await sock.groupGetInviteInfo(INVITE_CODE);
-              if (info?.id) {
-                targetGroupId = info.id.includes('@g.us') ? info.id : `${info.id}@g.us`;
-                targetGroupName = info.subject || null;
-                console.log(`✅ WhatsApp target group resolved: "${targetGroupName}" (${targetGroupId})`);
-              }
-            }
-
-            if (targetGroupId) {
+            } catch (_joinErr: any) {
+              // Already a member — just resolve the JID without re-joining
               try {
-                const meta = await sock.groupMetadata(targetGroupId);
-                targetGroupName = meta.subject || targetGroupName;
-              } catch (e) { }
+                const info = await sock.groupGetInviteInfo(INVITE_CODE);
+                if (info?.id) {
+                  targetGroupId = info.id.includes('@g.us') ? info.id : `${info.id}@g.us`;
+                  targetGroupName = info.subject || null;
+                  console.log(`✅ WhatsApp target group resolved: "${targetGroupName}" (${targetGroupId})`);
+                }
+              } catch (infoErr) {
+                console.error('Failed to resolve group from invite info:', infoErr);
+              }
             }
           } catch (err) {
             console.error('Failed to join/resolve group invite code:', err);
           }
+        } else if (targetGroupId) {
+          console.log(`ℹ️ WhatsApp reconnected. Group already known: ${targetGroupId}`);
+        }
+
+        // Refresh group name on every (re)connect if JID is known
+        if (targetGroupId && sock) {
+          try {
+            const meta = await sock.groupMetadata(targetGroupId);
+            targetGroupName = meta.subject || targetGroupName;
+          } catch (_e) { /* ignore */ }
         }
       }
     });
   } catch (error) {
     console.error('Failed to initialize WhatsApp socket:', error);
-  } finally {
     isInitializing = false;
   }
 }
