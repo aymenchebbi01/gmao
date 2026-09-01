@@ -13,8 +13,7 @@ import {
   MachineConditionHistory,
   ProductionProduct,
   MachineRendement,
-  CalendarEvent,
-  BonLivraisonRecord
+  CalendarEvent
 } from '../types';
 
 const API_BASE = '/api';
@@ -308,28 +307,6 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
     });
-    await handleResponse(res);
-  },
-
-  // Bon de Livraison
-  getBonLivraisons: async (): Promise<BonLivraisonRecord[]> => {
-    const res = await fetch(`${API_BASE}/bon-livraison`);
-    return handleResponse(res);
-  },
-  getLastBonLivraisonRef: async (): Promise<{ lastRef: string | null; nextRef: string }> => {
-    const res = await fetch(`${API_BASE}/bon-livraison/last-ref`);
-    return handleResponse(res);
-  },
-  saveBonLivraison: async (data: any): Promise<{ id: number; reference: string }> => {
-    const res = await fetch(`${API_BASE}/bon-livraison`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return handleResponse(res);
-  },
-  deleteBonLivraison: async (id: number | string): Promise<void> => {
-    const res = await fetch(`${API_BASE}/bon-livraison/${id}`, { method: 'DELETE' });
     await handleResponse(res);
   },
 
