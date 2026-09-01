@@ -50,6 +50,31 @@ export interface Machine {
     position: [number, number, number];
     rotation: [number, number, number];
   };
+
+  // ── Technical specifications (all optional) ───────────────────────────────
+  // Closing
+  closingType?: string;
+  // Mold dimensions
+  moldThicknessMin?: number;
+  moldThicknessMax?: number;
+  centeringDiameter?: number;
+  tieBarSpacingHorizontal?: number;
+  tieBarSpacingVertical?: number;
+  // Strokes / cores
+  maxOpeningStroke?: number;
+  maxEjectionStroke?: number;
+  coreCount?: number;
+  // Injection
+  screwDiameter?: number;
+  maxInjectableVolume?: number;
+  coolingChannelCount?: number;
+  // Regulation / accessories
+  thermalRegulation?: string;
+  accessories?: string;
+  // Fluids
+  hydraulicOilType?: string;
+  lubricantType?: string;
+  reservoirCapacity?: number;
 }
 
 export interface MachineProductionHistory {
@@ -165,6 +190,30 @@ export interface SparePart {
   unit: string;
   updatedAt?: string;
   createdAt?: string;
+}
+
+export interface BonLivraisonItem {
+  partId?: string;
+  name: string;
+  sku: string;
+  quantity: number;
+  unit: string;
+  remarks: string;
+}
+
+export interface BonLivraisonRecord {
+  id: number;
+  reference: string;
+  date: string;
+  requested_by: string;
+  department?: string;
+  machine_id?: string;
+  machine_name?: string;
+  reason?: string;
+  notes?: string;
+  items_json?: string;
+  items_count?: number;
+  created_at?: string;
 }
 
 export interface AuditLog {

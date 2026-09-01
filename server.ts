@@ -67,6 +67,34 @@ try {
     console.log("Added statusReason column to machines table");
   }
 
+  // ── Technical specification columns (all optional) ────────────────────────
+  const specColumns: { name: string; type: string }[] = [
+    { name: 'closingType',              type: 'TEXT' },
+    { name: 'moldThicknessMin',         type: 'REAL' },
+    { name: 'moldThicknessMax',         type: 'REAL' },
+    { name: 'centeringDiameter',        type: 'REAL' },
+    { name: 'tieBarSpacingHorizontal',  type: 'REAL' },
+    { name: 'tieBarSpacingVertical',    type: 'REAL' },
+    { name: 'maxOpeningStroke',         type: 'REAL' },
+    { name: 'maxEjectionStroke',        type: 'REAL' },
+    { name: 'coreCount',                type: 'INTEGER' },
+    { name: 'screwDiameter',            type: 'REAL' },
+    { name: 'maxInjectableVolume',      type: 'REAL' },
+    { name: 'coolingChannelCount',      type: 'INTEGER' },
+    { name: 'thermalRegulation',        type: 'TEXT' },
+    { name: 'accessories',              type: 'TEXT' },
+    { name: 'hydraulicOilType',         type: 'TEXT' },
+    { name: 'lubricantType',            type: 'TEXT' },
+    { name: 'reservoirCapacity',        type: 'REAL' },
+  ];
+  for (const col of specColumns) {
+    const exists = tableInfo.some((c: any) => c.name === col.name);
+    if (!exists) {
+      db.prepare(`ALTER TABLE machines ADD COLUMN ${col.name} ${col.type}`).run();
+      console.log(`Added ${col.name} column to machines table`);
+    }
+  }
+
   // New table for production history (tracking product/mold changes)
   db.prepare(`
     CREATE TABLE IF NOT EXISTS machine_production_history (
@@ -118,6 +146,24 @@ try {
   } catch (e) {
     // Column already exists, ignore
   }
+
+  // New bon_livraison table for stock delivery notes
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS bon_livraison (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      reference TEXT UNIQUE NOT NULL,
+      date TEXT NOT NULL,
+      requested_by TEXT,
+      department TEXT,
+      machine_id TEXT,
+      machine_name TEXT,
+      reason TEXT,
+      notes TEXT,
+      items_json TEXT,
+      items_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
 
 } catch (error) {
   console.error("Migration error:", error);
@@ -391,6 +437,88 @@ app.delete('/api/purchase-requests/:id', (req, res) => {
   try {
     db.prepare('DELETE FROM purchase_requests WHERE id = ?').run(id);
     res.json({ message: 'Purchase request deleted' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ── Bon de Livraison Endpoints ───────────────────────────────────────────────
+app.get('/api/bon-livraison', (req, res) => {
+  try {
+    const records = db.prepare('SELECT * FROM bon_livraison ORDER BY id DESC').all();
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.get('/api/bon-livraison/last-ref', (req, res) => {
+  try {
+    const currentYear = new Date().getFullYear();
+    const prefix = `BL${currentYear}`;
+    const row = db.prepare(`
+      SELECT reference FROM bon_livraison
+      WHERE reference LIKE ?
+      ORDER BY reference DESC
+      LIMIT 1
+    `).get(`${prefix}%`) as { reference: string } | undefined;
+
+    let nextRef = `${prefix}0001`;
+    if (row && row.reference) {
+      const numPart = parseInt(row.reference.replace(prefix, ''), 10);
+      if (!isNaN(numPart)) {
+        const nextNum = (numPart + 1).toString().padStart(4, '0');
+        nextRef = `${prefix}${nextNum}`;
+      }
+    }
+    res.json({ lastRef: row ? row.reference : null, nextRef });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.post('/api/bon-livraison', (req, res) => {
+  let { reference, date, requested_by, department, machine_id, machine_name, reason, notes, items_json, items_count } = req.body;
+  try {
+    const currentYear = new Date().getFullYear();
+    const prefix = `BL${currentYear}`;
+
+    if (!reference || reference.startsWith('BL-') || reference === '') {
+      const row = db.prepare(`
+        SELECT reference FROM bon_livraison
+        WHERE reference LIKE ?
+        ORDER BY reference DESC
+        LIMIT 1
+      `).get(`${prefix}%`) as { reference: string } | undefined;
+
+      let nextNum = 1;
+      if (row && row.reference) {
+        const numPart = parseInt(row.reference.replace(prefix, ''), 10);
+        if (!isNaN(numPart)) {
+          nextNum = numPart + 1;
+        }
+      }
+      reference = `${prefix}${nextNum.toString().padStart(4, '0')}`;
+    }
+
+    const count = items_count !== undefined ? items_count : (items_json ? JSON.parse(items_json).length : 0);
+
+    const info = db.prepare(`
+      INSERT INTO bon_livraison (reference, date, requested_by, department, machine_id, machine_name, reason, notes, items_json, items_count)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(reference, date, requested_by, department, machine_id || null, machine_name || null, reason, notes, items_json, count);
+
+    res.json({ id: info.lastInsertRowid, reference });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+app.delete('/api/bon-livraison/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    db.prepare('DELETE FROM bon_livraison WHERE id = ?').run(id);
+    res.json({ message: 'Bon de livraison deleted' });
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

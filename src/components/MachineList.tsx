@@ -27,13 +27,14 @@ import Modal from './ui/Modal';
 import MachineHistory from './MachineHistory';
 import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
-import { Trash2, Edit2 } from 'lucide-react';
+import { Trash2, Edit2, FileText } from 'lucide-react';
 import { api } from '../services/api';
 import { exportToCSV } from '../lib/exportUtils';
 import { format } from 'date-fns';
 import TableFooter from './ui/TableFooter';
 import { useGmaoStore } from '../store/gmaoStore';
 import { useAuth } from '../contexts/AuthContext';
+import { generateFicheTechniquePdf } from '../lib/ficheTechniquePdf';
 
 interface MachineListProps {
   historyMachineId?: string | null;
@@ -107,6 +108,7 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
   };
 
   // Form state
+  const [showSpecs, setShowSpecs] = useState(false);
   const [formData, setFormData] = useState({
     id: '',
     name: '',
@@ -123,7 +125,25 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
     installationDate: '',
     currentHours: 0,
     imageUrl: '',
-    preventivePlan: [] as any[]
+    preventivePlan: [] as any[],
+    // Technical specifications (all optional)
+    closingType: '' as string | undefined,
+    moldThicknessMin: '' as number | string,
+    moldThicknessMax: '' as number | string,
+    centeringDiameter: '' as number | string,
+    tieBarSpacingHorizontal: '' as number | string,
+    tieBarSpacingVertical: '' as number | string,
+    maxOpeningStroke: '' as number | string,
+    maxEjectionStroke: '' as number | string,
+    coreCount: '' as number | string,
+    screwDiameter: '' as number | string,
+    maxInjectableVolume: '' as number | string,
+    coolingChannelCount: '' as number | string,
+    thermalRegulation: '' as string | undefined,
+    accessories: '' as string | undefined,
+    hydraulicOilType: '' as string | undefined,
+    lubricantType: '' as string | undefined,
+    reservoirCapacity: '' as number | string,
   });
 
   // Auto-update hours in form if operational
@@ -348,7 +368,13 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
         installationDate: '',
         currentHours: 0,
         imageUrl: '',
-        preventivePlan: []
+        preventivePlan: [],
+        closingType: '', moldThicknessMin: '', moldThicknessMax: '',
+        centeringDiameter: '', tieBarSpacingHorizontal: '', tieBarSpacingVertical: '',
+        maxOpeningStroke: '', maxEjectionStroke: '', coreCount: '',
+        screwDiameter: '', maxInjectableVolume: '', coolingChannelCount: '',
+        thermalRegulation: '', accessories: '', hydraulicOilType: '',
+        lubricantType: '', reservoirCapacity: '',
       });
     } catch (error) {
       console.error("Error saving machine:", error);
@@ -376,7 +402,25 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
       installationDate: machine.installationDate || '',
       currentHours: liveHours,
       imageUrl: machine.imageUrl || '',
-      preventivePlan: machine.preventivePlan || []
+      preventivePlan: machine.preventivePlan || [],
+      // Technical specifications
+      closingType: machine.closingType || '',
+      moldThicknessMin: machine.moldThicknessMin ?? '',
+      moldThicknessMax: machine.moldThicknessMax ?? '',
+      centeringDiameter: machine.centeringDiameter ?? '',
+      tieBarSpacingHorizontal: machine.tieBarSpacingHorizontal ?? '',
+      tieBarSpacingVertical: machine.tieBarSpacingVertical ?? '',
+      maxOpeningStroke: machine.maxOpeningStroke ?? '',
+      maxEjectionStroke: machine.maxEjectionStroke ?? '',
+      coreCount: machine.coreCount ?? '',
+      screwDiameter: machine.screwDiameter ?? '',
+      maxInjectableVolume: machine.maxInjectableVolume ?? '',
+      coolingChannelCount: machine.coolingChannelCount ?? '',
+      thermalRegulation: machine.thermalRegulation || '',
+      accessories: machine.accessories || '',
+      hydraulicOilType: machine.hydraulicOilType || '',
+      lubricantType: machine.lubricantType || '',
+      reservoirCapacity: machine.reservoirCapacity ?? '',
     });
     setIsEditMode(true);
     setIsModalOpen(true);
@@ -517,7 +561,13 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                     installationDate: '',
                     currentHours: 0,
                     imageUrl: '',
-                    preventivePlan: generateRecommendedPlan()
+                    preventivePlan: generateRecommendedPlan(),
+                    closingType: '', moldThicknessMin: '', moldThicknessMax: '',
+                    centeringDiameter: '', tieBarSpacingHorizontal: '', tieBarSpacingVertical: '',
+                    maxOpeningStroke: '', maxEjectionStroke: '', coreCount: '',
+                    screwDiameter: '', maxInjectableVolume: '', coolingChannelCount: '',
+                    thermalRegulation: '', accessories: '', hydraulicOilType: '',
+                    lubricantType: '', reservoirCapacity: '',
                   });
                   setIsModalOpen(true);
                 }}
@@ -705,6 +755,13 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                           title="QR Code"
                         >
                           <QrCode size={18} />
+                        </button>
+                        <button
+                          onClick={() => generateFicheTechniquePdf(item)}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                          title="Télécharger Fiche Technique (PDF)"
+                        >
+                          <FileText size={18} />
                         </button>
                         {canEdit && (
                           <button
@@ -972,6 +1029,175 @@ export default function MachineList({ historyMachineId, onHistoryClose }: Machin
                     onChange={(e) => setFormData({ ...formData, currentHours: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
+              </div>
+
+              {/* ── Technical Specifications (collapsible) ─────────────────────── */}
+              <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowSpecs(v => !v)}
+                  className="w-full flex items-center justify-between px-5 py-3 bg-gray-50/70 hover:bg-gray-100/70 transition-colors text-left"
+                >
+                  <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">⚙ Spécifications Techniques <span className="text-gray-400 font-normal normal-case">(optionnel)</span></span>
+                  <span className={cn("text-gray-400 transition-transform duration-200", showSpecs && "rotate-180")}>▼</span>
+                </button>
+
+                {showSpecs && (
+                  <div className="p-5 space-y-6">
+
+                    {/* Closing Type */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 ml-1">Type de fermeture</label>
+                      <input
+                        type="text"
+                        placeholder="ex: Hydraulique, Genouillère..."
+                        className="w-full px-4 py-3 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                        value={formData.closingType || ''}
+                        onChange={e => setFormData({ ...formData, closingType: e.target.value })}
+                      />
+                    </div>
+
+                    {/* Mold Dimensions */}
+                    <div>
+                      <h5 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3">Dimensions moule</h5>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {([
+                          { key: 'moldThicknessMin',        label: 'Épaisseur moule - Mini (mm)' },
+                          { key: 'moldThicknessMax',        label: 'Épaisseur moule - Maxi (mm)' },
+                          { key: 'centeringDiameter',       label: 'Diamètre de centrage (mm)' },
+                          { key: 'tieBarSpacingHorizontal', label: 'Passage colonnes - H (mm)' },
+                          { key: 'tieBarSpacingVertical',   label: 'Passage colonnes - V (mm)' },
+                        ] as { key: keyof typeof formData; label: string }[]).map(({ key, label }) => (
+                          <div key={key}>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">{label}</label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder="—"
+                              className="w-full px-3 py-2.5 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                              value={formData[key] as string}
+                              onChange={e => setFormData({ ...formData, [key]: e.target.value })}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Strokes / Cores */}
+                    <div>
+                      <h5 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3">Courses / Noyaux</h5>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {([
+                          { key: 'maxOpeningStroke',  label: 'Course ouverture maxi (mm)' },
+                          { key: 'maxEjectionStroke', label: 'Course éjection maxi (mm)' },
+                          { key: 'coreCount',         label: 'Nombre de noyaux' },
+                        ] as { key: keyof typeof formData; label: string }[]).map(({ key, label }) => (
+                          <div key={key}>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">{label}</label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder="—"
+                              className="w-full px-3 py-2.5 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                              value={formData[key] as string}
+                              onChange={e => setFormData({ ...formData, [key]: e.target.value })}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Injection */}
+                    <div>
+                      <h5 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3">Injection</h5>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {([
+                          { key: 'screwDiameter',        label: 'Diamètre vis (mm)' },
+                          { key: 'maxInjectableVolume',  label: 'Volume injectable maxi (cm³)' },
+                          { key: 'coolingChannelCount',  label: 'Nb canaux refroidis' },
+                        ] as { key: keyof typeof formData; label: string }[]).map(({ key, label }) => (
+                          <div key={key}>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">{label}</label>
+                            <input
+                              type="number"
+                              step="any"
+                              placeholder="—"
+                              className="w-full px-3 py-2.5 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                              value={formData[key] as string}
+                              onChange={e => setFormData({ ...formData, [key]: e.target.value })}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Regulation & Accessories */}
+                    <div>
+                      <h5 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3">Régulation / Accessoires</h5>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Régulation thermique</label>
+                          <input
+                            type="text"
+                            placeholder="ex: Eau, Huile..."
+                            className="w-full px-3 py-2.5 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                            value={formData.thermalRegulation || ''}
+                            onChange={e => setFormData({ ...formData, thermalRegulation: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Accessoires</label>
+                          <textarea
+                            rows={2}
+                            placeholder="ex: Robot, Convoyeur..."
+                            className="w-full px-3 py-2 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none"
+                            value={formData.accessories || ''}
+                            onChange={e => setFormData({ ...formData, accessories: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Fluids */}
+                    <div>
+                      <h5 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3">Fluides</h5>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Type d'huile hydraulique</label>
+                          <input
+                            type="text"
+                            placeholder="ex: ISO VG 46"
+                            className="w-full px-3 py-2.5 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                            value={formData.hydraulicOilType || ''}
+                            onChange={e => setFormData({ ...formData, hydraulicOilType: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Type de lubrifiant</label>
+                          <input
+                            type="text"
+                            placeholder="ex: Grease EP2"
+                            className="w-full px-3 py-2.5 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                            value={formData.lubricantType || ''}
+                            onChange={e => setFormData({ ...formData, lubricantType: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 ml-1">Capacité réservoir (L)</label>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="—"
+                            className="w-full px-3 py-2.5 bg-gray-50/50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                            value={formData.reservoirCapacity as string}
+                            onChange={e => setFormData({ ...formData, reservoirCapacity: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-gray-100 pt-6">

@@ -103,8 +103,7 @@ export default function Sidebar({
         { id: 'layout', label: 'Factory Layout' },
         { id: 'machines', label: 'Machines' },
         { id: 'consultation', label: 'Consultation' },
-        { id: 'shift-history', label: 'Shift History' },
-        { id: 'production-mold-history', label: 'Moule History' },
+        { id: 'production-mold-history', label: 'Injection History' },
       ]
     },
     {
@@ -115,13 +114,23 @@ export default function Sidebar({
       subItems: [
         { id: 'work-orders-list', label: 'Maintenance Orders' },
         { id: 'intervention-reports', label: 'Intervention Reports' },
+        { id: 'maintenance-history', label: 'Maintenance History' },
         { id: 'downtime-analysis', label: 'Downtime Analysis' },
         { id: 'shift-history', label: 'Shift History' },
         { id: 'calendar', label: 'Calendar' }
       ]
     },
 
-    { id: 'inventory', label: 'Stock', icon: Package, roles: ['admin', 'manager', 'technician'] },
+    {
+      id: 'stock-mgmt',
+      label: 'Stock',
+      icon: Package,
+      roles: ['admin', 'manager', 'technician'],
+      subItems: [
+        { id: 'inventory', label: 'Stock Magasin' },
+        { id: 'bon-livraison', label: 'Bon de Livraison' }
+      ]
+    },
 
     {
       id: 'production-mgmt',
