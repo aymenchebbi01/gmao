@@ -9,9 +9,7 @@ import {
     RefreshCw,
     Edit2,
     Save,
-    X,
-    FileText,
-    Download
+    X
 } from 'lucide-react';
 import { Machine } from '../types';
 import { api } from '../services/api';
@@ -20,7 +18,6 @@ import TableFooter from './ui/TableFooter';
 import Modal from './ui/Modal';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
-import { generateFicheTechniquePdf } from '../lib/ficheTechniquePdf';
 
 export default function MachineConsultation() {
     const { user } = useAuth();
@@ -35,7 +32,6 @@ export default function MachineConsultation() {
     const [newProduct, setNewProduct] = useState('');
     const [newMoule, setNewMoule] = useState('');
     const [saving, setSaving] = useState(false);
-    const [specMachine, setSpecMachine] = useState<Machine | null>(null);
 
     const fetchMachines = async () => {
         setLoading(true);
@@ -159,11 +155,7 @@ export default function MachineConsultation() {
                                 ))
                             ) : pagedItems.length > 0 ? (
                                 pagedItems.map((machine) => (
-                                <tr
-                                    key={machine.id}
-                                    className="hover:bg-blue-50/30 transition-colors group cursor-pointer"
-                                    onClick={() => setSpecMachine(machine)}
-                                >
+                                    <tr key={machine.id} className="hover:bg-blue-50/30 transition-colors group">
                                         <td className="px-6 py-4">
                                             <span className="inline-flex items-center px-2.5 py-1 text-blue-700 text-xs font-bold font-inter">
                                                 #{machine.siteNumber || 'N/A'}
@@ -209,30 +201,15 @@ export default function MachineConsultation() {
                                             )}
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end space-x-1">
+                                            {!isTechnician && (
                                                 <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        generateFicheTechniquePdf(machine);
-                                                    }}
+                                                    onClick={() => handleEditClick(machine)}
                                                     className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                    title="Télécharger Fiche Technique (PDF)"
+                                                    title="Update Injected Product"
                                                 >
-                                                    <FileText size={16} />
+                                                    <Edit2 size={16} />
                                                 </button>
-                                                {!isTechnician && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleEditClick(machine);
-                                                        }}
-                                                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                                        title="Update Injected Product"
-                                                    >
-                                                        <Edit2 size={16} />
-                                                    </button>
-                                                )}
-                                            </div>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -262,98 +239,6 @@ export default function MachineConsultation() {
                     onPageChange={setCurrentPage}
                 />
             </div>
-
-            {/* Technical Specs Detail Modal */}
-            <Modal
-                isOpen={!!specMachine}
-                onClose={() => setSpecMachine(null)}
-                title={`Fiche Technique — ${specMachine?.name}`}
-            >
-                {specMachine && (() => {
-                    const m = specMachine;
-                    const Row = ({ label, value }: { label: string; value?: string | number | null }) =>
-                        value !== undefined && value !== null && value !== '' ? (
-                            <div className="flex justify-between py-1.5 border-b border-gray-50 last:border-0">
-                                <span className="text-xs text-gray-500 font-medium">{label}</span>
-                                <span className="text-xs font-bold text-gray-900 text-right max-w-[55%]">{value}</span>
-                            </div>
-                        ) : null;
-
-                    const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-                        <div>
-                            <p className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-2">{title}</p>
-                            <div className="bg-gray-50/70 rounded-xl px-4 py-1">{children}</div>
-                        </div>
-                    );
-
-                    return (
-                        <div className="space-y-5 p-1">
-                            {/* Basic info */}
-                            <Section title="Identification">
-                                <Row label="Nom" value={m.name} />
-                                <Row label="S/N" value={m.serialNumber} />
-                                <Row label="Type" value={m.type} />
-                                <Row label="Année" value={m.manufacturingYear} />
-                                <Row label="Force de fermeture" value={m.clampingForce ? `${m.clampingForce} T` : undefined} />
-                                <Row label="Type de fermeture" value={m.closingType} />
-                            </Section>
-
-                            {(m.moldThicknessMin || m.moldThicknessMax || m.centeringDiameter ||
-                              m.tieBarSpacingHorizontal || m.tieBarSpacingVertical) && (
-                                <Section title="Dimensions Moule">
-                                    <Row label="Épaisseur Mini" value={m.moldThicknessMin ? `${m.moldThicknessMin} mm` : undefined} />
-                                    <Row label="Épaisseur Maxi" value={m.moldThicknessMax ? `${m.moldThicknessMax} mm` : undefined} />
-                                    <Row label="Ø Centrage" value={m.centeringDiameter ? `${m.centeringDiameter} mm` : undefined} />
-                                    <Row label="Colonnes H" value={m.tieBarSpacingHorizontal ? `${m.tieBarSpacingHorizontal} mm` : undefined} />
-                                    <Row label="Colonnes V" value={m.tieBarSpacingVertical ? `${m.tieBarSpacingVertical} mm` : undefined} />
-                                </Section>
-                            )}
-
-                            {(m.maxOpeningStroke || m.maxEjectionStroke || m.coreCount) && (
-                                <Section title="Courses / Noyaux">
-                                    <Row label="Course ouverture maxi" value={m.maxOpeningStroke ? `${m.maxOpeningStroke} mm` : undefined} />
-                                    <Row label="Course éjection maxi" value={m.maxEjectionStroke ? `${m.maxEjectionStroke} mm` : undefined} />
-                                    <Row label="Nombre de noyaux" value={m.coreCount} />
-                                </Section>
-                            )}
-
-                            {(m.screwDiameter || m.maxInjectableVolume || m.coolingChannelCount) && (
-                                <Section title="Injection">
-                                    <Row label="Ø Vis" value={m.screwDiameter ? `${m.screwDiameter} mm` : undefined} />
-                                    <Row label="Volume injectable maxi" value={m.maxInjectableVolume ? `${m.maxInjectableVolume} cm³` : undefined} />
-                                    <Row label="Canaux refroidis" value={m.coolingChannelCount} />
-                                </Section>
-                            )}
-
-                            {(m.thermalRegulation || m.accessories) && (
-                                <Section title="Régulation / Accessoires">
-                                    <Row label="Régulation thermique" value={m.thermalRegulation} />
-                                    <Row label="Accessoires" value={m.accessories} />
-                                </Section>
-                            )}
-
-                            {(m.hydraulicOilType || m.lubricantType || m.reservoirCapacity) && (
-                                <Section title="Fluides">
-                                    <Row label="Huile hydraulique" value={m.hydraulicOilType} />
-                                    <Row label="Lubrifiant" value={m.lubricantType} />
-                                    <Row label="Capacité réservoir" value={m.reservoirCapacity ? `${m.reservoirCapacity} L` : undefined} />
-                                </Section>
-                            )}
-
-                            <div className="pt-3 border-t border-gray-100 flex justify-end gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => generateFicheTechniquePdf(m)}
-                                    className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-md shadow-blue-500/20"
-                                >
-                                    <Download size={14} />
-                                    Télécharger Fiche Technique (PDF)
-                                </button>
-                            </div>
-                        </div>
-                    );
-                })()}
-            </Modal>
 
             {/* Edit Product Modal */}
             <Modal

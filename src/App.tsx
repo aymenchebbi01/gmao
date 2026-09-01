@@ -31,8 +31,6 @@ import ProductionLinesMgmt from './components/production/ProductionLinesMgmt';
 import ProductionWorkersMgmt from './components/production/ProductionWorkersMgmt';
 import ProductionManagement from './components/production/ProductionManagement';
 import ProductionImportCenter from './components/production/ProductionImportCenter';
-import MachineHistoryView from './components/MachineHistoryView';
-import BonLivraison from './components/BonLivraison';
 import { Toaster } from 'sonner';
 import { cn, calculateMachineLiveHours } from './lib/utils';
 import { api } from './services/api';
@@ -256,11 +254,8 @@ function AppLayout() {
               <Route path="/intervention-reports" element={<WorkOrderList view="reports" />} />
               <Route path="/downtime-analysis" element={<RequireRole allowed={['admin', 'manager', 'technician']}><DowntimeAnalysis /></RequireRole>} />
               <Route path="/shift-history" element={<RequireRole allowed={['admin', 'manager', 'technician']}><ShiftHistory /></RequireRole>} />
-              <Route path="/maintenance-history" element={<RequireRole allowed={['admin', 'manager', 'technician']}><MachineHistoryView /></RequireRole>} />
-              <Route path="/machine-history-view" element={<RequireRole allowed={['admin', 'manager', 'technician']}><MachineHistoryView /></RequireRole>} />
               <Route path="/production-mold-history" element={<ProductionMoldHistory />} />
               <Route path="/inventory" element={<Inventory />} />
-              <Route path="/bon-livraison" element={<RequireRole allowed={['admin', 'manager', 'technician']}><BonLivraison /></RequireRole>} />
               <Route path="/purchase-requests" element={<PurchaseRequests />} />
               <Route path="/calendar" element={<MaintenanceCalendar setActiveTab={setActiveTab} />} />
               <Route path="/audit-logs" element={<RequireRole allowed="admin"><AuditLogList /></RequireRole>} />
